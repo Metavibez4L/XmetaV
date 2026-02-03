@@ -12,10 +12,11 @@ chmod +x /home/manifest/projects/XmetaV/scripts/openclaw-fix.sh
 
 | # | Check | Command | Expected | If Fails |
 |---|-------|---------|----------|----------|
-| 1 | Ollama running | `curl -s http://127.0.0.1:11434/api/tags` | JSON with models list | `ollama serve` or `snap start ollama` |
+| 1 | Ollama running | `curl -s http://127.0.0.1:11434/api/tags` | JSON with models list | `ollama serve` |
 | 2 | Model available | `curl -s http://127.0.0.1:11434/api/tags \| grep qwen2.5:7b-instruct` | Match found | `ollama pull qwen2.5:7b-instruct` |
-| 3 | No stale locks | `find ~/.openclaw-dev -name "*.lock"` | No output | `find ~/.openclaw-dev -name "*.lock" -delete` |
-| 4 | No zombie procs | `pgrep -f 'openclaw\|gateway'` | No output | `pkill -9 -f openclaw` |
+| 3 | GPU enabled | `curl -s http://127.0.0.1:11434/api/ps \| grep size_vram` | `size_vram > 0` | Reinstall native Ollama (not snap) |
+| 4 | No stale locks | `find ~/.openclaw-dev -name "*.lock"` | No output | `find ~/.openclaw-dev -name "*.lock" -delete` |
+| 5 | No zombie procs | `pgrep -f 'openclaw\|gateway'` | No output | `pkill -9 -f openclaw` |
 
 ---
 
@@ -46,20 +47,27 @@ openclaw --profile dev models list
 ---
 
 ### Step 3: Agent Response (THE MAIN TEST)
+
+**Use `--local` mode** (bypasses gateway websocket issues):
 ```bash
 openclaw --profile dev agent \
   --agent dev \
+  --local \
   --session-id test_ok_$(date +%s) \
-  --message "Say OK and print provider+model"
+  --message "Say hello briefly"
 ```
-**Expected output must include:**
-- The word `OK`
-- `ollama/qwen2.5:7b-instruct` (or similar provider/model string)
+**Expected:**
+- Response in 2-4 seconds (GPU) or 30+ seconds (CPU)
+- JSON with `payloads` containing assistant response
 
-**If hangs ("Waiting for agent reply…"):**
-1. Check `~/.openclaw-dev/gateway.log` for errors
-2. Verify Ollama responds: `curl http://127.0.0.1:11434/v1/chat/completions -d '{"model":"qwen2.5:7b-instruct","messages":[{"role":"user","content":"hi"}]}'`
-3. Ensure `api` is `openai-chat-completions` (not `openai-completions`)
+**If hangs:**
+1. Check GPU is being used: `curl -s http://127.0.0.1:11434/api/ps | grep size_vram`
+2. If `size_vram: 0`, reinstall Ollama natively (not snap):
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull qwen2.5:7b-instruct
+   ```
+3. Verify Ollama responds: `curl http://127.0.0.1:11434/v1/chat/completions -d '{"model":"qwen2.5:7b-instruct","messages":[{"role":"user","content":"hi"}]}'`
 
 ---
 

@@ -64,8 +64,11 @@ XmetaV/
 |-------------|---------|---------------|
 | OpenClaw CLI | 2026.2.1+ | `openclaw --version` |
 | Node.js | 22.x | `node --version` |
-| Ollama | Latest | `ollama --version` |
+| Ollama | Latest (native install) | `ollama --version` |
+| NVIDIA GPU | CUDA support | `nvidia-smi` |
 | WSL2 (if Windows) | 2.0+ | `wsl --version` |
+
+> ⚠️ **Important**: Use the **native Ollama installer** (`curl -fsSL https://ollama.com/install.sh | sh`), NOT the snap version. Snap Ollama lacks proper CUDA/GPU support and will run on CPU only.
 
 ### 1. Clone & Setup
 
@@ -92,8 +95,12 @@ This script will:
 
 ```bash
 openclaw --profile dev health
-openclaw --profile dev agent --agent dev --session-id test --message "Say hello"
+
+# Use --local flag for reliable agent calls (bypasses gateway websocket)
+openclaw --profile dev agent --agent dev --local --session-id test --message "Say hello"
 ```
+
+> **Note**: The `--local` flag runs the agent embedded (bypasses gateway websocket). This is the recommended mode for local Ollama usage.
 
 ---
 

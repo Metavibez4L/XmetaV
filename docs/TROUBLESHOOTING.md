@@ -6,8 +6,17 @@ This guide targets OpenClaw 2026.2.1 on WSL2 without systemd.
 
 - Profile: `dev`
 - Gateway: local, loopback, port 19001
-- Ollama: `http://127.0.0.1:11434`
+- Ollama: `http://127.0.0.1:11434` (native install, NOT snap)
 - Provider API: `openai-completions`
+- Agent mode: `--local` (recommended for reliability)
+
+### Performance expectations (with GPU)
+| Metric | Expected |
+|--------|----------|
+| Agent response time | 2-4 seconds |
+| Token generation | 40-55 tokens/sec |
+| Prompt eval | 800+ tokens/sec |
+| VRAM usage | ~4.9 GB |
 
 Run the full repair + verify:
 ```bash
@@ -41,10 +50,33 @@ Run the full repair + verify:
 
 ## Problem: Agent hangs ("Waiting for agent reply…")
 
-### Common cause: wrong Ollama API mode
-If `models.providers.ollama.api` is set to something other than `openai-completions`, OpenClaw may reject it or behave unexpectedly.
+### Cause 1: Gateway websocket connection issue
+The gateway websocket can hang on WSL2. **Use `--local` mode** to bypass:
+```bash
+openclaw --profile dev agent --agent dev --local --message "Hi"
+```
 
-Fix:
+### Cause 2: Ollama running on CPU (snap version)
+If using snap Ollama, it lacks CUDA support. Check with:
+```bash
+curl -s http://127.0.0.1:11434/api/ps | grep size_vram
+# If size_vram: 0, GPU is not being used
+```
+
+**Fix**: Install native Ollama with CUDA:
+```bash
+sudo snap disable ollama 2>/dev/null
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:7b-instruct
+```
+
+Verify GPU is working (should show ~4-5GB VRAM usage):
+```bash
+nvidia-smi
+```
+
+### Cause 3: Wrong API mode
+OpenClaw 2026.2.1 requires `openai-completions` (NOT `openai-chat-completions`):
 ```bash
 openclaw --profile dev config set models.providers.ollama.api openai-completions
 openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
@@ -54,8 +86,9 @@ openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0
 ```bash
 curl -s http://127.0.0.1:11434/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{"model":"qwen2.5:7b-instruct","messages":[{"role":"user","content":"Say OK"}]}' | head -c 400 && echo
+  -d '{"model":"qwen2.5:7b-instruct","messages":[{"role":"user","content":"Say OK"}]}'
 ```
+Expected: Response in <1 second with GPU, 10+ seconds on CPU.
 
 ## Problem: Session lock hangs / stale .jsonl.lock
 

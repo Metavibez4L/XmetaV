@@ -1,23 +1,42 @@
 # Ollama Setup — OpenClaw Integration (WSL2/Linux)
 
-This command center assumes Ollama is running locally and OpenClaw uses Ollama via the OpenAI-compatible API.
+This command center assumes Ollama is running locally with **GPU acceleration** and OpenClaw uses Ollama via the OpenAI-compatible API.
 
 ## Requirements
 
+- **NVIDIA GPU** with CUDA support (tested: RTX 4070)
 - Ollama reachable at: `http://127.0.0.1:11434`
 - Model installed: `qwen2.5:7b-instruct`
 
-## Verify Ollama is running
+> ⚠️ **CRITICAL**: Use the **native Ollama installer**, NOT snap. Snap Ollama does not have proper CUDA support.
+
+## Install Ollama (Native with CUDA)
 
 ```bash
-curl -s http://127.0.0.1:11434/api/tags
+# Remove snap version if present
+sudo snap disable ollama 2>/dev/null
+
+# Install native Ollama with CUDA support
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull the model
+ollama pull qwen2.5:7b-instruct
 ```
-Expected: JSON output listing installed models.
 
-If Ollama is not running, start it (depending on how you installed it):
+## Verify Ollama is running with GPU
 
-- If installed via the official installer: `ollama serve`
-- If installed as a service: start via your system’s service mechanism
+```bash
+# Check Ollama is responding
+curl -s http://127.0.0.1:11434/api/tags
+
+# Check GPU is being used (size_vram should be > 0)
+curl -s http://127.0.0.1:11434/api/ps
+
+# Verify NVIDIA driver
+nvidia-smi
+```
+
+Expected: `size_vram` shows ~4-5 GB for qwen2.5:7b-instruct.
 
 ## Ensure model is present
 
@@ -54,14 +73,26 @@ openclaw --profile dev config set models.providers.ollama.api openai-completions
 
 ## Context window
 
-For `qwen2.5:7b-instruct`, the model metadata often reports a max context of 32768.
+For `qwen2.5:7b-instruct`, the model supports 32768 context window.
 
-Check:
 ```bash
-curl -s http://127.0.0.1:11434/api/show -d '{"name":"qwen2.5:7b-instruct"}' \
-  | grep -o '"qwen2.context_length":[0-9]*'
+curl -s http://127.0.0.1:11434/api/show -d '{"name":"qwen2.5:7b-instruct"}' | grep context
 ```
 
-OpenClaw should set `contextWindow` to match the model max context.
+## Performance Benchmarks (RTX 4070)
 
-If you want to be conservative for speed/stability, set a smaller `contextWindow` and/or `maxTokens` in OpenClaw.
+| Metric | GPU (Native) | CPU (Snap) |
+|--------|--------------|------------|
+| Prompt eval | 827 tokens/s | 7 tokens/s |
+| Token generation | 42-54 tokens/s | 7 tokens/s |
+| VRAM usage | 4.9 GB | 0 GB |
+| Response time | 2-4 sec | 30+ sec |
+
+## Recommended OpenClaw Usage
+
+For reliable agent calls, use `--local` mode:
+```bash
+openclaw --profile dev agent --agent dev --local --message "Your prompt"
+```
+
+The `--local` flag runs the agent embedded, bypassing gateway websocket issues on WSL2.
