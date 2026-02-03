@@ -319,6 +319,17 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 
 ---
 
+## 🐙 GitHub Skill Integration
+
+The GitHub skill is now installed, authenticated, and working with OpenClaw agents.
+
+- To use: `/github help`, `/github status`, `/github issue list`, etc.
+- Requires: GitHub CLI (`gh`) installed and authenticated (`gh auth login`).
+- If agent output is empty, check authentication and repo context.
+- See [docs/GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) for troubleshooting and status.
+
+---
+
 ## 🛠️ Development
 
 ### Adding New Scripts
