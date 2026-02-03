@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+#
+# OpenClaw 2026.2.1 - WSL2 "Golden Path" Fix Script
+# -------------------------------------------------
+# Fixes: gateway connection (1006), agent hangs, stale locks, API mode
+# Profile: dev (state dir: ~/.openclaw-dev)
+# Idempotent: safe to run multiple times
+#
+set -euo pipefail
+
+PROFILE="dev"
+STATE_DIR="$HOME/.openclaw-dev"
+CONFIG_FILE="$STATE_DIR/openclaw.json"
+GATEWAY_PORT=19001
+OLLAMA_URL="http://127.0.0.1:11434"
+
+echo "🦞 OpenClaw WSL2 Fix Script"
+echo "==========================="
+echo ""
+
+# ────────────────────────────────────────────────────────────────────────────
+# 1. Kill stale openclaw/gateway processes
+# ────────────────────────────────────────────────────────────────────────────
+echo "▶ [1/6] Killing stale openclaw/gateway processes..."
+pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
+pkill -9 -f "node.*openclaw" 2>/dev/null || true
+# Also kill anything holding the port
+fuser -k ${GATEWAY_PORT}/tcp 2>/dev/null || true
+sleep 1
+echo "   ✓ Done"
+
+# ────────────────────────────────────────────────────────────────────────────
+# 2. Remove stale lock files (sessions/*.jsonl.lock)
+# ────────────────────────────────────────────────────────────────────────────
+echo "▶ [2/6] Removing stale lock files..."
+find "$STATE_DIR" -name "*.lock" -type f -delete 2>/dev/null || true
+echo "   ✓ Done"
+
+# ────────────────────────────────────────────────────────────────────────────
+# 3. Verify Ollama is reachable
+# ────────────────────────────────────────────────────────────────────────────
+echo "▶ [3/6] Verifying Ollama is reachable at $OLLAMA_URL..."
+if ! curl -sf "$OLLAMA_URL/api/tags" >/dev/null 2>&1; then
+    echo "   ✗ ERROR: Ollama not reachable at $OLLAMA_URL"
+    echo "   → Start Ollama first: ollama serve (or check snap/systemd status)"
+    exit 1
+fi
+echo "   ✓ Ollama is running"
+
+# ────────────────────────────────────────────────────────────────────────────
+# 4. Patch openclaw.json config
+# ────────────────────────────────────────────────────────────────────────────
+echo "▶ [4/6] Patching $CONFIG_FILE..."
+
+# Backup current config
+cp "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%s)"
+
+# Apply fixes using openclaw config set (validates keys)
+# Fix 1: gateway.mode = "local" (run gateway in-process or spawn it)
+openclaw --profile "$PROFILE" config set gateway.mode local
+
+# Fix 2: ollama API mode = openai-chat-completions (for chat-based agents)
+openclaw --profile "$PROFILE" config set models.providers.ollama.api openai-chat-completions
+
+# Fix 3: Remove the /v1 suffix from baseUrl (Ollama's OpenAI-compat endpoint is /v1/chat/completions,
+#        but the SDK adds /v1 itself when api=openai-chat-completions)
+# Actually, Ollama's /v1/chat/completions works at http://host:11434/v1/chat/completions
+# so baseUrl should be http://127.0.0.1:11434/v1 OR http://127.0.0.1:11434 depending on SDK.
+# OpenClaw with api=openai-chat-completions expects baseUrl WITHOUT /v1 suffix.
+openclaw --profile "$PROFILE" config set models.providers.ollama.baseUrl "http://127.0.0.1:11434"
+
+echo "   ✓ Config patched"
+
+# ────────────────────────────────────────────────────────────────────────────
+# 5. Start gateway in background (foreground for first verification)
+# ────────────────────────────────────────────────────────────────────────────
+echo "▶ [5/6] Starting gateway on port $GATEWAY_PORT..."
+
+# Start gateway in background with --force to claim the port
+nohup openclaw --profile "$PROFILE" gateway --port "$GATEWAY_PORT" --force --verbose \
+    > "$STATE_DIR/gateway.log" 2>&1 &
+GATEWAY_PID=$!
+echo "   Gateway PID: $GATEWAY_PID"
+
+# Wait for gateway to be ready
+echo "   Waiting for gateway port to accept connections..."
+for i in {1..15}; do
+    if timeout 1 bash -lc "</dev/tcp/127.0.0.1/$GATEWAY_PORT" >/dev/null 2>&1; then
+        echo "   ✓ Gateway port is open"
+        break
+    fi
+    if [ $i -eq 15 ]; then
+        echo "   ✗ Gateway failed to start. Check $STATE_DIR/gateway.log"
+        tail -20 "$STATE_DIR/gateway.log" 2>/dev/null || true
+        exit 1
+    fi
+    sleep 1
+done
+
+# ────────────────────────────────────────────────────────────────────────────
+# 6. Run verification commands
+# ────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "▶ [6/6] Running verification..."
+echo ""
+
+echo "─── 6a. Gateway health ───"
+openclaw --profile "$PROFILE" health || echo "(health check returned non-zero)"
+
+echo ""
+echo "─── 6b. Models list ───"
+openclaw --profile "$PROFILE" models list 2>/dev/null | head -20 || echo "(models list failed)"
+
+echo ""
+echo "─── 6c. Agent test (expecting OK + provider/model) ───"
+# Use a fresh session ID to avoid any cached state
+SESSION_ID="verify_$(date +%s)"
+AGENT_OUTPUT=$(timeout 60 openclaw --profile "$PROFILE" agent \
+    --agent dev \
+    --session-id "$SESSION_ID" \
+    --message "Say OK and print provider+model" 2>&1) || true
+
+echo "$AGENT_OUTPUT"
+
+# Validate output contains expected strings
+if echo "$AGENT_OUTPUT" | grep -qi "OK"; then
+    echo ""
+    echo "   ✓ Agent responded with OK"
+else
+    echo ""
+    echo "   ✗ Agent did NOT respond with OK. Check gateway.log and retry."
+fi
+
+echo ""
+echo "========================================"
+echo "🦞 OpenClaw fix script complete!"
+echo ""
+echo "Gateway running in background (PID $GATEWAY_PID)"
+echo "Logs: $STATE_DIR/gateway.log"
+echo ""
+echo "To stop gateway:  kill $GATEWAY_PID"
+echo "To restart:       openclaw --profile dev gateway --force"
+echo "========================================"

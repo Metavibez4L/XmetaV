@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.1",
+    "lastTouchedAt": "2026-02-03T12:00:00.000Z"
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://127.0.0.1:11434",
+        "apiKey": "ollama-local",
+        "api": "openai-chat-completions",
+        "models": [
+          {
+            "id": "qwen2.5:7b-instruct",
+            "name": "qwen2.5:7b-instruct",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 32768,
+            "maxTokens": 4096
+          },
+          {
+            "id": "qwen2.5vl:7b",
+            "name": "qwen2.5vl:7b",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            },
+            "contextWindow": 32768,
+            "maxTokens": 4096
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/qwen2.5:7b-instruct"
+      },
+      "workspace": "/home/manifest/.openclaw/workspace-dev",
+      "skipBootstrap": true,
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      }
+    },
+    "list": [
+      {
+        "id": "dev",
+        "default": true,
+        "workspace": "/home/manifest/.openclaw/workspace-dev",
+        "identity": {
+          "name": "C3-PO",
+          "theme": "protocol droid",
+          "emoji": "🤖"
+        }
+      }
+    ]
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "token": "f4b6c0792c3077f9a1d0747ed47ad2bb6d51ba16e54e9c4676b135032ed0b0a2"
+    },
+    "remote": {
+      "url": "ws://127.0.0.1:19011",
+      "token": "f4b6c0792c3077f9a1d0747ed47ad2bb6d51ba16e54e9c4676b135032ed0b0a2"
+    }
+  }
+}
