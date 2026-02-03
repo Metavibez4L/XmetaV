@@ -68,8 +68,8 @@ openclaw --profile dev agent \
 | Key | Old Value | New Value | Why |
 |-----|-----------|-----------|-----|
 | `gateway.mode` | `"remote"` | `"local"` | CLI was trying to connect to a non-existent remote gateway; local mode spawns/manages its own |
-| `models.providers.ollama.api` | `"openai-completions"` | `"openai-chat-completions"` | Agent loop uses chat format; completions endpoint doesn't support multi-turn |
-| `models.providers.ollama.baseUrl` | `"http://127.0.0.1:11434/v1"` | `"http://127.0.0.1:11434"` | SDK appends `/v1` internally when using `openai-chat-completions` |
+| `models.providers.ollama.api` | `"openai-completions"` | `"openai-completions"` | OpenClaw 2026.2.1 uses the `openai-completions` API mode for OpenAI-compatible providers (including Ollama) |
+| `models.providers.ollama.baseUrl` | `"http://127.0.0.1:11434/v1"` | `"http://127.0.0.1:11434/v1"` | OpenClaw’s Ollama default is the OpenAI-compat base under `/v1` |
 
 ---
 
@@ -82,8 +82,8 @@ cp ~/.openclaw-dev/openclaw.json ~/.openclaw-dev/openclaw.json.bak
 
 # Apply fixes
 openclaw --profile dev config set gateway.mode local
-openclaw --profile dev config set models.providers.ollama.api openai-chat-completions
-openclaw --profile dev config set models.providers.ollama.baseUrl "http://127.0.0.1:11434"
+openclaw --profile dev config set models.providers.ollama.api openai-completions
+openclaw --profile dev config set models.providers.ollama.baseUrl "http://127.0.0.1:11434/v1"
 
 # Clear locks
 find ~/.openclaw-dev -name "*.lock" -delete

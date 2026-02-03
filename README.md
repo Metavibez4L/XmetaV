@@ -126,8 +126,8 @@ This repo is configured for the **dev** profile:
 
 | Setting | Value |
 |---------|-------|
-| Base URL | `http://127.0.0.1:11434` |
-| API Mode | `openai-chat-completions` |
+| Base URL | `http://127.0.0.1:11434/v1` |
+| API Mode | `openai-completions` |
 | Primary Model | `qwen2.5:7b-instruct` |
 | Context Window | 32768 tokens |
 
@@ -142,8 +142,8 @@ This repo is configured for the **dev** profile:
   "models": {
     "providers": {
       "ollama": {
-        "baseUrl": "http://127.0.0.1:11434",
-        "api": "openai-chat-completions"
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "api": "openai-completions"
       }
     }
   },

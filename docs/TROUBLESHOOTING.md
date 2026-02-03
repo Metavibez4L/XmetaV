@@ -7,7 +7,7 @@ This guide targets OpenClaw 2026.2.1 on WSL2 without systemd.
 - Profile: `dev`
 - Gateway: local, loopback, port 19001
 - Ollama: `http://127.0.0.1:11434`
-- Provider API: `openai-chat-completions`
+- Provider API: `openai-completions`
 
 Run the full repair + verify:
 ```bash
@@ -42,12 +42,12 @@ Run the full repair + verify:
 ## Problem: Agent hangs ("Waiting for agent reply…")
 
 ### Common cause: wrong Ollama API mode
-If `models.providers.ollama.api` is set to `openai-completions`, the agent loop may send the wrong schema to Ollama.
+If `models.providers.ollama.api` is set to something other than `openai-completions`, OpenClaw may reject it or behave unexpectedly.
 
 Fix:
 ```bash
-openclaw --profile dev config set models.providers.ollama.api openai-chat-completions
-openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434
+openclaw --profile dev config set models.providers.ollama.api openai-completions
+openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
 ```
 
 ### Verify Ollama chat endpoint works
