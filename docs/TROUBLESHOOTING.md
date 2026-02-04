@@ -126,6 +126,44 @@ fuser -k 19001/tcp
 ollama pull qwen2.5:7b-instruct
 ```
 
+## Problem: Tools not actually executing (model narrates instead)
+
+### Symptoms
+- Agent describes what it would do but doesn't actually execute
+- Model says it ran a command but results are hallucinated (wrong date, wrong output)
+- JSON output shows `tools.schemaChars: 0` and `tools.entries: []`
+
+### Cause
+The API mode `openai-completions` doesn't support function calling. Tool schemas aren't passed to the model.
+
+### Fix
+1. Switch to `openai-responses` API mode (supports tool calling):
+   ```bash
+   openclaw --profile dev config set models.providers.ollama.api "openai-responses"
+   ```
+   Note: You may need to set the full ollama provider config:
+   ```bash
+   openclaw --profile dev config set models.providers.ollama '{"baseUrl":"http://127.0.0.1:11434/v1","apiKey":"ollama-local","api":"openai-responses","models":[{"id":"qwen2.5:7b-instruct","name":"qwen2.5:7b-instruct","reasoning":false,"input":["text"],"contextWindow":32768,"maxTokens":4096}]}'
+   ```
+
+2. Use `coding` profile to enable tools:
+   ```bash
+   openclaw --profile dev config set tools.profile coding
+   ```
+
+### Verify fix
+```bash
+# Check JSON output for tool entries
+openclaw --profile dev agent --agent dev --local --thinking off --json \
+  --message "Use exec to run: whoami" 2>&1 | grep -o '"entries": \[[^]]*\]'
+# Should show entries like: "entries": [{"name":"read"...}]
+
+# Test actual execution
+timeout 30 openclaw --profile dev agent --agent dev --local --thinking off \
+  --message "Call the exec tool with command: date +%Y-%m-%d"
+# Should return today's actual date (Feb 2026)
+```
+
 ## Problem: Agent loops calling TTS tool repeatedly
 
 ### Symptoms
@@ -149,9 +187,11 @@ The qwen2.5:7b-instruct model gets confused by OpenClaw's 23+ tools and repeated
    openclaw --profile dev config set tools.deny '["tts"]'
    ```
 
-3. Use minimal tool profile (reduces tool confusion):
+3. Use coding profile for tool execution (or minimal if no tools needed):
    ```bash
-   openclaw --profile dev config set tools.profile minimal
+   openclaw --profile dev config set tools.profile coding  # For system automation
+   # OR
+   openclaw --profile dev config set tools.profile minimal  # For chat-only
    ```
 
 4. Use `--thinking off` flag for simple prompts:

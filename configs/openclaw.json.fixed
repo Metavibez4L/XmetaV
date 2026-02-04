@@ -8,7 +8,7 @@
       "ollama": {
         "baseUrl": "http://127.0.0.1:11434/v1",
         "apiKey": "ollama-local",
-        "api": "openai-completions",
+        "api": "openai-responses",
         "models": [
           {
             "id": "qwen2.5:7b-instruct",
@@ -72,7 +72,7 @@
     ]
   },
   "tools": {
-    "profile": "minimal",
+    "profile": "coding",
     "deny": [
       "tts"
     ]

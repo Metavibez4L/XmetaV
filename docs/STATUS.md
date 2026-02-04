@@ -32,8 +32,8 @@ openclaw --profile dev config get messages.tts
 
 Expected values (high level):
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
-- `models.providers.ollama.api`: `openai-completions`
-- `tools.profile`: `minimal`
+- `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
+- `tools.profile`: `coding` (enables read, write, exec, process tools)
 - `tools.deny`: includes `tts`
 - `messages.tts.auto`: `off`
 - `messages.tts.edge.enabled`: `false`
@@ -80,7 +80,21 @@ fuser -k 19001/tcp 2>/dev/null || true
 ./scripts/openclaw-fix.sh
 ```
 
+## Tool Calling (System Automation)
+
+With `tools.profile=coding` and `api=openai-responses`, the agent can:
+- Execute shell commands via `exec` tool
+- Read/write files via `read`/`write` tools
+- Manage background processes via `process` tool
+
+Test:
+```bash
+openclaw --profile dev agent --agent dev --local --thinking off \
+  --message "Call the exec tool with command: whoami"
+```
+
 Notes:
-- If you see loops calling tools (especially `tts`), keep `tools.profile=minimal` and deny `tts`.
+- If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
+- The `openai-responses` API mode is required for tool schemas to be passed to the model.
 

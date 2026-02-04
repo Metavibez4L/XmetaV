@@ -60,14 +60,16 @@ cp "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%s)"
 openclaw --profile "$PROFILE" config set gateway.mode local
 
 # Fix 2: Ollama uses OpenAI-compatible endpoints under /v1.
-# Use "openai-completions" - openai-responses hangs with local Ollama.
-openclaw --profile "$PROFILE" config set models.providers.ollama.api openai-completions
+# Use "openai-responses" for tool calling support.
+# Note: "openai-completions" works for chat-only but doesn't support function calling.
+openclaw --profile "$PROFILE" config set models.providers.ollama.api openai-responses
 
 # Fix 3: Base URL should include /v1 for the OpenAI-compatible API.
 openclaw --profile "$PROFILE" config set models.providers.ollama.baseUrl "http://127.0.0.1:11434/v1"
 
-# Fix 4: Reduce tool surface area to avoid tool-loop hangs on small local models.
-openclaw --profile "$PROFILE" config set tools.profile minimal
+# Fix 4: Set coding profile for tool execution (read, write, exec, process).
+# Use "minimal" if you only need chat without tool calling.
+openclaw --profile "$PROFILE" config set tools.profile coding
 openclaw --profile "$PROFILE" config set tools.deny '["tts"]'
 
 # Fix 5: Disable TTS (auto + Edge fallback + model-driven overrides).
