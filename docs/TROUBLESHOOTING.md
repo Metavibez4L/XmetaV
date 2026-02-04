@@ -121,6 +121,69 @@ fuser -k 19001/tcp
 ./scripts/start-gateway.sh
 ```
 
+## Problem: Browser automation fails to start (WSL2/Linux)
+
+### Symptoms
+- `openclaw --profile dev browser start` fails with:
+  - `No supported browser found`, or
+  - `error while loading shared libraries: libnspr4.so: cannot open shared object file`
+
+### Cause
+Chromium/Chrome system dependencies are missing on the Linux environment (common on WSL2), or no Chromium binary is installed.
+
+### Fix
+1) Install system dependencies (requires `sudo`):
+
+```bash
+sudo apt-get update && sudo apt-get install -y \
+  ca-certificates fonts-liberation wget xdg-utils \
+  libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+  libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 \
+  libgtk-3-0 libpango-1.0-0 libudev1 libvulkan1 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
+  libxkbcommon0 libasound2
+```
+
+2) Install Chromium via Playwright (no sudo):
+
+```bash
+npx playwright install chromium
+```
+
+3) Configure OpenClaw to use that Chromium:
+
+```bash
+openclaw --profile dev config set browser.enabled true
+openclaw --profile dev config set browser.defaultProfile openclaw
+openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+```
+
+4) Restart gateway and retest:
+
+```bash
+pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
+./scripts/start-gateway.sh
+openclaw --profile dev browser start
+openclaw --profile dev browser open https://example.com
+openclaw --profile dev browser snapshot
+```
+
+## Problem: Agent ignores browser tool (small local models)
+
+### Symptoms
+- You ask an agent to “use the browser tool”, but it uses `exec` + `curl`, or tries shell screenshot tools (`scrot`, `gnome-screenshot`, etc.).
+
+### Cause
+Smaller local models (notably `qwen2.5:7b-instruct`) can be inconsistent at reliably selecting complex tools like `browser`.
+
+### Fix / Workarounds
+- Use deterministic CLI browser automation instead:
+  - `openclaw --profile dev browser open ...`
+  - `openclaw --profile dev browser snapshot`
+  - `openclaw --profile dev browser click <ref>`
+- Or use `exec` + `curl -sL ...` for “web fetch + summarize” tasks.
+- If you need the agent itself to drive the browser, consider a larger model with better tool-selection behavior.
+
 ## Problem: Ollama reachable but model not found
 
 ### Fix

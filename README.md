@@ -27,6 +27,7 @@
 - Ollama integration for local LLMs
 - Customizable agent profiles and workspaces
 - Skill system for extensible automation
+- OpenClaw-managed browser automation (`openclaw browser ...` snapshots/click/type)
 - GitHub skill integration for repo operations
 - Self-evolve skill for self-modifying automation
 - WSL2/Linux optimized workflows
@@ -182,6 +183,35 @@ This repo is configured for the **dev** profile:
 }
 ```
 
+### Browser automation (optional, WSL2/Linux)
+
+If you want interactive browser automation (tabs/snapshots/click/type) via `openclaw browser ...`, you need a Chromium binary + system deps.
+
+```bash
+# 1) System deps (requires sudo)
+sudo apt-get update && sudo apt-get install -y \
+  ca-certificates fonts-liberation wget xdg-utils \
+  libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+  libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 \
+  libgtk-3-0 libpango-1.0-0 libudev1 libvulkan1 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
+  libxkbcommon0 libasound2
+
+# 2) Install Chromium via Playwright (no sudo)
+npx playwright install chromium
+
+# 3) Configure OpenClaw to use it (example path)
+openclaw --profile dev config set browser.enabled true
+openclaw --profile dev config set browser.defaultProfile openclaw
+openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+
+# 4) Smoke test
+./scripts/start-gateway.sh
+openclaw --profile dev browser start
+openclaw --profile dev browser open https://example.com
+openclaw --profile dev browser snapshot
+```
+
 ---
 
 ## 🤖 Agents
@@ -289,6 +319,16 @@ openclaw --profile dev health
 openclaw --profile dev logs --tail 50
 ```
 
+### Browser automation (OpenClaw-managed)
+
+```bash
+openclaw --profile dev browser status
+openclaw --profile dev browser start
+openclaw --profile dev browser open https://base.org
+openclaw --profile dev browser snapshot
+openclaw --profile dev browser click e123
+```
+
 ### Agent Operations
 
 ```bash
@@ -341,6 +381,7 @@ curl http://127.0.0.1:11434/v1/chat/completions \
 | `Session locked` | `find ~/.openclaw-dev -name "*.lock" -delete` |
 | `Connection refused` to Ollama | `ollama serve` or `snap start ollama` |
 | Port 19001 already in use | `fuser -k 19001/tcp` then restart gateway |
+| Browser start fails (`libnspr4.so` missing) | Install browser deps (see `docs/STATUS.md`), then `openclaw --profile dev browser start` |
 
 See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 

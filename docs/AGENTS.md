@@ -8,6 +8,7 @@ This doc covers how to manage OpenClaw agents on this system using the `dev` pro
 - Run default agent: `openclaw --profile dev agent --message "Hello"`
 - Run specific agent: `openclaw --profile dev agent --agent dev --message "Hello"`
 - Use a stable session id: `openclaw --profile dev agent --session-id my_session --message "..."`
+- Browser automation (CLI): `openclaw --profile dev browser open https://example.com`
 
 ## How agent routing works
 
@@ -59,6 +60,10 @@ If output is slow/hanging:
 - If you only need chat (no tools), you can use `openai-completions`—but tools will not execute.
 - If the model loops calling tools (commonly `tts`), deny `tts` and temporarily reduce tool surface area.
 - Clear stale locks.
+
+## Browser automation notes
+
+OpenClaw supports a dedicated managed browser (`openclaw browser ...`). On smaller local models, agents may be inconsistent at invoking the `browser` tool; for reliable results prefer the CLI commands in `docs/STATUS.md`.
 
 ## Concurrency notes
 

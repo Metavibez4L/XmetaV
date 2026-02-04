@@ -3,6 +3,10 @@
     "lastTouchedVersion": "2026.2.1",
     "lastTouchedAt": "2026-02-03T12:00:00.000Z"
   },
+  "browser": {
+    "enabled": false,
+    "defaultProfile": "openclaw"
+  },
   "models": {
     "providers": {
       "ollama": {
@@ -73,9 +77,19 @@
   },
   "tools": {
     "profile": "coding",
+    "allow": [
+      "exec",
+      "process",
+      "read",
+      "write"
+    ],
     "deny": [
       "tts"
-    ]
+    ],
+    "exec": {
+      "host": "gateway",
+      "security": "full"
+    }
   },
   "messages": {
     "ackReactionScope": "group-mentions",
@@ -96,6 +110,7 @@
   "gateway": {
     "mode": "local",
     "bind": "loopback",
+    "port": 19001,
     "remote": {
       "url": "ws://127.0.0.1:19011",
       "token": "REPLACE_ME"

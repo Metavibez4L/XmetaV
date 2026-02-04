@@ -57,6 +57,7 @@ Expected values (high level):
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
 - `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
 - `tools.profile`: `coding` (enables read, write, exec, process tools)
+- `tools.allow`: includes `exec`, `process`, `read`, `write` (and `browser` if you enable browser automation)
 - `tools.deny`: includes `tts`
 - `messages.tts.auto`: `off`
 - `messages.tts.edge.enabled`: `false`
@@ -120,4 +121,58 @@ Notes:
 - If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
 - The `openai-responses` API mode is required for tool schemas to be passed to the model.
+
+## Browser Automation (OpenClaw-managed browser)
+
+This setup supports OpenClaw’s dedicated browser automation via the `openclaw browser ...` CLI (open tabs, snapshot, click/type).
+
+### Prereqs (WSL2/Linux)
+
+1) Install system dependencies (requires `sudo`):
+
+```bash
+sudo apt-get update && sudo apt-get install -y \
+  ca-certificates fonts-liberation wget xdg-utils \
+  libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+  libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 \
+  libgtk-3-0 libpango-1.0-0 libudev1 libvulkan1 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
+  libxkbcommon0 libasound2
+```
+
+2) Install a Chromium binary via Playwright (no sudo):
+
+```bash
+npx playwright install chromium
+```
+
+3) Point OpenClaw at that Chromium (example path shown; adjust if your version differs):
+
+```bash
+openclaw --profile dev config set browser.enabled true
+openclaw --profile dev config set browser.defaultProfile openclaw
+openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+
+# Ensure browser tool is allowed (if using allowlist)
+openclaw --profile dev config set tools.allow '[\"exec\",\"process\",\"read\",\"write\",\"browser\"]'
+```
+
+### Smoke test (CLI)
+
+```bash
+# Start gateway (if not already running)
+./scripts/start-gateway.sh
+
+openclaw --profile dev browser start
+openclaw --profile dev browser open https://example.com
+openclaw --profile dev browser snapshot
+```
+
+### Known limitation (small local models)
+
+With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
+
+Workarounds:
+- Use the deterministic `openclaw browser ...` CLI for browser automation.
+- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
 
