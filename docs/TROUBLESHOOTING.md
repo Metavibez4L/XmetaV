@@ -126,9 +126,51 @@ fuser -k 19001/tcp
 ollama pull qwen2.5:7b-instruct
 ```
 
+## Problem: Agent loops calling TTS tool repeatedly
+
+### Symptoms
+- Agent hangs with no output
+- Logs show repeated `tool=tts` calls
+- Output shows garbage like `ronics` or `{"name": "tts", ...}`
+
+### Cause
+The qwen2.5:7b-instruct model gets confused by OpenClaw's 23+ tools and repeatedly calls TTS when asked to "say" or "greet".
+
+### Fix (applied to this setup)
+1. Disable TTS completely:
+   ```bash
+   openclaw --profile dev config set messages.tts.auto off
+   openclaw --profile dev config set messages.tts.edge.enabled false
+   openclaw --profile dev config set messages.tts.modelOverrides.enabled false
+   ```
+
+2. Block TTS tool from being presented to the model:
+   ```bash
+   openclaw --profile dev config set tools.deny '["tts"]'
+   ```
+
+3. Use minimal tool profile (reduces tool confusion):
+   ```bash
+   openclaw --profile dev config set tools.profile minimal
+   ```
+
+4. Use `--thinking off` flag for simple prompts:
+   ```bash
+   openclaw --profile dev agent --agent dev --local --thinking off --message "Hello"
+   ```
+
+### Verify fix
+```bash
+timeout 30 openclaw --profile dev agent --agent dev --local --session-id test_$(date +%s) --thinking off --message "What is 2+2?"
+# Expected: "4" or "The answer is 4" in ~5 seconds
+```
+
+---
+
 ## Collecting logs
 
 - Gateway logs: `~/.openclaw-dev/gateway.log`
+- Main logs: `/tmp/openclaw/openclaw-*.log`
 - Quick health + agent test:
   ```bash
   ./scripts/health-check.sh
