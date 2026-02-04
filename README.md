@@ -18,6 +18,21 @@
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ```
 
+---
+
+## 🚀 Features
+
+- Automated agent and gateway management
+- One-command setup and troubleshooting scripts
+- Ollama integration for local LLMs
+- Customizable agent profiles and workspaces
+- Skill system for extensible automation
+- GitHub skill integration for repo operations
+- Self-evolve skill for self-modifying automation
+- WSL2/Linux optimized workflows
+
+---
+
 ## 🎯 What is XmetaV?
 
 **XmetaV** is your operational command center for managing [OpenClaw](https://openclaw.dev) — an AI agent automation platform. This repository contains:
