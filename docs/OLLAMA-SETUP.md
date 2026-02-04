@@ -63,12 +63,12 @@ Expected: JSON that includes an assistant message with `OK`.
 These are the settings this repo standardizes on:
 
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
-- `models.providers.ollama.api`: `openai-completions`
+- `models.providers.ollama.api`: `openai-responses` (tool calling)
 
 Apply:
 ```bash
 openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
-openclaw --profile dev config set models.providers.ollama.api openai-completions
+openclaw --profile dev config set models.providers.ollama.api openai-responses
 ```
 
 ## Context window

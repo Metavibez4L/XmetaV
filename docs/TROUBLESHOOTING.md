@@ -7,7 +7,7 @@ This guide targets OpenClaw 2026.2.1 on WSL2 without systemd.
 - Profile: `dev`
 - Gateway: local, loopback, port 19001
 - Ollama: `http://127.0.0.1:11434` (native install, NOT snap)
-- Provider API: `openai-completions`
+- Provider API: `openai-responses` (required for tool calling)
 - Agent mode: `--local` (recommended for reliability)
 
 ### Performance expectations (with GPU)
@@ -75,12 +75,14 @@ Verify GPU is working (should show ~4-5GB VRAM usage):
 nvidia-smi
 ```
 
-### Cause 3: Wrong API mode
-OpenClaw 2026.2.1 requires `openai-completions` (NOT `openai-chat-completions`):
+### Cause 3: Wrong API mode (tools don’t execute / agent “narrates”)
+Use `openai-responses` for tool calling:
 ```bash
-openclaw --profile dev config set models.providers.ollama.api openai-completions
+openclaw --profile dev config set models.providers.ollama.api openai-responses
 openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
 ```
+
+If you only want chat (no tools), `openai-completions` can work, but tools won’t be callable.
 
 ### Verify Ollama chat endpoint works
 ```bash

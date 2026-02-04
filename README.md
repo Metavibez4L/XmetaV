@@ -113,7 +113,7 @@ This script will:
 openclaw --profile dev health
 
 # Use --local flag for reliable agent calls (bypasses gateway websocket)
-openclaw --profile dev agent --agent dev --local --session-id test --message "Say hello"
+openclaw --profile dev agent --agent dev --local --thinking off --session-id test_$(date +%s) --message "What is 2+2? Reply with just 4."
 ```
 
 > **Note**: The `--local` flag runs the agent embedded (bypasses gateway websocket). This is the recommended mode for local Ollama usage.
@@ -150,9 +150,11 @@ This repo is configured for the **dev** profile:
 | Setting | Value |
 |---------|-------|
 | Base URL | `http://127.0.0.1:11434/v1` |
-| API Mode | `openai-completions` |
+| API Mode | `openai-responses` |
 | Primary Model | `qwen2.5:7b-instruct` |
 | Context Window | 32768 tokens |
+
+> **Why `openai-responses`?** It’s required for **tool calling** (exec/read/write/process). If you only want chat (no tools), `openai-completions` can work but won’t inject tool schemas.
 
 ### Key Config Values
 
@@ -166,7 +168,7 @@ This repo is configured for the **dev** profile:
     "providers": {
       "ollama": {
         "baseUrl": "http://127.0.0.1:11434/v1",
-        "api": "openai-completions"
+        "api": "openai-responses"
       }
     }
   },
@@ -194,17 +196,38 @@ This repo is configured for the **dev** profile:
 | Emoji | 🤖 |
 | Workspace | `~/.openclaw/workspace-dev` |
 
+### Repo Agent: `basedintern` (example)
+
+This command center can host multiple isolated agents. For example, you can run a dedicated agent whose workspace is the `basedintern` repo checkout:
+
+- **Agent ID**: `basedintern`
+- **Workspace**: `~/basedintern/based-intern`
+- **Tooling**: `tools.profile=coding` (enables `read`, `write`, `exec`, `process`)
+- **Skills** (from that workspace): `based-intern-ops`, `based-intern-railway-control`
+
+Run it:
+
+```bash
+openclaw --profile dev agent --agent basedintern --local --thinking off \
+  --message "Summarize the architecture of this repo and point to key entrypoints."
+```
+
 ### Creating New Agents
 
 ```bash
 # List existing agents
 openclaw --profile dev agents list
 
-# Create a new agent
-openclaw --profile dev agents create --id myagent --name "My Agent"
+# Add a new isolated agent (requires workspace)
+openclaw --profile dev agents add myagent \
+  --workspace "$HOME/myagent-workspace" \
+  --non-interactive
+
+# Optional: set identity
+openclaw --profile dev agents set-identity --agent myagent --name "My Agent" --emoji "🤖"
 
 # Run with specific agent
-openclaw --profile dev agent --agent myagent --message "Hello"
+openclaw --profile dev agent --agent myagent --local --thinking off --message "Hello"
 ```
 
 ---
@@ -314,7 +337,7 @@ curl http://127.0.0.1:11434/v1/chat/completions \
 | Issue | Solution |
 |-------|----------|
 | `Gateway closed (1006)` | Run `./scripts/openclaw-fix.sh` — gateway not running or wrong port |
-| `Waiting for agent reply…` forever | Use `--local --thinking off` and set `tools.profile=minimal` + deny `tts` (see `docs/TROUBLESHOOTING.md`) |
+| `Waiting for agent reply…` forever | Use `--local --thinking off`, clear stale locks, and ensure `models.providers.ollama.api=openai-responses` (see `docs/TROUBLESHOOTING.md`) |
 | `Session locked` | `find ~/.openclaw-dev -name "*.lock" -delete` |
 | `Connection refused` to Ollama | `ollama serve` or `snap start ollama` |
 | Port 19001 already in use | `fuser -k 19001/tcp` then restart gateway |

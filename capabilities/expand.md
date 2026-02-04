@@ -26,19 +26,24 @@ Edit `~/.openclaw-dev/openclaw.json`:
 ```json5
 {
   models: {
-    ollama: {
-      api: "openai-completions",
-      baseUrl: "http://127.0.0.1:11434/v1",
-      models: {
-        "ollama/qwen2.5:7b-instruct": {},
-        "ollama/llama3:8b": {},
-        "ollama/codellama:7b": {}
-      }
-    }
+    providers: {
+      ollama: {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        apiKey: "ollama-local",      // required by OpenClaw; ignored by Ollama
+        api: "openai-responses",     // tool calling (exec/read/write/process)
+        models: [
+          { id: "qwen2.5:7b-instruct", name: "qwen2.5:7b-instruct" },
+          { id: "llama3:8b", name: "llama3:8b" },
+          { id: "codellama:7b", name: "codellama:7b" },
+        ],
+      },
+    },
   },
-  agent: {
-    model: "ollama/qwen2.5:7b-instruct"  // Change this
-  }
+  agents: {
+    defaults: {
+      model: { primary: "ollama/qwen2.5:7b-instruct" }, // Change this
+    },
+  },
 }
 ```
 

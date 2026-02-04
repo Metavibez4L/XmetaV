@@ -54,9 +54,10 @@ openclaw --profile dev agent \
 ```
 
 If output is slow/hanging:
-- Confirm `models.providers.ollama.api` is `openai-completions`.
+- Confirm `models.providers.ollama.api` is `openai-responses` (required for tool calling).
 - Confirm `models.providers.ollama.baseUrl` is `http://127.0.0.1:11434/v1`.
-- If the model loops calling tools (commonly `tts`), set `tools.profile` to `minimal` and deny `tts` (see `docs/TROUBLESHOOTING.md`).
+- If you only need chat (no tools), you can use `openai-completions`—but tools will not execute.
+- If the model loops calling tools (commonly `tts`), deny `tts` and temporarily reduce tool surface area.
 - Clear stale locks.
 
 ## Concurrency notes
@@ -66,3 +67,23 @@ Config fields that influence concurrency:
 - `agents.defaults.subagents.maxConcurrent`
 
 If you see lock contention or long waits, reduce concurrency temporarily and re-test.
+
+## Repo agents (example: `basedintern`)
+
+You can create a dedicated agent whose workspace is a specific repo checkout. This is useful for focused repo analysis, code changes, running tests, and keeping session state separate.
+
+Example (`basedintern`):
+
+```bash
+# Add the repo agent
+openclaw --profile dev agents add basedintern \
+  --workspace "$HOME/basedintern/based-intern" \
+  --non-interactive
+
+# Optional identity (nice in logs + agent lists)
+openclaw --profile dev agents set-identity --agent basedintern --name "BasedIntern" --emoji "🤖"
+
+# Run it
+openclaw --profile dev agent --agent basedintern --local --thinking off \
+  --message "Run npm test and summarize any failures."
+```

@@ -42,7 +42,9 @@ OpenClaw talks to Ollama through its OpenAI-compatible API.
 - Ollama base: `http://127.0.0.1:11434`
 - OpenAI-compat base (this setup): `http://127.0.0.1:11434/v1`
 
-**Golden path for agents (this repo):** `models.providers.ollama.api = "openai-completions"`
+**Golden path for agents (this repo):** `models.providers.ollama.api = "openai-responses"`
+
+Why: `openai-responses` supports **tool calling** (function/tool schemas are sent to the model). If you use `openai-completions`, the model may “narrate” tool usage but cannot actually execute tools.
 
 Practical note for small local models (e.g. 7B):
 - If the agent hangs or loops calling tools (commonly `tts`), restrict tools with `tools.profile = "minimal"` and deny `tts`.

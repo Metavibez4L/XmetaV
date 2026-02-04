@@ -18,6 +18,29 @@ This file captures the **known-good** runtime settings for this machine/profile 
 - Gateway: `ws://127.0.0.1:19001`
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
 
+## Configured agents (this machine)
+
+This command center is set up for **multiple isolated agents**:
+
+- **`dev`**: general-purpose command-center agent
+  - Workspace: `~/.openclaw/workspace-dev`
+- **`basedintern`**: repo agent for the local checkout at `~/basedintern/based-intern`
+  - Workspace: `~/basedintern/based-intern`
+  - Intended use: repo analysis + code/docs changes + running tests (`npm test`)
+
+List agents:
+
+```bash
+openclaw --profile dev agents list
+```
+
+Run the repo agent:
+
+```bash
+openclaw --profile dev agent --agent basedintern --local --thinking off \
+  --message "Summarize this repo and run npm test."
+```
+
 ## Known-good config (sanity checks)
 
 These should match (do not paste tokens publicly):
