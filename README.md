@@ -66,6 +66,7 @@ XmetaV/
     ├── ARCHITECTURE.md             # System architecture overview
     ├── AGENTS.md                   # Agent configuration guide
     ├── TROUBLESHOOTING.md          # Common issues & solutions
+    ├── STATUS.md                   # Current known-good settings + checks
     └── OLLAMA-SETUP.md             # Ollama integration guide
 ```
 
@@ -313,7 +314,7 @@ curl http://127.0.0.1:11434/v1/chat/completions \
 | Issue | Solution |
 |-------|----------|
 | `Gateway closed (1006)` | Run `./scripts/openclaw-fix.sh` — gateway not running or wrong port |
-| `Waiting for agent reply…` forever | Check `api: openai-chat-completions` in config |
+| `Waiting for agent reply…` forever | Use `--local --thinking off` and set `tools.profile=minimal` + deny `tts` (see `docs/TROUBLESHOOTING.md`) |
 | `Session locked` | `find ~/.openclaw-dev -name "*.lock" -delete` |
 | `Connection refused` to Ollama | `ollama serve` or `snap start ollama` |
 | Port 19001 already in use | `fuser -k 19001/tcp` then restart gateway |
@@ -330,6 +331,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
+| [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 
 ---

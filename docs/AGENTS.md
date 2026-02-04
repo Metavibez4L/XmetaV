@@ -14,7 +14,7 @@ This doc covers how to manage OpenClaw agents on this system using the `dev` pro
 OpenClaw’s agent command sends a turn through the Gateway.
 
 - Gateway must be reachable (default dev: `ws://127.0.0.1:19001`).
-- Model provider must be configured correctly (Ollama chat completions recommended).
+- Model provider must be configured correctly (this setup uses Ollama via OpenAI-compatible `/v1`).
 
 ## Agent workspace
 
@@ -48,12 +48,15 @@ Use a new session id each time to avoid ambiguous session state:
 openclaw --profile dev agent \
   --agent dev \
   --session-id fresh_ok_$(date +%s) \
+  --local \
+  --thinking off \
   --message "Say OK and print provider+model"
 ```
 
 If output is slow/hanging:
-- Confirm `models.providers.ollama.api` is `openai-chat-completions`.
-- Confirm `models.providers.ollama.baseUrl` is `http://127.0.0.1:11434`.
+- Confirm `models.providers.ollama.api` is `openai-completions`.
+- Confirm `models.providers.ollama.baseUrl` is `http://127.0.0.1:11434/v1`.
+- If the model loops calling tools (commonly `tts`), set `tools.profile` to `minimal` and deny `tts` (see `docs/TROUBLESHOOTING.md`).
 - Clear stale locks.
 
 ## Concurrency notes
