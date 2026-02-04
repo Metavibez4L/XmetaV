@@ -66,6 +66,15 @@ openclaw --profile "$PROFILE" config set models.providers.ollama.api openai-comp
 # Fix 3: Base URL should include /v1 for the OpenAI-compatible API.
 openclaw --profile "$PROFILE" config set models.providers.ollama.baseUrl "http://127.0.0.1:11434/v1"
 
+# Fix 4: Reduce tool surface area to avoid tool-loop hangs on small local models.
+openclaw --profile "$PROFILE" config set tools.profile minimal
+openclaw --profile "$PROFILE" config set tools.deny '["tts"]'
+
+# Fix 5: Disable TTS (auto + Edge fallback + model-driven overrides).
+openclaw --profile "$PROFILE" config set messages.tts.auto off
+openclaw --profile "$PROFILE" config set messages.tts.edge.enabled false
+openclaw --profile "$PROFILE" config set messages.tts.modelOverrides.enabled false
+
 echo "   ✓ Config patched"
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -116,8 +125,9 @@ AGENT_OUTPUT=$(timeout 60 openclaw --profile "$PROFILE" agent \
     --agent dev \
     --session-id "$SESSION_ID" \
     --local \
+    --thinking off \
     --json \
-    --message "Say hello briefly" 2>&1) || true
+    --message "What is 2+2? Reply with just 4." 2>&1) || true
 
 # Check if agent responded successfully
 if echo "$AGENT_OUTPUT" | grep -q '"payloads"'; then
