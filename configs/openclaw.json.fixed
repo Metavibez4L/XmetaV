@@ -71,8 +71,23 @@
       }
     ]
   },
+  "tools": {
+    "profile": "minimal",
+    "deny": [
+      "tts"
+    ]
+  },
   "messages": {
-    "ackReactionScope": "group-mentions"
+    "ackReactionScope": "group-mentions",
+    "tts": {
+      "auto": "off",
+      "edge": {
+        "enabled": false
+      },
+      "modelOverrides": {
+        "enabled": false
+      }
+    }
   },
   "commands": {
     "native": "auto",
@@ -81,12 +96,9 @@
   "gateway": {
     "mode": "local",
     "bind": "loopback",
-    "auth": {
-      "token": "f4b6c0792c3077f9a1d0747ed47ad2bb6d51ba16e54e9c4676b135032ed0b0a2"
-    },
     "remote": {
       "url": "ws://127.0.0.1:19011",
-      "token": "f4b6c0792c3077f9a1d0747ed47ad2bb6d51ba16e54e9c4676b135032ed0b0a2"
+      "token": "REPLACE_ME"
     }
   }
 }

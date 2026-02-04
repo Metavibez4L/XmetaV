@@ -36,7 +36,7 @@ openclaw --profile "$PROFILE" models status --plain
 echo ""
 echo "▶ Agent smoke test"
 SESSION_ID="smoke_$(date +%s)"
-OUT=$(timeout 60 openclaw --profile "$PROFILE" agent --agent dev --session-id "$SESSION_ID" --message "Say OK and print provider+model" 2>&1) || true
+OUT=$(timeout 60 openclaw --profile "$PROFILE" agent --agent dev --local --thinking off --session-id "$SESSION_ID" --message "Reply with OK" 2>&1) || true
 printf "%s\n" "$OUT"
 echo ""
 echo "$OUT" | grep -qi "OK" || fail "Agent did not produce OK"
