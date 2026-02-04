@@ -40,10 +40,12 @@ Important practical details:
 OpenClaw talks to Ollama through its OpenAI-compatible API.
 
 - Ollama base: `http://127.0.0.1:11434`
-- OpenAI-compat endpoints:
-  - Chat: `POST /v1/chat/completions`
+- OpenAI-compat base (this setup): `http://127.0.0.1:11434/v1`
 
-**Golden path for agents:** `models.providers.ollama.api = "openai-chat-completions"`
+**Golden path for agents (this repo):** `models.providers.ollama.api = "openai-completions"`
+
+Practical note for small local models (e.g. 7B):
+- If the agent hangs or loops calling tools (commonly `tts`), restrict tools with `tools.profile = "minimal"` and deny `tts`.
 
 ## Data flow
 
@@ -51,7 +53,7 @@ OpenClaw talks to Ollama through its OpenAI-compatible API.
 2. CLI reads `~/.openclaw-dev/openclaw.json`.
 3. CLI connects to the Gateway at `ws://127.0.0.1:19001`.
 4. Gateway routes the turn to the agent runtime.
-5. Agent runtime calls the configured model provider (Ollama) using chat-completions.
+5. Agent runtime calls the configured model provider (Ollama) using the configured OpenAI-compatible API mode.
 6. The response is written to the session JSONL and returned to CLI.
 
 ## Ports and endpoints

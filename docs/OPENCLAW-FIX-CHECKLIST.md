@@ -42,7 +42,7 @@ openclaw --profile dev models list
 ```
 **Expected:** Table showing `ollama/qwen2.5:7b-instruct` with `contextWindow: 32768`
 
-**If fails:** Check `models.providers.ollama.baseUrl` is `http://127.0.0.1:11434` (no `/v1` suffix)
+**If fails:** Check `models.providers.ollama.baseUrl` is `http://127.0.0.1:11434/v1`
 
 ---
 
@@ -107,7 +107,7 @@ openclaw --profile dev gateway --port 19001 --force
 
 1. **Port mismatch (1006 error):** With `gateway.mode = "remote"`, the CLI tried to connect to whatever URL was in `gateway.remote.url` (port 19011), but nothing was listening there. The `--profile dev` flag defaults to port 19001. Switching to `mode = "local"` makes the CLI manage its own gateway on the correct port.
 
-2. **Agent hangs:** The `openai-completions` API mode sends requests to `/v1/completions`, which expects a single prompt string. Ollama's chat models need `/v1/chat/completions` with a messages array. The agent was sending malformed requests.
+2. **Agent hangs / tool loops:** On small local models, the agent can get confused by large tool inventories and loop calling tools (commonly `tts`). The stable configuration is to use `--local --thinking off`, restrict tools (`tools.profile = minimal`), and deny `tts`.
 
 3. **Context window:** Your config's `contextWindow: 32768` actually matches Ollama's model metadata (`qwen2.context_length: 32768`). No fix needed—the 4096 you saw in `/api/ps` is the runtime-loaded context, not the max.
 
@@ -118,7 +118,7 @@ openclaw --profile dev gateway --port 19001 --force
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
 | "Gateway closed (1006)" | Gateway not running or wrong port | `openclaw --profile dev gateway --port 19001 --force` |
-| "Waiting for agent reply…" forever | Wrong API mode or Ollama down | Check `api: openai-chat-completions` and `curl http://127.0.0.1:11434/api/tags` |
+| "Waiting for agent reply…" forever | Tool loop or stale locks | Use `--local --thinking off`, clear locks, set `tools.profile minimal`, deny `tts` |
 | "Session locked" | Stale `.jsonl.lock` file | `find ~/.openclaw-dev -name "*.lock" -delete` |
 | "Model not found" | Wrong model ID | `openclaw --profile dev models list` to see available models |
 | Gateway starts then dies | Port already in use | `fuser -k 19001/tcp` then retry |
