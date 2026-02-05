@@ -243,6 +243,7 @@ This command center can host multiple isolated agents. For example, you can run 
 
 - **Agent ID**: `basedintern`
 - **Workspace**: `~/basedintern/based-intern`
+- **Model**: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
 - **Tooling**: `tools.profile=coding` (enables `read`, `write`, `exec`, `process`)
 - **Skills** (from that workspace): `based-intern-ops`, `based-intern-railway-control`
 
@@ -299,10 +300,12 @@ openclaw --profile dev agent --agent myagent --local --thinking off --message "H
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         Model Providers                                 │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐              │
-│  │   Ollama (Local)        │  │   Cloud Providers       │              │
+│  │   Ollama (Local Host)   │  │   Cloud Providers       │              │
 │  │   http://127.0.0.1:11434│  │   (Anthropic, OpenAI)   │              │
 │  │   ├─ qwen2.5:7b-instruct│  │                         │              │
-│  │   └─ qwen2.5vl:7b       │  │                         │              │
+│  │   ├─ qwen2.5vl:7b       │  │                         │              │
+│  │   └─ kimi-k2.5:cloud    │  │                         │              │
+│  │      (Ollama Cloud)     │  │                         │              │
 │  └─────────────────────────┘  └─────────────────────────┘              │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
