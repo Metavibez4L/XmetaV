@@ -229,6 +229,39 @@ timeout 30 openclaw --profile dev agent --agent dev --local --thinking off \
 # Should return today's actual date (Feb 2026)
 ```
 
+## Problem: Ollama Cloud model returns HTTP 429 (“session usage limit”)
+
+### Symptoms
+- Any request to a cloud model (e.g. `kimi-k2.5:cloud`) fails with:
+  - `HTTP 429: you've reached your session usage limit, please wait or upgrade to continue`
+- The failure happens even for a tiny prompt like “OK”.
+
+### Cause
+Ollama Cloud enforces plan-based usage limits for cloud models. When the account/session quota is exhausted, the local Ollama daemon returns HTTP 429.
+
+### Diagnose (capture raw response)
+Direct Ollama endpoint:
+
+```bash
+curl -i -sS http://127.0.0.1:11434/api/chat \
+  -d '{"model":"kimi-k2.5:cloud","messages":[{"role":"user","content":"OK"}],"stream":false}' | sed -n '1,80p'
+```
+
+OpenAI-compatible endpoint:
+
+```bash
+curl -i -sS http://127.0.0.1:11434/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"kimi-k2.5:cloud","messages":[{"role":"user","content":"OK"}]}' | sed -n '1,80p'
+```
+
+### Fix
+- Wait for the quota window to reset, **or** upgrade your Ollama plan.
+- Confirm you are signed in (cloud models require auth):
+  ```bash
+  ollama signin
+  ```
+
 ## Problem: Agent loops calling TTS tool repeatedly
 
 ### Symptoms

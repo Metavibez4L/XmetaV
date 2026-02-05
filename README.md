@@ -152,10 +152,21 @@ This repo is configured for the **dev** profile:
 |---------|-------|
 | Base URL | `http://127.0.0.1:11434/v1` |
 | API Mode | `openai-responses` |
-| Primary Model | `qwen2.5:7b-instruct` |
-| Context Window | 32768 tokens |
+| Primary Model | `qwen2.5:7b-instruct` (local) or `kimi-k2.5:cloud` (cloud) |
+| Context Window | 32768 tokens (qwen) / 262144 tokens (kimi cloud) |
 
 > **Why `openai-responses`?** It’s required for **tool calling** (exec/read/write/process). If you only want chat (no tools), `openai-completions` can work but won’t inject tool schemas.
+
+#### Ollama Cloud limits (Kimi)
+
+Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. If you hit the quota you’ll see HTTP 429:
+
+```bash
+curl -i -sS http://127.0.0.1:11434/api/chat \
+  -d '{"model":"kimi-k2.5:cloud","messages":[{"role":"user","content":"OK"}],"stream":false}' | sed -n '1,40p'
+```
+
+Fix: wait for reset or upgrade the plan. Cloud auth uses `ollama signin`.
 
 ### Key Config Values
 

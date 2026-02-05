@@ -71,6 +71,14 @@ If output is slow/hanging:
 
 OpenClaw supports a dedicated managed browser (`openclaw browser ...`). On smaller local models, agents may be inconsistent at invoking the `browser` tool; for reliable results prefer the CLI commands in `docs/STATUS.md`.
 
+## Cloud models (Ollama)
+
+If you pin an agent to an Ollama cloud model (e.g. `kimi-k2.5:cloud`), note:
+
+- Auth is via `ollama signin` (no API key needed for local `http://127.0.0.1:11434` calls).
+- Cloud models can hit plan/session limits and return HTTP 429 (“session usage limit”).
+- Keep a local fallback model configured for when cloud quota is exhausted.
+
 ## Concurrency notes
 
 Config fields that influence concurrency:

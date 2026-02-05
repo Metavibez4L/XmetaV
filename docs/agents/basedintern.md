@@ -23,7 +23,7 @@ openclaw --profile dev agents list
 
 ## Model
 
-By default this setup uses the same model as `dev` unless overridden:
+In this command center, `basedintern` is pinned to a cloud model (override of defaults):
 
 ```bash
 openclaw --profile dev agents get basedintern 2>/dev/null || true
@@ -32,7 +32,21 @@ openclaw --profile dev config get agents.defaults.model.primary
 
 Typical value:
 
-- `ollama/qwen2.5:7b-instruct`
+- `ollama/kimi-k2.5:cloud` (cloud; 256k context)
+
+### Cloud quota note (HTTP 429 “session usage limit”)
+
+Ollama cloud models can return HTTP 429 if you exceed the current plan/session quota.
+
+Diagnose quickly:
+
+```bash
+curl -i -sS http://127.0.0.1:11434/api/chat \
+  -d '{"model":"kimi-k2.5:cloud","messages":[{"role":"user","content":"OK"}],"stream":false}' | sed -n '1,80p'
+```
+
+Fix:
+- Wait for the limit window to reset, or upgrade your Ollama plan.
 
 ## Tools
 
