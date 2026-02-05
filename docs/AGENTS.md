@@ -2,6 +2,12 @@
 
 This doc covers how to manage OpenClaw agents on this system using the `dev` profile.
 
+For per-agent runbooks, see `docs/agents/`:
+
+- `docs/agents/README.md`
+- `docs/agents/dev.md`
+- `docs/agents/basedintern.md`
+
 ## Quick reference
 
 - List agents: `openclaw --profile dev agents list`

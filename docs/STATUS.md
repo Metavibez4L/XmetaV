@@ -28,6 +28,10 @@ This command center is set up for **multiple isolated agents**:
   - Workspace: `~/basedintern/based-intern`
   - Intended use: repo analysis + code/docs changes + running tests (`npm test`)
 
+Detailed agent runbooks:
+- `docs/agents/dev.md`
+- `docs/agents/basedintern.md`
+
 List agents:
 
 ```bash

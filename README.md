@@ -394,6 +394,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Step-by-step verification checklist |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
+| [agents/](docs/agents/) | Per-agent runbooks (dev, basedintern) |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
