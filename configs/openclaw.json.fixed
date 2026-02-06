@@ -27,7 +27,7 @@
         "default": true,
         "workspace": "/home/manifest/.openclaw/workspace",
         "model": {
-          "primary": "ollama/qwen2.5:7b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         }
       },
       {

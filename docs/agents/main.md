@@ -30,7 +30,7 @@ openclaw config get agents.defaults.model.primary
 
 Typical value in this setup:
 
-- `ollama/qwen2.5:7b-instruct`
+- `ollama/kimi-k2.5:cloud` (256k context)
 
 ## Tools
 

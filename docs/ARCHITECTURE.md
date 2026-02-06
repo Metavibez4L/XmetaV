@@ -41,7 +41,7 @@ Two agents are configured:
 
 | Agent | Model | Workspace | Tools | Purpose |
 |-------|-------|-----------|-------|---------|
-| `main` (default) | `qwen2.5:7b-instruct` | `~/.openclaw/workspace` | coding | General-purpose command-center agent |
+| `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | default | General-purpose command-center agent |
 | `basedintern` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | coding | Repo agent — code/tests/commits (lean, fast) |
 | `basedintern_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | full | Same repo — browser/web automation only |
 

@@ -17,7 +17,7 @@
   _______________________________________________
  |                                               |
  |   agents:  main | basedintern | basedintern_web
- |   models:  qwen2.5:7b  |  kimi-k2.5:cloud
+ |   models:  kimi-k2.5:cloud (all agents)
  |   gateway: ws://127.0.0.1:18789
  |   engine:  Ollama + CUDA  |  RTX 4070
  |_______________________________________________|
@@ -221,9 +221,9 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 | Property | Value |
 |----------|-------|
 | ID | `main` |
-| Model | `ollama/qwen2.5:7b-instruct` |
+| Model | `ollama/kimi-k2.5:cloud` (256k context) |
 | Workspace | `~/.openclaw/workspace` |
-| Tools | `coding` profile (exec, read, write, process) |
+| Tools | default (inherits global config) |
 
 ```bash
 openclaw agent --agent main --local --thinking off --message "Hello!"

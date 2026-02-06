@@ -23,7 +23,7 @@ Quick reference for everything you can do with your OpenClaw setup.
 │  Mode:     --local (recommended)        │
 ├─────────────────────────────────────────┤
 │  Agents:                                │
-│    main         qwen2.5:7b-instruct     │
+│    main         kimi-k2.5:cloud (256k)   │
 │    basedintern  kimi-k2.5:cloud (256k)  │
 ├─────────────────────────────────────────┤
 │  Provider: Ollama (native + CUDA)       │

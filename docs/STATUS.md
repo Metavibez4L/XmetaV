@@ -24,6 +24,7 @@ This command center is set up for **multiple isolated agents**:
 
 - **`main`**: general-purpose command-center agent
   - Workspace: `~/.openclaw/workspace`
+  - Model: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
 - **`basedintern`**: repo agent for the local checkout at `/home/manifest/basedintern`
   - Workspace: `/home/manifest/basedintern`
   - Intended use: repo analysis + code/docs changes + running tests (`npm test`)

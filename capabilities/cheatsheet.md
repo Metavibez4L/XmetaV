@@ -104,7 +104,7 @@ alias ocbiweb='openclaw agent --agent basedintern_web --local --message'
 ```
 Config:   ~/.openclaw/openclaw.json
 Gateway:  127.0.0.1:18789
-Agents:   main (qwen2.5:7b), basedintern (kimi, coding), basedintern_web (kimi, full)
+Agents:   main (kimi), basedintern (kimi, coding), basedintern_web (kimi, full)
 GPU:      RTX 4070 (8GB)
 Speed:    42-54 tok/s
 ```
