@@ -1,6 +1,8 @@
 # Agents — Operating Guide
 
-This doc covers how to manage OpenClaw agents on this system using the `dev` profile.
+This doc covers how to manage OpenClaw agents on this system.
+
+Note: Older iterations of this command center used a separate `dev` profile and `~/.openclaw-dev/`. The current setup uses the default config at `~/.openclaw/`. If you still use a profile, prefix commands with `openclaw --profile dev ...`.
 
 For per-agent runbooks, see `docs/agents/`:
 
@@ -10,11 +12,11 @@ For per-agent runbooks, see `docs/agents/`:
 
 ## Quick reference
 
-- List agents: `openclaw --profile dev agents list`
-- Run default agent: `openclaw --profile dev agent --message "Hello"`
-- Run specific agent: `openclaw --profile dev agent --agent dev --message "Hello"`
+- List agents: `openclaw agents list`
+- Run default agent: `openclaw agent --message "Hello"`
+- Run specific agent: `openclaw agent --agent basedintern --message "Hello"`
 - Use a stable session id: `openclaw --profile dev agent --session-id my_session --message "..."`
-- Browser automation (CLI): `openclaw --profile dev browser open https://example.com`
+- Browser automation (CLI): `openclaw browser open https://example.com`
 
 ## How agent routing works
 
@@ -25,8 +27,7 @@ OpenClaw’s agent command sends a turn through the Gateway.
 
 ## Agent workspace
 
-Your config currently points the default agent workspace to:
-- `~/.openclaw/workspace-dev`
+Your config uses **per-agent workspaces** (see `openclaw agents list`).
 
 This is where agent tools and working files may be created during runs.
 

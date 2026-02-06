@@ -1,5 +1,5 @@
-# Status — XmetaV / OpenClaw (dev profile)
-Last verified: 2026-02-05
+# Status — XmetaV / OpenClaw (local config)
+Last verified: 2026-02-06
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -11,23 +11,24 @@ This file captures the **known-good** runtime settings for this machine/profile 
 
 ## Active profile and paths
 
-- Profile: `dev`
-- State dir: `~/.openclaw-dev/`
-- Config file: `~/.openclaw-dev/openclaw.json`
-- Workspace: `~/.openclaw/workspace-dev`
-- Gateway: `ws://127.0.0.1:19001`
+- Profile: (none; using default `~/.openclaw/` config)
+- State dir: `~/.openclaw/`
+- Config file: `~/.openclaw/openclaw.json`
+- Workspace(s): per-agent (`openclaw agents list`)
+- Gateway: local (`gateway.mode: local`)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
 
 ## Configured agents (this machine)
 
 This command center is set up for **multiple isolated agents**:
 
-- **`dev`**: general-purpose command-center agent
-  - Workspace: `~/.openclaw/workspace-dev`
-- **`basedintern`**: repo agent for the local checkout at `~/basedintern/based-intern`
-  - Workspace: `~/basedintern/based-intern`
+- **`main`**: general-purpose command-center agent
+  - Workspace: `~/.openclaw/workspace`
+- **`basedintern`**: repo agent for the local checkout at `/home/manifest/basedintern`
+  - Workspace: `/home/manifest/basedintern`
   - Intended use: repo analysis + code/docs changes + running tests (`npm test`)
   - Model: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
+  - Tools: **full** (fs + runtime + web + browser + github)
 
 Detailed agent runbooks:
 - `docs/agents/dev.md`
@@ -36,13 +37,13 @@ Detailed agent runbooks:
 List agents:
 
 ```bash
-openclaw --profile dev agents list
+openclaw agents list
 ```
 
 Run the repo agent:
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
+openclaw agent --agent basedintern --local --thinking off \
   --message "Summarize this repo and run npm test."
 ```
 
@@ -51,30 +52,24 @@ openclaw --profile dev agent --agent basedintern --local --thinking off \
 These should match (do not paste tokens publicly):
 
 ```bash
-openclaw --profile dev config get agents.defaults.model.primary
-openclaw --profile dev config get models.providers.ollama.baseUrl
-openclaw --profile dev config get models.providers.ollama.api
-openclaw --profile dev config get tools
-openclaw --profile dev config get messages.tts
+openclaw config get agents.list
+openclaw config get models.providers.ollama.baseUrl
+openclaw config get models.providers.ollama.api
+openclaw config get models.providers.ollama.apiKey
 ```
 
 Expected values (high level):
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
 - `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
-- `tools.profile`: `coding` (enables read, write, exec, process tools)
-- `tools.allow`: includes `exec`, `process`, `read`, `write` (and `browser` if you enable browser automation)
-- `tools.deny`: includes `tts`
-- `messages.tts.auto`: `off`
-- `messages.tts.edge.enabled`: `false`
-- `messages.tts.modelOverrides.enabled`: `false`
+- `models.providers.ollama.apiKey`: set to a non-secret placeholder (e.g. `"local"`) to satisfy OpenClaw auth checks for local Ollama
 
 ## Standard way to run the agent (stable)
 
 Use embedded mode + disable thinking for “simple chat” reliability on small local models:
 
 ```bash
-openclaw --profile dev agent \
-  --agent dev \
+openclaw agent \
+  --agent main \
   --local \
   --thinking off \
   --session-id smoke_$(date +%s) \
@@ -92,8 +87,8 @@ This environment is configured with the Ollama cloud model:
 Verify config:
 
 ```bash
-openclaw --profile dev config get agents.list.1.model.primary
-openclaw --profile dev config get models.providers.ollama.models
+openclaw config get agents.list
+openclaw config get models.providers.ollama.models
 ```
 
 ## Known behavior: Ollama Cloud “session usage limit” (HTTP 429)

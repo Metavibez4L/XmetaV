@@ -12,13 +12,13 @@
 ## Identity and workspace
 
 - **Agent ID**: `basedintern`
-- **Workspace**: `~/basedintern/based-intern`
-- **Agent dir**: `~/.openclaw-dev/agents/basedintern/agent/`
+- **Workspace**: `/home/manifest/basedintern` (repo root)
+- **Agent dir**: `~/.openclaw/agents/basedintern/agent/`
 
 Verify:
 
 ```bash
-openclaw --profile dev agents list
+openclaw agents list
 ```
 
 ## Model
@@ -26,8 +26,8 @@ openclaw --profile dev agents list
 In this command center, `basedintern` is pinned to a cloud model (override of defaults):
 
 ```bash
-openclaw --profile dev agents get basedintern 2>/dev/null || true
-openclaw --profile dev config get agents.defaults.model.primary
+openclaw agents list --json
+openclaw config get agents.list
 ```
 
 Typical value:
@@ -50,29 +50,28 @@ Fix:
 
 ## Tools
 
-This agent is intended to run with **coding automation** enabled:
+This agent is intended to run with **full repo automation** enabled:
 
 - `exec` — run shell commands in the repo workspace
 - `read` / `write` — inspect and edit repo files
 - `process` — manage longer-running commands (tests, dev servers)
-- Optional: `browser` — OpenClaw-managed browser (best driven via CLI)
+- `web_fetch` / `web_search` — fetch pages + research
+- `browser` — OpenClaw-managed browser automation (UI tool)
 
 Verify current tool config:
 
 ```bash
-openclaw --profile dev config get tools
+openclaw config get agents.list
 ```
 
 ## Skills
 
-This command center loads extra skills from the repo workspace skills directory:
-
-- `~/basedintern/based-intern/skills`
+This command center uses bundled skills (including `github`), and can also load repo-local skills.
 
 You can see what’s ready/missing:
 
 ```bash
-openclaw --profile dev skills list
+openclaw skills list
 ```
 
 ## How to run (recommended)
@@ -80,7 +79,7 @@ openclaw --profile dev skills list
 Run it in local embedded mode for stability:
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
+openclaw agent --agent basedintern --local --thinking off \
   --session-id basedintern_$(date +%s) \
   --message "Summarize this repo and identify key entrypoints."
 ```
@@ -90,15 +89,15 @@ openclaw --profile dev agent --agent basedintern --local --thinking off \
 ### Run tests
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
-  --message "Use exec to run: npm test"
+openclaw agent --agent basedintern --local --thinking off \
+  --message "Use exec to run: cd based-intern && npm test"
 ```
 
 ### Build + typecheck
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
-  --message "Use exec to run: npm run build && npm run typecheck"
+openclaw agent --agent basedintern --local --thinking off \
+  --message "Use exec to run: cd based-intern && npm run build && npx tsc --noEmit"
 ```
 
 ### Make a docs change safely
@@ -110,24 +109,22 @@ openclaw --profile dev agent --agent basedintern --local --thinking off \
 
 ## Web access: two modes
 
-### 1) Reliable: `exec` + `curl`
+### 1) Reliable: `web_fetch` / `web_search` (preferred)
 
-For “fetch a page/API and summarize”, the most reliable approach with small local models is:
+With Kimi, tool selection is reliable. Use `web_fetch` when you just need the page content:
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
-  --message "Use exec to run: curl -sL https://example.com | head -80"
+openclaw agent --agent basedintern --local --thinking off \
+  --message "Use web_fetch to fetch https://example.com and summarize the key points."
 ```
 
-### 2) Interactive: OpenClaw-managed browser (CLI)
+### 2) Interactive: browser automation (agent tool)
 
-If browser automation is set up (see `docs/STATUS.md`), you can do:
+Ask the agent to use `browser` directly:
 
 ```bash
-openclaw --profile dev browser start
-openclaw --profile dev browser open https://base.org
-openclaw --profile dev browser snapshot
-openclaw --profile dev browser click e123
+openclaw agent --agent basedintern --local --thinking off \
+  --message "Use the browser tool to open https://base.org, take a snapshot, then report the page title."
 ```
 
 ## Known limitations (small local models)
@@ -148,7 +145,7 @@ Workarounds:
 ### Clear stale locks
 
 ```bash
-find ~/.openclaw-dev -name "*.lock" -type f -delete
+find ~/.openclaw -name "*.lock" -type f -delete
 ```
 
 ### Kill stuck processes

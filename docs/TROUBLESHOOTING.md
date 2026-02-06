@@ -2,6 +2,9 @@
 
 This guide targets OpenClaw 2026.2.1 on WSL2 without systemd.
 
+Note: Older docs use `--profile dev` and `~/.openclaw-dev/`. This machine is now using the default config at `~/.openclaw/`.
+If you see `--profile dev` in examples, you can usually **omit it**.
+
 ## Golden-path baseline
 
 - Profile: `dev`
