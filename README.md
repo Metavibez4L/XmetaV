@@ -216,19 +216,25 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 openclaw agent --agent main --local --thinking off --message "Hello!"
 ```
 
-### Agent: `basedintern`
+### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
-| Property | Value |
-|----------|-------|
-| ID | `basedintern` |
-| Model | `ollama/kimi-k2.5:cloud` (256k context) |
-| Workspace | `/home/manifest/basedintern` |
-| Tools | `full` profile (fs, runtime, web, browser, automation) |
-| Elevated | Yes |
+| Property | `basedintern` | `basedintern_web` |
+|----------|---------------|-------------------|
+| Model | `kimi-k2.5:cloud` (256k) | `kimi-k2.5:cloud` (256k) |
+| Workspace | `/home/manifest/basedintern` | `/home/manifest/basedintern` |
+| Tools | `coding` (exec, read, write, process) | `full` (all tools + browser + web) |
+| Use for | 90% of work (code, tests, commits) | Only browser/web automation |
+
+**Why two agents?** The `coding` profile advertises ~4 tools (small schema). The `full` profile advertises 20+ tools. Fewer tools = fewer tokens per Kimi call = faster + less 429s.
 
 ```bash
+# Default (lean, fast)
 openclaw agent --agent basedintern --local --thinking off \
-  --message "Summarize this repo and run npm test."
+  --session-id bi_$(date +%s) --message "Run npm test."
+
+# Full tools (only when needed)
+openclaw agent --agent basedintern_web --local --thinking off \
+  --session-id biweb_$(date +%s) --message "Use web_fetch to check a URL."
 ```
 
 ### Creating New Agents

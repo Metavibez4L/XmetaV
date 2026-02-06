@@ -1,4 +1,4 @@
-# Agent: `basedintern`
+# Agent: `basedintern` (+ `basedintern_web`)
 
 ## Purpose
 
@@ -9,10 +9,23 @@
 - Running repo commands (`npm test`, `npm run build`, `npm run typecheck`, etc.)
 - Git tasks scoped to that repo (add/commit/push) when explicitly requested
 
+## Agent split (Kimi optimization)
+
+To reduce Kimi cloud token usage and avoid 429s, this agent is split into two:
+
+| Agent ID | Tools | When to use |
+|----------|-------|-------------|
+| `basedintern` | **coding** (exec, read, write, process) | 90% of work: code changes, tests, commits |
+| `basedintern_web` | **full** (fs, runtime, web, browser, automation) | Only when you need browser/web automation |
+
+Both share the same workspace (`/home/manifest/basedintern`) and model (`kimi-k2.5:cloud`).
+
+**Why the split matters**: The `coding` profile advertises ~4 tools to the model. The `full` profile advertises 20+ tools. Fewer tools = smaller tool schema per turn = fewer tokens per Kimi call = faster + less likely to hit 429.
+
 ## Identity and workspace
 
-- **Agent ID**: `basedintern`
-- **Workspace**: `/home/manifest/basedintern` (repo root)
+- **Agent ID**: `basedintern` (coding) / `basedintern_web` (full)
+- **Workspace**: `/home/manifest/basedintern` (repo root, shared)
 - **Agent dir**: `~/.openclaw/agents/basedintern/agent/`
 
 Verify:
@@ -23,18 +36,11 @@ openclaw agents list
 
 ## Model
 
-In this command center, `basedintern` is pinned to a cloud model (override of defaults):
+Both agents are pinned to a cloud model:
 
-```bash
-openclaw agents list --json
-openclaw config get agents.list
-```
+- `ollama/kimi-k2.5:cloud` (cloud; 256k context, maxTokens capped at 4096)
 
-Typical value:
-
-- `ollama/kimi-k2.5:cloud` (cloud; 256k context)
-
-### Cloud quota note (HTTP 429 “session usage limit”)
+### Cloud quota note (HTTP 429 "session usage limit")
 
 Ollama cloud models can return HTTP 429 if you exceed the current plan/session quota.
 
@@ -48,27 +54,36 @@ curl -i -sS http://127.0.0.1:11434/api/chat \
 Fix:
 - Wait for the limit window to reset, or upgrade your Ollama plan.
 
+### Optimization tips (avoid 429)
+
+1. **Use fresh session IDs** per task: `--session-id bi_$(date +%s)`
+2. **Keep prompts atomic** (one task per turn)
+3. **Don't paste big logs** — ask for exit codes + summary instead
+4. **Use `basedintern`** (coding profile) for 90% of work
+5. **Use `basedintern_web`** only when browser/web tools are needed
+
 ## Tools
 
-This agent is intended to run with **full repo automation** enabled:
+### `basedintern` (default — use this)
+
+Lean tool set for maximum speed and minimum token usage:
 
 - `exec` — run shell commands in the repo workspace
 - `read` / `write` — inspect and edit repo files
 - `process` — manage longer-running commands (tests, dev servers)
+
+### `basedintern_web` (full — use sparingly)
+
+All tools, for when you actually need web automation:
+
+- Everything in `basedintern` plus:
 - `web_fetch` / `web_search` — fetch pages + research
 - `browser` — OpenClaw-managed browser automation (UI tool)
-
-Verify current tool config:
-
-```bash
-openclaw config get agents.list
-```
+- `sessions` — inspect agent sessions
 
 ## Skills
 
 This command center uses bundled skills (including `github`), and can also load repo-local skills.
-
-You can see what’s ready/missing:
 
 ```bash
 openclaw skills list
@@ -76,12 +91,18 @@ openclaw skills list
 
 ## How to run (recommended)
 
-Run it in local embedded mode for stability:
+Run in local embedded mode for stability:
 
 ```bash
+# Default (coding tools — fast, lean)
 openclaw agent --agent basedintern --local --thinking off \
-  --session-id basedintern_$(date +%s) \
+  --session-id bi_$(date +%s) \
   --message "Summarize this repo and identify key entrypoints."
+
+# Full tools (only when needed)
+openclaw agent --agent basedintern_web --local --thinking off \
+  --session-id biweb_$(date +%s) \
+  --message "Use web_fetch to check https://example.com"
 ```
 
 ## Repo workflows (copy/paste)
@@ -90,6 +111,7 @@ openclaw agent --agent basedintern --local --thinking off \
 
 ```bash
 openclaw agent --agent basedintern --local --thinking off \
+  --session-id bi_test_$(date +%s) \
   --message "Use exec to run: cd based-intern && npm test"
 ```
 
@@ -97,6 +119,7 @@ openclaw agent --agent basedintern --local --thinking off \
 
 ```bash
 openclaw agent --agent basedintern --local --thinking off \
+  --session-id bi_build_$(date +%s) \
   --message "Use exec to run: cd based-intern && npm run build && npx tsc --noEmit"
 ```
 
@@ -104,43 +127,19 @@ openclaw agent --agent basedintern --local --thinking off \
 
 ```bash
 openclaw agent --agent basedintern --local --thinking off \
+  --session-id bi_docs_$(date +%s) \
   --message "Read docs/ then propose a small docs improvement in one file."
 ```
 
-## Web access: two modes
-
-### 1) Reliable: `web_fetch` / `web_search` (preferred)
-
-With Kimi, tool selection is reliable. Use `web_fetch` when you just need the page content:
+### Web access (use basedintern_web)
 
 ```bash
-openclaw agent --agent basedintern --local --thinking off \
+openclaw agent --agent basedintern_web --local --thinking off \
+  --session-id biweb_$(date +%s) \
   --message "Use web_fetch to fetch https://example.com and summarize the key points."
 ```
 
-### 2) Interactive: browser automation (agent tool)
-
-Ask the agent to use `browser` directly:
-
-```bash
-openclaw agent --agent basedintern --local --thinking off \
-  --message "Use the browser tool to open https://base.org, take a snapshot, then report the page title."
-```
-
-## Known limitations (small local models)
-
-With `qwen2.5:7b-instruct`, the agent may sometimes:
-
-- ignore the `browser` tool and fall back to `exec`/shell approaches
-- “narrate” steps instead of selecting the correct tool
-
-Workarounds:
-
-- Use deterministic CLI browser commands (`openclaw browser ...`) when you need interactive automation.
-- Keep prompts **atomic** (one tool action per message) when reliability matters.
-- Prefer `exec` + `curl` for web fetch tasks.
-
-## Maintenance / recovery (repo agent)
+## Maintenance / recovery
 
 ### Clear stale locks
 
@@ -154,4 +153,3 @@ find ~/.openclaw -name "*.lock" -type f -delete
 pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
 pkill -9 -f "node.*openclaw" 2>/dev/null || true
 ```
-

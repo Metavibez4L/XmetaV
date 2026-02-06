@@ -60,7 +60,9 @@ alias oc='openclaw'
 alias oca='openclaw agent --agent main --local'
 alias ocm='openclaw agent --agent main --local --message'
 alias ocbi='openclaw agent --agent basedintern --local --message'
+alias ocbiweb='openclaw agent --agent basedintern_web --local --message'
 
 # Usage: ocm "What is the capital of France?"
 # Usage: ocbi "Run npm test and report failures."
+# Usage: ocbiweb "Use web_fetch to check https://example.com"
 ```

@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.2.1",
-    "lastTouchedAt": "2026-02-03T21:31:35.645Z"
+    "lastTouchedAt": "2026-02-06T00:00:00.000Z"
   },
   "agents": {
     "defaults": {
@@ -13,9 +13,9 @@
       "compaction": {
         "mode": "safeguard"
       },
-      "maxConcurrent": 4,
+      "maxConcurrent": 2,
       "subagents": {
-        "maxConcurrent": 8
+        "maxConcurrent": 4
       },
       "model": {
         "primary": "ollama/qwen2.5:7b-instruct"
@@ -32,6 +32,22 @@
       },
       {
         "id": "basedintern",
+        "workspace": "/home/manifest/basedintern",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "basedintern_web",
         "workspace": "/home/manifest/basedintern",
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
@@ -76,11 +92,16 @@
         "models": [
           {
             "id": "qwen2.5:7b-instruct",
-            "name": "qwen2.5:7b-instruct"
+            "name": "qwen2.5:7b-instruct",
+            "contextWindow": 32768,
+            "maxTokens": 4096
           },
           {
             "id": "kimi-k2.5:cloud",
-            "name": "kimi-k2.5:cloud"
+            "name": "kimi-k2.5:cloud",
+            "input": ["text", "image"],
+            "contextWindow": 262144,
+            "maxTokens": 4096
           }
         ]
       }

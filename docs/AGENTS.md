@@ -93,12 +93,22 @@ You can create a dedicated agent whose workspace is a specific repo checkout. Th
 Example (`basedintern`):
 
 ```bash
-# Run the basedintern agent
+# Coding tasks (lean tools — fast, saves Kimi quota)
 openclaw agent --agent basedintern --local --thinking off \
+  --session-id bi_$(date +%s) \
   --message "Run npm test and summarize any failures."
+
+# Web/browser tasks (full tools — use sparingly)
+openclaw agent --agent basedintern_web --local --thinking off \
+  --session-id biweb_$(date +%s) \
+  --message "Use web_fetch to check https://example.com"
 ```
 
-The `basedintern` agent is configured in `~/.openclaw/openclaw.json` with:
-- Model: `ollama/kimi-k2.5:cloud` (256k context)
-- Workspace: `/home/manifest/basedintern`
-- Tools: `full` profile with elevated permissions
+The `basedintern` agents are configured in `~/.openclaw/openclaw.json`:
+
+| Agent | Tools | Purpose |
+|-------|-------|---------|
+| `basedintern` | `coding` (exec, read, write, process) | 90% of work |
+| `basedintern_web` | `full` (all tools + browser + web) | Web automation only |
+
+Both share workspace `/home/manifest/basedintern` and model `ollama/kimi-k2.5:cloud` (256k context, maxTokens 4096).

@@ -28,7 +28,11 @@ This command center is set up for **multiple isolated agents**:
   - Workspace: `/home/manifest/basedintern`
   - Intended use: repo analysis + code/docs changes + running tests (`npm test`)
   - Model: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
-  - Tools: **full** (fs + runtime + web + browser + github)
+  - Tools: **coding** (exec + read + write + process) — lean tool schema for speed + 429 avoidance
+- **`basedintern_web`**: same workspace, full tools — use only when browser/web automation is needed
+  - Workspace: `/home/manifest/basedintern` (shared)
+  - Model: `ollama/kimi-k2.5:cloud`
+  - Tools: **full** (fs + runtime + web + browser + automation)
 
 Detailed agent runbooks:
 - `docs/agents/main.md`
