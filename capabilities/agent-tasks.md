@@ -1,6 +1,6 @@
 # Agent Tasks
 
-Examples of what you can ask your AI agent to do.
+Examples of what you can ask your AI agents to do.
 
 ## Code Help
 
@@ -14,6 +14,8 @@ ocm "Why am I getting 'TypeError: NoneType object is not iterable'?"
 # Code review
 ocm "Review this code for bugs and improvements: $(cat myfile.py)"
 ```
+
+Note: `ocm` is an alias for `openclaw agent --agent main --local --message`. See `capabilities/quick-commands.md` for alias setup.
 
 ## Generate Code
 
@@ -41,7 +43,25 @@ ocm "My SSH connection keeps timing out, how do I fix it?"
 ocm "Write an nginx config for reverse proxy to localhost:3000"
 ```
 
-## Writing & Documentation
+## Repo Agent Tasks (basedintern)
+
+```bash
+# Run tests
+ocbi "Use exec to run: cd based-intern && npm test"
+
+# Typecheck + build
+ocbi "Use exec to run: cd based-intern && npx tsc --noEmit && npm run build"
+
+# Docs update
+ocbi "Read docs/STATUS.md and suggest improvements."
+
+# Full end-to-end
+ocbi "Pull latest, run typecheck, run tests, and summarize results."
+```
+
+Note: `ocbi` is an alias for `openclaw agent --agent basedintern --local --message`.
+
+## Writing and Documentation
 
 ```bash
 # Documentation
@@ -54,7 +74,7 @@ ocm "Explain Docker containers to a beginner"
 ocm "Summarize the key points of this article: $(cat article.txt)"
 ```
 
-## Data & Analysis
+## Data and Analysis
 
 ```bash
 # Data parsing
@@ -73,7 +93,7 @@ For complex, multi-turn conversations:
 
 ```bash
 # Start interactive mode
-openclaw --profile dev agent --agent dev --local
+openclaw agent --agent main --local
 
 # Now chat naturally:
 # > Let's build a web scraper

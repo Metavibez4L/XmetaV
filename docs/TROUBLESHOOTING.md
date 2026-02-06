@@ -2,15 +2,13 @@
 
 This guide targets OpenClaw 2026.2.1 on WSL2 without systemd.
 
-Note: Older docs use `--profile dev` and `~/.openclaw-dev/`. This machine is now using the default config at `~/.openclaw/`.
-If you see `--profile dev` in examples, you can usually **omit it**.
-
 ## Golden-path baseline
 
-- Profile: `dev`
-- Gateway: local, loopback, port 19001
+- Config: default (`~/.openclaw/openclaw.json`)
+- Gateway: local, loopback, port 18789
 - Ollama: `http://127.0.0.1:11434` (native install, NOT snap)
 - Provider API: `openai-responses` (required for tool calling)
+- Provider API key: `"local"` (required placeholder for OpenClaw auth checks)
 - Agent mode: `--local` (recommended for reliability)
 
 ### Performance expectations (with GPU)
@@ -26,10 +24,10 @@ Run the full repair + verify:
 ./scripts/openclaw-fix.sh
 ```
 
-## Problem: "gateway closed (1006)" / tries ws://127.0.0.1:19001
+## Problem: "gateway closed (1006)" / tries ws://127.0.0.1:18789
 
 ### Symptoms
-- `openclaw` connects to `ws://127.0.0.1:19001` and immediately fails.
+- `openclaw` connects to `ws://127.0.0.1:18789` and immediately fails.
 - Or the CLI tries an unexpected port (e.g. remote url), and fails.
 
 ### Causes
@@ -40,7 +38,7 @@ Run the full repair + verify:
 ### Fix
 1. Make gateway local:
    ```bash
-   openclaw --profile dev config set gateway.mode local
+   openclaw config set gateway.mode local
    ```
 2. Start/restart gateway:
    ```bash
@@ -48,7 +46,7 @@ Run the full repair + verify:
    ```
 3. Check health:
    ```bash
-   openclaw --profile dev health
+   openclaw health
    ```
 
 ## Problem: Agent hangs ("Waiting for agent reply…")
@@ -56,7 +54,7 @@ Run the full repair + verify:
 ### Cause 1: Gateway websocket connection issue
 The gateway websocket can hang on WSL2. **Use `--local` mode** to bypass:
 ```bash
-openclaw --profile dev agent --agent dev --local --message "Hi"
+openclaw agent --agent main --local --message "Hi"
 ```
 
 ### Cause 2: Ollama running on CPU (snap version)
@@ -78,14 +76,14 @@ Verify GPU is working (should show ~4-5GB VRAM usage):
 nvidia-smi
 ```
 
-### Cause 3: Wrong API mode (tools don’t execute / agent “narrates”)
+### Cause 3: Wrong API mode (tools don't execute / agent "narrates")
 Use `openai-responses` for tool calling:
 ```bash
-openclaw --profile dev config set models.providers.ollama.api openai-responses
-openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
+openclaw config set models.providers.ollama.api openai-responses
+openclaw config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
 ```
 
-If you only want chat (no tools), `openai-completions` can work, but tools won’t be callable.
+If you only want chat (no tools), `openai-completions` can work, but tools won't be callable.
 
 ### Verify Ollama chat endpoint works
 ```bash
@@ -104,12 +102,12 @@ Expected: Response in <1 second with GPU, 10+ seconds on CPU.
 ### Fix (safe)
 This deletes only lock files:
 ```bash
-find ~/.openclaw-dev -name "*.lock" -type f -delete
+find ~/.openclaw -name "*.lock" -type f -delete
 ```
 
 Then rerun:
 ```bash
-openclaw --profile dev agent --agent dev --session-id fresh_ok --message "Say OK"
+openclaw agent --agent main --session-id fresh_ok --message "Say OK"
 ```
 
 ## Problem: Port already in use
@@ -120,14 +118,14 @@ openclaw --profile dev agent --agent dev --session-id fresh_ok --message "Say OK
 
 ### Fix
 ```bash
-fuser -k 19001/tcp
+fuser -k 18789/tcp
 ./scripts/start-gateway.sh
 ```
 
 ## Problem: Browser automation fails to start (WSL2/Linux)
 
 ### Symptoms
-- `openclaw --profile dev browser start` fails with:
+- `openclaw browser start` fails with:
   - `No supported browser found`, or
   - `error while loading shared libraries: libnspr4.so: cannot open shared object file`
 
@@ -156,9 +154,9 @@ npx playwright install chromium
 3) Configure OpenClaw to use that Chromium:
 
 ```bash
-openclaw --profile dev config set browser.enabled true
-openclaw --profile dev config set browser.defaultProfile openclaw
-openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+openclaw config set browser.enabled true
+openclaw config set browser.defaultProfile openclaw
+openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
 ```
 
 4) Restart gateway and retest:
@@ -166,25 +164,25 @@ openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwr
 ```bash
 pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
 ./scripts/start-gateway.sh
-openclaw --profile dev browser start
-openclaw --profile dev browser open https://example.com
-openclaw --profile dev browser snapshot
+openclaw browser start
+openclaw browser open https://example.com
+openclaw browser snapshot
 ```
 
 ## Problem: Agent ignores browser tool (small local models)
 
 ### Symptoms
-- You ask an agent to “use the browser tool”, but it uses `exec` + `curl`, or tries shell screenshot tools (`scrot`, `gnome-screenshot`, etc.).
+- You ask an agent to "use the browser tool", but it uses `exec` + `curl`, or tries shell screenshot tools (`scrot`, `gnome-screenshot`, etc.).
 
 ### Cause
 Smaller local models (notably `qwen2.5:7b-instruct`) can be inconsistent at reliably selecting complex tools like `browser`.
 
 ### Fix / Workarounds
 - Use deterministic CLI browser automation instead:
-  - `openclaw --profile dev browser open ...`
-  - `openclaw --profile dev browser snapshot`
-  - `openclaw --profile dev browser click <ref>`
-- Or use `exec` + `curl -sL ...` for “web fetch + summarize” tasks.
+  - `openclaw browser open ...`
+  - `openclaw browser snapshot`
+  - `openclaw browser click <ref>`
+- Or use `exec` + `curl -sL ...` for "web fetch + summarize" tasks.
 - If you need the agent itself to drive the browser, consider a larger model with better tool-selection behavior.
 
 ## Problem: Ollama reachable but model not found
@@ -207,37 +205,33 @@ The API mode `openai-completions` doesn't support function calling. Tool schemas
 ### Fix
 1. Switch to `openai-responses` API mode (supports tool calling):
    ```bash
-   openclaw --profile dev config set models.providers.ollama.api "openai-responses"
-   ```
-   Note: You may need to set the full ollama provider config:
-   ```bash
-   openclaw --profile dev config set models.providers.ollama '{"baseUrl":"http://127.0.0.1:11434/v1","apiKey":"ollama-local","api":"openai-responses","models":[{"id":"qwen2.5:7b-instruct","name":"qwen2.5:7b-instruct","reasoning":false,"input":["text"],"contextWindow":32768,"maxTokens":4096}]}'
+   openclaw config set models.providers.ollama.api "openai-responses"
    ```
 
-2. Use `coding` profile to enable tools:
+2. Ensure the Ollama API key placeholder is set:
    ```bash
-   openclaw --profile dev config set tools.profile coding
+   openclaw config set models.providers.ollama.apiKey "local"
    ```
 
 ### Verify fix
 ```bash
 # Check JSON output for tool entries
-openclaw --profile dev agent --agent dev --local --thinking off --json \
+openclaw agent --agent main --local --thinking off --json \
   --message "Use exec to run: whoami" 2>&1 | grep -o '"entries": \[[^]]*\]'
 # Should show entries like: "entries": [{"name":"read"...}]
 
 # Test actual execution
-timeout 30 openclaw --profile dev agent --agent dev --local --thinking off \
+timeout 30 openclaw agent --agent main --local --thinking off \
   --message "Call the exec tool with command: date +%Y-%m-%d"
 # Should return today's actual date (Feb 2026)
 ```
 
-## Problem: Ollama Cloud model returns HTTP 429 (“session usage limit”)
+## Problem: Ollama Cloud model returns HTTP 429 ("session usage limit")
 
 ### Symptoms
 - Any request to a cloud model (e.g. `kimi-k2.5:cloud`) fails with:
   - `HTTP 429: you've reached your session usage limit, please wait or upgrade to continue`
-- The failure happens even for a tiny prompt like “OK”.
+- The failure happens even for a tiny prompt like "OK".
 
 ### Cause
 Ollama Cloud enforces plan-based usage limits for cloud models. When the account/session quota is exhausted, the local Ollama daemon returns HTTP 429.
@@ -278,31 +272,31 @@ The qwen2.5:7b-instruct model gets confused by OpenClaw's 23+ tools and repeated
 ### Fix (applied to this setup)
 1. Disable TTS completely:
    ```bash
-   openclaw --profile dev config set messages.tts.auto off
-   openclaw --profile dev config set messages.tts.edge.enabled false
-   openclaw --profile dev config set messages.tts.modelOverrides.enabled false
+   openclaw config set messages.tts.auto off
+   openclaw config set messages.tts.edge.enabled false
+   openclaw config set messages.tts.modelOverrides.enabled false
    ```
 
 2. Block TTS tool from being presented to the model:
    ```bash
-   openclaw --profile dev config set tools.deny '["tts"]'
+   openclaw config set tools.deny '["tts"]'
    ```
 
 3. Use coding profile for tool execution (or minimal if no tools needed):
    ```bash
-   openclaw --profile dev config set tools.profile coding  # For system automation
+   openclaw config set tools.profile coding  # For system automation
    # OR
-   openclaw --profile dev config set tools.profile minimal  # For chat-only
+   openclaw config set tools.profile minimal  # For chat-only
    ```
 
 4. Use `--thinking off` flag for simple prompts:
    ```bash
-   openclaw --profile dev agent --agent dev --local --thinking off --message "Hello"
+   openclaw agent --agent main --local --thinking off --message "Hello"
    ```
 
 ### Verify fix
 ```bash
-timeout 30 openclaw --profile dev agent --agent dev --local --session-id test_$(date +%s) --thinking off --message "What is 2+2?"
+timeout 30 openclaw agent --agent main --local --session-id test_$(date +%s) --thinking off --message "What is 2+2?"
 # Expected: "4" or "The answer is 4" in ~5 seconds
 ```
 
@@ -310,7 +304,7 @@ timeout 30 openclaw --profile dev agent --agent dev --local --session-id test_$(
 
 ## Collecting logs
 
-- Gateway logs: `~/.openclaw-dev/gateway.log`
+- Gateway logs: `~/.openclaw/gateway.log`
 - Main logs: `/tmp/openclaw/openclaw-*.log`
 - Quick health + agent test:
   ```bash

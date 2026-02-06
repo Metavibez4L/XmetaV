@@ -103,7 +103,7 @@ openclaw agent --agent basedintern --local --thinking off \
 ### Make a docs change safely
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off \
+openclaw agent --agent basedintern --local --thinking off \
   --message "Read docs/ then propose a small docs improvement in one file."
 ```
 

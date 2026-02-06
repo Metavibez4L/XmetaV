@@ -2,38 +2,42 @@
 
 One-page quick reference.
 
-## 🚀 Daily Commands
+## Daily Commands
 
 ```bash
 ocm "message"           # Quick question (alias)
 oca                     # Interactive chat (alias)
+ocbi "message"          # Basedintern repo agent (alias)
 ./scripts/health-check.sh   # Verify everything works
 ```
 
-## 📝 Full Commands
+## Full Commands
 
 ```bash
-# One-shot
-openclaw --profile dev agent --agent dev --local --message "Question"
+# One-shot (main agent)
+openclaw agent --agent main --local --message "Question"
+
+# One-shot (basedintern agent)
+openclaw agent --agent basedintern --local --message "Run npm test"
 
 # Interactive
-openclaw --profile dev agent --agent dev --local
+openclaw agent --agent main --local
 
 # With thinking
-openclaw --profile dev agent --agent dev --local --thinking high
+openclaw agent --agent main --local --thinking high
 ```
 
-## 🔧 Management
+## Management
 
 | Action | Command |
 |--------|---------|
 | Start gateway | `./scripts/start-gateway.sh` |
 | Stop all | `./scripts/stop-all.sh` |
 | Full reset | `./scripts/openclaw-fix.sh` |
-| Doctor | `openclaw --profile dev doctor` |
-| Config | `nano ~/.openclaw-dev/openclaw.json` |
+| Doctor | `openclaw doctor` |
+| Config | `nano ~/.openclaw/openclaw.json` |
 
-## 💬 Chat Commands (interactive mode)
+## Chat Commands (interactive mode)
 
 | Command | Action |
 |---------|--------|
@@ -42,11 +46,11 @@ openclaw --profile dev agent --agent dev --local --thinking high
 | `/think high` | Extended thinking |
 | `/compact` | Summarize context |
 
-## 🖥️ System Checks
+## System Checks
 
 ```bash
 # Gateway up?
-nc -z 127.0.0.1 19001 && echo "OK"
+nc -z 127.0.0.1 18789 && echo "OK"
 
 # Ollama running?
 curl -s localhost:11434/api/tags | jq '.models[].name'
@@ -55,47 +59,51 @@ curl -s localhost:11434/api/tags | jq '.models[].name'
 nvidia-smi --query-gpu=memory.used --format=csv,noheader
 ```
 
-## 📦 Add Models
+## Add Models
 
 ```bash
-ollama pull llama3:8b
-ollama pull codellama:7b
-ollama pull mistral:7b
+ollama pull qwen2.5:7b-instruct  # Local (default)
+ollama pull kimi-k2.5:cloud      # Cloud (requires ollama signin)
+ollama pull llama3:8b             # Alternative
+ollama pull codellama:7b          # Code-focused
 ```
 
-## 🔑 Key Paths
+## Key Paths
 
 | Path | Purpose |
 |------|---------|
-| `~/.openclaw-dev/openclaw.json` | Config |
-| `~/.openclaw-dev/workspace/` | Agent files |
-| `~/.openclaw-dev/logs/` | Logs |
-| `/home/manifest/projects/XmetaV/` | Command center |
+| `~/.openclaw/openclaw.json` | Config |
+| `~/.openclaw/workspace/` | Main agent files |
+| `~/.openclaw/gateway.log` | Gateway logs |
+| `/home/manifest/basedintern/` | Basedintern agent workspace |
+| `/home/manifest/XmetaV/` | Command center |
 
-## ⚡ Recommended Aliases
+## Recommended Aliases
 
 ```bash
 # Add to ~/.bashrc
-alias oc='openclaw --profile dev'
-alias oca='openclaw --profile dev agent --agent dev --local'
-alias ocm='openclaw --profile dev agent --agent dev --local --message'
+alias oc='openclaw'
+alias oca='openclaw agent --agent main --local'
+alias ocm='openclaw agent --agent main --local --message'
+alias ocbi='openclaw agent --agent basedintern --local --message'
 ```
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Gateway stuck | `./scripts/stop-all.sh && rm ~/.openclaw-dev/*.lock` |
+| Gateway stuck | `./scripts/stop-all.sh && find ~/.openclaw -name "*.lock" -delete` |
 | Slow responses | Check `nvidia-smi` - ensure GPU active |
 | Agent hangs | Use `--local` flag |
-| Config error | Run `openclaw --profile dev doctor` |
+| Config error | Run `openclaw doctor` |
+| API key error | `openclaw config set models.providers.ollama.apiKey "local"` |
 
-## 📊 Your Setup
+## Your Setup
 
 ```
-Profile:  dev
-Gateway:  127.0.0.1:19001
-Model:    qwen2.5:7b-instruct
+Config:   ~/.openclaw/openclaw.json
+Gateway:  127.0.0.1:18789
+Agents:   main (qwen2.5:7b), basedintern (kimi-k2.5:cloud)
 GPU:      RTX 4070 (8GB)
 Speed:    42-54 tok/s
 ```

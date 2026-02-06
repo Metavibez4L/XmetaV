@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Start OpenClaw Gateway (dev profile) in the background.
+# Start OpenClaw Gateway in the background.
 # Safe to re-run: kills anything on the target port and restarts.
 set -euo pipefail
 
-PROFILE="dev"
-STATE_DIR="$HOME/.openclaw-dev"
-PORT=19001
+STATE_DIR="$HOME/.openclaw"
+PORT=18789
 
 mkdir -p "$STATE_DIR"
 
@@ -15,11 +14,11 @@ pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
 fuser -k ${PORT}/tcp 2>/dev/null || true
 sleep 1
 
-echo "▶ Ensuring gateway.mode=local (recommended for WSL2 dev)..."
-openclaw --profile "$PROFILE" config set gateway.mode local >/dev/null
+echo "▶ Ensuring gateway.mode=local (recommended for WSL2)..."
+openclaw config set gateway.mode local >/dev/null
 
 echo "▶ Starting gateway (ws://127.0.0.1:$PORT)..."
-nohup openclaw --profile "$PROFILE" gateway --port "$PORT" --force --verbose \
+nohup openclaw gateway --port "$PORT" --force --verbose \
   > "$STATE_DIR/gateway.log" 2>&1 &
 PID=$!
 

@@ -6,9 +6,9 @@ This command center assumes Ollama is running locally with **GPU acceleration** 
 
 - **NVIDIA GPU** with CUDA support (tested: RTX 4070)
 - Ollama reachable at: `http://127.0.0.1:11434`
-- Model installed: `qwen2.5:7b-instruct`
+- Models installed: `qwen2.5:7b-instruct`, `kimi-k2.5:cloud`
 
-> ⚠️ **CRITICAL**: Use the **native Ollama installer**, NOT snap. Snap Ollama does not have proper CUDA support.
+> **CRITICAL**: Use the **native Ollama installer**, NOT snap. Snap Ollama does not have proper CUDA support.
 
 ## Install Ollama (Native with CUDA)
 
@@ -19,8 +19,11 @@ sudo snap disable ollama 2>/dev/null
 # Install native Ollama with CUDA support
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull the model
+# Pull the local model
 ollama pull qwen2.5:7b-instruct
+
+# Sign in for cloud models (required for kimi-k2.5:cloud)
+ollama signin
 ```
 
 ## Verify Ollama is running with GPU
@@ -38,10 +41,12 @@ nvidia-smi
 
 Expected: `size_vram` shows ~4-5 GB for qwen2.5:7b-instruct.
 
-## Ensure model is present
+## Ensure models are present
 
 ```bash
 ollama pull qwen2.5:7b-instruct
+# Cloud model (requires ollama signin):
+ollama pull kimi-k2.5:cloud
 ```
 
 ## Verify OpenAI-compatible chat endpoint
@@ -64,16 +69,21 @@ These are the settings this repo standardizes on:
 
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
 - `models.providers.ollama.api`: `openai-responses` (tool calling)
+- `models.providers.ollama.apiKey`: `"local"` (required placeholder)
 
 Apply:
 ```bash
-openclaw --profile dev config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
-openclaw --profile dev config set models.providers.ollama.api openai-responses
+openclaw config set models.providers.ollama.baseUrl http://127.0.0.1:11434/v1
+openclaw config set models.providers.ollama.api openai-responses
+openclaw config set models.providers.ollama.apiKey local
 ```
 
-## Context window
+## Context windows
 
-For `qwen2.5:7b-instruct`, the model supports 32768 context window.
+| Model | Context Window |
+|-------|---------------|
+| `qwen2.5:7b-instruct` | 32,768 |
+| `kimi-k2.5:cloud` | 262,144 (256k) |
 
 ```bash
 curl -s http://127.0.0.1:11434/api/show -d '{"name":"qwen2.5:7b-instruct"}' | grep context
@@ -92,7 +102,7 @@ curl -s http://127.0.0.1:11434/api/show -d '{"name":"qwen2.5:7b-instruct"}' | gr
 
 For reliable agent calls, use `--local` mode:
 ```bash
-openclaw --profile dev agent --agent dev --local --message "Your prompt"
+openclaw agent --agent main --local --message "Your prompt"
 ```
 
 The `--local` flag runs the agent embedded, bypassing gateway websocket issues on WSL2.

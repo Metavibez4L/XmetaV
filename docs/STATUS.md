@@ -31,7 +31,7 @@ This command center is set up for **multiple isolated agents**:
   - Tools: **full** (fs + runtime + web + browser + github)
 
 Detailed agent runbooks:
-- `docs/agents/dev.md`
+- `docs/agents/main.md`
 - `docs/agents/basedintern.md`
 
 List agents:
@@ -113,7 +113,7 @@ Fix:
 
 ```bash
 # Gateway should be reachable
-openclaw --profile dev health
+openclaw health
 
 # Ollama should list models
 curl -s http://127.0.0.1:11434/api/tags
@@ -127,7 +127,7 @@ curl -s http://127.0.0.1:11434/api/ps
 This is the “we can ship” verification for `basedintern`:
 
 ```bash
-openclaw --profile dev agent --agent basedintern --local --thinking off --session-id bi_smoke_$(date +%s) --message "\
+openclaw agent --agent basedintern --local --thinking off --session-id bi_smoke_$(date +%s) --message "\
 In /home/manifest/basedintern/based-intern, use exec to run:\n\
 1) git pull --ff-only\n\
 2) npx tsc --noEmit\n\
@@ -139,12 +139,12 @@ Paste raw stdout/stderr and exit codes."
 
 ```bash
 # Clear stale session locks
-find ~/.openclaw-dev -name "*.lock" -type f -delete
+find ~/.openclaw -name "*.lock" -type f -delete
 
 # Stop anything stuck
 pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
 pkill -9 -f "node.*openclaw" 2>/dev/null || true
-fuser -k 19001/tcp 2>/dev/null || true
+fuser -k 18789/tcp 2>/dev/null || true
 
 # Re-apply the golden-path fix
 ./scripts/openclaw-fix.sh
@@ -152,14 +152,16 @@ fuser -k 19001/tcp 2>/dev/null || true
 
 ## Tool Calling (System Automation)
 
-With `tools.profile=coding` and `api=openai-responses`, the agent can:
+With `tools.profile=coding` (or `full` for `basedintern`) and `api=openai-responses`, the agent can:
 - Execute shell commands via `exec` tool
 - Read/write files via `read`/`write` tools
 - Manage background processes via `process` tool
+- Browse the web via `browser` tool (full profile)
+- Fetch web pages via `web_fetch` / `web_search` tools (full profile)
 
 Test:
 ```bash
-openclaw --profile dev agent --agent dev --local --thinking off \
+openclaw agent --agent main --local --thinking off \
   --message "Call the exec tool with command: whoami"
 ```
 
@@ -195,12 +197,9 @@ npx playwright install chromium
 3) Point OpenClaw at that Chromium (example path shown; adjust if your version differs):
 
 ```bash
-openclaw --profile dev config set browser.enabled true
-openclaw --profile dev config set browser.defaultProfile openclaw
-openclaw --profile dev config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
-
-# Ensure browser tool is allowed (if using allowlist)
-openclaw --profile dev config set tools.allow '[\"exec\",\"process\",\"read\",\"write\",\"browser\"]'
+openclaw config set browser.enabled true
+openclaw config set browser.defaultProfile openclaw
+openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
 ```
 
 ### Smoke test (CLI)
@@ -209,9 +208,9 @@ openclaw --profile dev config set tools.allow '[\"exec\",\"process\",\"read\",\"
 # Start gateway (if not already running)
 ./scripts/start-gateway.sh
 
-openclaw --profile dev browser start
-openclaw --profile dev browser open https://example.com
-openclaw --profile dev browser snapshot
+openclaw browser start
+openclaw browser open https://example.com
+openclaw browser snapshot
 ```
 
 ### Known limitation (small local models)

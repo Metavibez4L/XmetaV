@@ -2,12 +2,10 @@
 
 This doc covers how to manage OpenClaw agents on this system.
 
-Note: Older iterations of this command center used a separate `dev` profile and `~/.openclaw-dev/`. The current setup uses the default config at `~/.openclaw/`. If you still use a profile, prefix commands with `openclaw --profile dev ...`.
-
 For per-agent runbooks, see `docs/agents/`:
 
 - `docs/agents/README.md`
-- `docs/agents/dev.md`
+- `docs/agents/main.md`
 - `docs/agents/basedintern.md`
 
 ## Quick reference
@@ -15,14 +13,14 @@ For per-agent runbooks, see `docs/agents/`:
 - List agents: `openclaw agents list`
 - Run default agent: `openclaw agent --message "Hello"`
 - Run specific agent: `openclaw agent --agent basedintern --message "Hello"`
-- Use a stable session id: `openclaw --profile dev agent --session-id my_session --message "..."`
+- Use a stable session id: `openclaw agent --session-id my_session --message "..."`
 - Browser automation (CLI): `openclaw browser open https://example.com`
 
 ## How agent routing works
 
-OpenClaw’s agent command sends a turn through the Gateway.
+OpenClaw's agent command sends a turn through the Gateway.
 
-- Gateway must be reachable (default dev: `ws://127.0.0.1:19001`).
+- Gateway must be reachable (default: `ws://127.0.0.1:18789`).
 - Model provider must be configured correctly (this setup uses Ollama via OpenAI-compatible `/v1`).
 
 ## Agent workspace
@@ -35,26 +33,26 @@ This is where agent tools and working files may be created during runs.
 
 OpenClaw persists sessions as JSONL files and uses lock files to protect writes.
 
-- Session files: under `~/.openclaw-dev/agents/<agent>/sessions/`
+- Session files: under `~/.openclaw/agents/<agent>/sessions/`
 - Lock files: `*.jsonl.lock`
 
 ### Why locks cause hangs
 If OpenClaw crashes mid-write, the lock file may remain. Future runs can block waiting on the lock.
 
 ### Safe lock cleanup
-This repo’s scripts only delete `*.lock` files, not the session history.
+This repo's scripts only delete `*.lock` files, not the session history.
 
 Manual cleanup:
 ```bash
-find ~/.openclaw-dev -name "*.lock" -type f -delete
+find ~/.openclaw -name "*.lock" -type f -delete
 ```
 
 ## Deterministic smoke tests
 
 Use a new session id each time to avoid ambiguous session state:
 ```bash
-openclaw --profile dev agent \
-  --agent dev \
+openclaw agent \
+  --agent main \
   --session-id fresh_ok_$(date +%s) \
   --local \
   --thinking off \
@@ -77,7 +75,7 @@ OpenClaw supports a dedicated managed browser (`openclaw browser ...`). On small
 If you pin an agent to an Ollama cloud model (e.g. `kimi-k2.5:cloud`), note:
 
 - Auth is via `ollama signin` (no API key needed for local `http://127.0.0.1:11434` calls).
-- Cloud models can hit plan/session limits and return HTTP 429 (“session usage limit”).
+- Cloud models can hit plan/session limits and return HTTP 429 ("session usage limit").
 - Keep a local fallback model configured for when cloud quota is exhausted.
 
 ## Concurrency notes
@@ -95,15 +93,12 @@ You can create a dedicated agent whose workspace is a specific repo checkout. Th
 Example (`basedintern`):
 
 ```bash
-# Add the repo agent
-openclaw --profile dev agents add basedintern \
-  --workspace "$HOME/basedintern/based-intern" \
-  --non-interactive
-
-# Optional identity (nice in logs + agent lists)
-openclaw --profile dev agents set-identity --agent basedintern --name "BasedIntern" --emoji "🤖"
-
-# Run it
-openclaw --profile dev agent --agent basedintern --local --thinking off \
+# Run the basedintern agent
+openclaw agent --agent basedintern --local --thinking off \
   --message "Run npm test and summarize any failures."
 ```
+
+The `basedintern` agent is configured in `~/.openclaw/openclaw.json` with:
+- Model: `ollama/kimi-k2.5:cloud` (256k context)
+- Workspace: `/home/manifest/basedintern`
+- Tools: `full` profile with elevated permissions

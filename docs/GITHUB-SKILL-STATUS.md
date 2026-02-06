@@ -8,7 +8,7 @@
 
 ## Usage Example
 ```
-openclaw --profile dev agent --agent dev --local --message '/github help' --json
+openclaw agent --agent main --local --message '/github help' --json
 ```
 
 ## Troubleshooting
