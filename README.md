@@ -7,7 +7,20 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 ```
-XmetaV Command Center -- Automation Infrastructure Management
+ ___   ___                    __           ___   ___
+ \  \ /  / _ __ ___    ___  _/  |_  __ _   \  \ /  /
+  \  V  / | '_ ` _ \  / _ \ \   __\/ _` |   \  V  /
+  /  X  \ | | | | | ||  __/  |  | | (_| |   /     \
+ /__/ \__\|_| |_| |_| \___|  |__|  \__,_|  /__/ \__\
+
+      [ COMMAND CENTER : AGENT ORCHESTRATION ]
+  _______________________________________________
+ |                                               |
+ |   agents:  main | basedintern | basedintern_web
+ |   models:  qwen2.5:7b  |  kimi-k2.5:cloud
+ |   gateway: ws://127.0.0.1:18789
+ |   engine:  Ollama + CUDA  |  RTX 4070
+ |_______________________________________________|
 ```
 
 ---
