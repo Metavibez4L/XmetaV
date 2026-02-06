@@ -38,7 +38,7 @@ openclaw agents list
 
 Both agents are pinned to a cloud model:
 
-- `ollama/kimi-k2.5:cloud` (cloud; 256k context, maxTokens capped at 4096)
+- `ollama/kimi-k2.5:cloud` (cloud; 256k context, maxTokens capped at 8192)
 
 ### Cloud quota note (HTTP 429 "session usage limit")
 
@@ -83,21 +83,100 @@ All tools, for when you actually need web automation:
 
 ## Skills
 
-This command center uses bundled skills (including `github`), and can also load repo-local skills.
+Installed skills in the basedintern workspace (`/home/manifest/basedintern/.openclaw/skills/`):
+
+| Skill | Description |
+|-------|-------------|
+| `github` | GitHub CLI (`gh`) for issues, PRs, CI runs |
+| `self-edit` | Edit skill files |
+| `self-evolve` | Self-modification with backup/restore |
+| `repo-ops` | Atomic repo operations (typecheck, test, commit, push) |
+| `repo-health` | Full health check returning structured JSON |
 
 ```bash
 openclaw skills list
 ```
 
+### repo-ops (most useful)
+
+Single-command repo operations — eliminates multi-step exec chaining:
+
+```bash
+# Typecheck
+/repo-ops typecheck
+
+# Run tests
+/repo-ops test
+
+# Full check (typecheck + test)
+/repo-ops check
+
+# Git status
+/repo-ops status
+
+# Commit + push
+/repo-ops commit "feat: add new feature"
+/repo-ops push
+```
+
+### repo-health
+
+One-shot health check that returns structured JSON:
+
+```bash
+/repo-health
+```
+
+Output:
+```json
+{
+  "tsc": "pass",
+  "tsc_errors": 0,
+  "tests": "pass",
+  "tests_total": 217,
+  "tests_passed": 217,
+  "tests_failed": 0,
+  "git": "clean",
+  "git_branch": "main",
+  "git_changed_files": 0
+}
+```
+
 ## How to run (recommended)
 
-Run in local embedded mode for stability:
+### Option 1: agent-task.sh wrapper (best for reliability)
+
+Use the XmetaV wrapper script that bakes in all anti-stall best practices:
+
+```bash
+# Single atomic task
+./scripts/agent-task.sh basedintern "Run /repo-health and report results"
+
+# Chain tasks (stops on first failure)
+./scripts/agent-task.sh basedintern "Run /repo-ops typecheck" && \
+./scripts/agent-task.sh basedintern "Run /repo-ops test"
+```
+
+### Option 2: agent-pipeline.sh (multi-step workflows)
+
+```bash
+# Health check
+./scripts/agent-pipeline.sh health
+
+# Ship (typecheck + test + commit + push)
+./scripts/agent-pipeline.sh ship "feat: add LP support"
+
+# Evolve (health + implement + health)
+./scripts/agent-pipeline.sh evolve "add retry logic to moltbook posting"
+```
+
+### Option 3: Direct openclaw (manual control)
 
 ```bash
 # Default (coding tools — fast, lean)
 openclaw agent --agent basedintern --local --thinking off \
   --session-id bi_$(date +%s) \
-  --message "Summarize this repo and identify key entrypoints."
+  --message "Run /repo-health"
 
 # Full tools (only when needed)
 openclaw agent --agent basedintern_web --local --thinking off \
@@ -105,38 +184,47 @@ openclaw agent --agent basedintern_web --local --thinking off \
   --message "Use web_fetch to check https://example.com"
 ```
 
+## Anti-stall best practices
+
+The agent stalls on complex multi-step prompts. Avoid this by:
+
+1. **One task per message** — never combine "typecheck AND fix AND commit" in one prompt
+2. **Use skills** — `/repo-ops typecheck` is one tool call; "run npx tsc --noEmit" requires reasoning about cd, exec, etc.
+3. **Fresh session per task** — `--session-id bi_$(date +%s)` prevents context pollution
+4. **Use `--thinking off`** — reduces token waste on Kimi K2.5
+5. **Use `--local`** — avoids gateway websocket hangs on WSL2
+6. **Use the wrapper scripts** — `agent-task.sh` and `agent-pipeline.sh` enforce all of the above
+
 ## Repo workflows (copy/paste)
 
-### Run tests
+### Quick health check
 
 ```bash
-openclaw agent --agent basedintern --local --thinking off \
-  --session-id bi_test_$(date +%s) \
-  --message "Use exec to run: cd based-intern && npm test"
+./scripts/agent-task.sh basedintern "Run /repo-health"
 ```
 
-### Build + typecheck
+### Run tests only
 
 ```bash
-openclaw agent --agent basedintern --local --thinking off \
-  --session-id bi_build_$(date +%s) \
-  --message "Use exec to run: cd based-intern && npm run build && npx tsc --noEmit"
+./scripts/agent-task.sh basedintern "Run /repo-ops test"
 ```
 
-### Make a docs change safely
+### Ship changes
 
 ```bash
-openclaw agent --agent basedintern --local --thinking off \
-  --session-id bi_docs_$(date +%s) \
-  --message "Read docs/ then propose a small docs improvement in one file."
+./scripts/agent-pipeline.sh ship "feat: add new feature"
+```
+
+### Implement + verify
+
+```bash
+./scripts/agent-pipeline.sh evolve "add error handling to the LP manager"
 ```
 
 ### Web access (use basedintern_web)
 
 ```bash
-openclaw agent --agent basedintern_web --local --thinking off \
-  --session-id biweb_$(date +%s) \
-  --message "Use web_fetch to fetch https://example.com and summarize the key points."
+./scripts/agent-task.sh basedintern_web "Use web_fetch to fetch https://example.com and summarize"
 ```
 
 ## Maintenance / recovery

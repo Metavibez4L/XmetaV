@@ -45,13 +45,50 @@ ocm "Write an nginx config for reverse proxy to localhost:3000"
 
 ## Repo Agent Tasks (basedintern)
 
+### Using skills (recommended — no stalling)
+
 ```bash
-# Run tests
-ocbi "Use exec to run: cd based-intern && npm test"
+# Health check (typecheck + test + git status in one shot)
+ocbi "Run /repo-health"
 
-# Typecheck + build
-ocbi "Use exec to run: cd based-intern && npx tsc --noEmit && npm run build"
+# Typecheck only
+ocbi "Run /repo-ops typecheck"
 
+# Run tests only
+ocbi "Run /repo-ops test"
+
+# Full check (typecheck + test)
+ocbi "Run /repo-ops check"
+
+# Git status
+ocbi "Run /repo-ops status"
+
+# Commit changes
+ocbi "Run /repo-ops commit 'feat: add new feature'"
+
+# Push
+ocbi "Run /repo-ops push"
+```
+
+### Using wrapper scripts (best for pipelines)
+
+```bash
+# Single atomic task
+./scripts/agent-task.sh basedintern "Run /repo-health"
+
+# Ship pipeline (typecheck + test + commit + push)
+./scripts/agent-pipeline.sh ship "feat: add LP support"
+
+# Evolve pipeline (health + implement + health)
+./scripts/agent-pipeline.sh evolve "add retry logic to moltbook posting"
+
+# Health check pipeline
+./scripts/agent-pipeline.sh health
+```
+
+### Manual commands (legacy — can stall on complex tasks)
+
+```bash
 # Docs update
 ocbi "Read docs/STATUS.md and suggest improvements."
 

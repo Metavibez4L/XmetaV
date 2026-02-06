@@ -8,14 +8,31 @@ Essential commands for daily use.
 # One-shot message (default agent: main)
 openclaw agent --agent main --local --message "Your question here"
 
-# Run basedintern repo agent
-openclaw agent --agent basedintern --local --message "Run npm test."
+# Run basedintern repo agent (using skills — preferred)
+openclaw agent --agent basedintern --local --message "Run /repo-health"
 
 # Interactive chat session
 openclaw agent --agent main --local
 
 # With extended thinking (for complex tasks)
 openclaw agent --agent main --local --thinking high --message "Complex task..."
+```
+
+## Agent Task Wrappers (anti-stall)
+
+```bash
+# Single atomic task (fresh session, --local, --thinking off)
+./scripts/agent-task.sh basedintern "Run /repo-health"
+./scripts/agent-task.sh basedintern "Run /repo-ops typecheck"
+
+# Multi-step pipelines (each step = separate agent run)
+./scripts/agent-pipeline.sh health                          # typecheck + test + report
+./scripts/agent-pipeline.sh ship "feat: add new feature"    # typecheck + test + commit + push
+./scripts/agent-pipeline.sh fix                             # typecheck + report errors
+./scripts/agent-pipeline.sh evolve "add retry logic"        # health + implement + health
+
+# Use a different agent
+AGENT=basedintern_web ./scripts/agent-pipeline.sh health
 ```
 
 ## Gateway Management
@@ -62,7 +79,12 @@ alias ocm='openclaw agent --agent main --local --message'
 alias ocbi='openclaw agent --agent basedintern --local --message'
 alias ocbiweb='openclaw agent --agent basedintern_web --local --message'
 
+# Agent task wrappers (recommended for basedintern)
+alias agtask='./scripts/agent-task.sh'
+alias agpipe='./scripts/agent-pipeline.sh'
+
 # Usage: ocm "What is the capital of France?"
-# Usage: ocbi "Run npm test and report failures."
-# Usage: ocbiweb "Use web_fetch to check https://example.com"
+# Usage: ocbi "Run /repo-health"
+# Usage: agtask basedintern "Run /repo-ops typecheck"
+# Usage: agpipe ship "feat: add LP support"
 ```
