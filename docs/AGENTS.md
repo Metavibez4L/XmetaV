@@ -7,6 +7,7 @@ For per-agent runbooks, see `docs/agents/`:
 - `docs/agents/README.md`
 - `docs/agents/main.md`
 - `docs/agents/basedintern.md`
+- `docs/agents/akua.md`
 
 ## Quick reference
 
@@ -104,11 +105,13 @@ openclaw agent --agent basedintern_web --local --thinking off \
   --message "Use web_fetch to check https://example.com"
 ```
 
-The `basedintern` agents are configured in `~/.openclaw/openclaw.json`:
+The repo agents are configured in `~/.openclaw/openclaw.json`:
 
-| Agent | Tools | Purpose |
-|-------|-------|---------|
-| `basedintern` | `coding` (exec, read, write, process) | 90% of work |
-| `basedintern_web` | `full` (all tools + browser + web) | Web automation only |
+| Agent | Tools | Workspace | Purpose |
+|-------|-------|-----------|---------|
+| `basedintern` | `coding` (exec, read, write, process) | `/home/manifest/basedintern` | 90% of work |
+| `basedintern_web` | `full` (all tools + browser + web) | `/home/manifest/basedintern` | Web automation only |
+| `akua` | `coding` (exec, read, write, process) | `/home/manifest/akua` | 90% of work |
+| `akua_web` | `full` (all tools + browser + web) | `/home/manifest/akua` | Web automation only |
 
-Both share workspace `/home/manifest/basedintern` and model `ollama/kimi-k2.5:cloud` (256k context, maxTokens 4096).
+All repo agents use model `ollama/kimi-k2.5:cloud` (256k context, maxTokens 8192).

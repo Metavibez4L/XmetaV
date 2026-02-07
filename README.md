@@ -16,7 +16,7 @@
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  main | basedintern | basedintern_web
+ |   agents:  main | basedintern | akua
  |   models:  kimi-k2.5:cloud (all agents)
  |   gateway: ws://127.0.0.1:18789
  |   engine:  Ollama + CUDA  |  RTX 4070
@@ -27,7 +27,7 @@
 
 ## Features
 
-- Multi-agent management (`main` + `basedintern`)
+- Multi-agent management (`main` + `basedintern` + `akua`)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
 - One-command setup and troubleshooting scripts
 - Ollama integration for local LLMs with GPU acceleration
@@ -85,7 +85,8 @@ XmetaV/
     +-- agents/               # Per-agent runbooks
         |-- README.md
         |-- main.md           # main agent runbook
-        +-- basedintern.md    # basedintern agent runbook
+        |-- basedintern.md    # basedintern agent runbook
+        +-- akua.md           # akua agent runbook
 ```
 
 ---
@@ -250,6 +251,26 @@ openclaw agent --agent basedintern_web --local --thinking off \
   --session-id biweb_$(date +%s) --message "Use web_fetch to check a URL."
 ```
 
+### Agent: `akua` (coding) + `akua_web` (full)
+
+| Property | `akua` | `akua_web` |
+|----------|--------|------------|
+| Model | `kimi-k2.5:cloud` (256k) | `kimi-k2.5:cloud` (256k) |
+| Workspace | `/home/manifest/akua` | `/home/manifest/akua` |
+| Tools | `coding` (exec, read, write, process) | `full` (all tools + browser + web) |
+| Use for | 90% of work (contracts, tests, commits) | Only browser/web automation |
+| Repo | [Metavibez4L/akua](https://github.com/Metavibez4L/akua) | Same |
+
+```bash
+# Default (lean, fast)
+openclaw agent --agent akua --local --thinking off \
+  --session-id akua_$(date +%s) --message "Run /repo-ops compile."
+
+# Full tools (only when needed)
+openclaw agent --agent akua_web --local --thinking off \
+  --session-id akuaweb_$(date +%s) --message "Use web_fetch to check a URL."
+```
+
 ### Creating New Agents
 
 Add an agent to `~/.openclaw/openclaw.json` under `agents.list`:
@@ -386,7 +407,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 |----------|-------------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
-| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern) |
+| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
@@ -425,6 +446,7 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ## Changelog
 
 ### 2026-02-06
+- Added `akua` + `akua_web` agents (Solidity/Hardhat repo, Kimi K2.5, full tooling + browser)
 - Aligned all scripts, configs, and docs to current setup
 - Removed stale `--profile dev` / `~/.openclaw-dev/` references
 - Updated to port 18789, agents `main` + `basedintern`

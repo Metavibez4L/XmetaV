@@ -78,6 +78,8 @@ alias oca='openclaw agent --agent main --local'
 alias ocm='openclaw agent --agent main --local --message'
 alias ocbi='openclaw agent --agent basedintern --local --message'
 alias ocbiweb='openclaw agent --agent basedintern_web --local --message'
+alias ocakua='openclaw agent --agent akua --local --message'
+alias ocakuaweb='openclaw agent --agent akua_web --local --message'
 
 # Agent task wrappers (recommended for basedintern)
 alias agtask='./scripts/agent-task.sh'
@@ -85,6 +87,8 @@ alias agpipe='./scripts/agent-pipeline.sh'
 
 # Usage: ocm "What is the capital of France?"
 # Usage: ocbi "Run /repo-health"
+# Usage: ocakua "Run /repo-ops compile"
 # Usage: agtask basedintern "Run /repo-ops typecheck"
+# Usage: agtask akua "Run /repo-ops compile"
 # Usage: agpipe ship "feat: add LP support"
 ```

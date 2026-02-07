@@ -59,6 +59,36 @@
             "enabled": true
           }
         }
+      },
+      {
+        "id": "akua",
+        "workspace": "/home/manifest/akua",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "akua_web",
+        "workspace": "/home/manifest/akua",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "elevated": {
+            "enabled": true
+          }
+        }
       }
     ]
   },
