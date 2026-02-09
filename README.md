@@ -27,8 +27,10 @@
 
 ## Features
 
-- Multi-agent management (`main` + `basedintern` + `akua`)
+- **Agent Factory** — main agent can create new agents, scaffold apps, and manage the fleet
+- Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
+- App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - One-command setup and troubleshooting scripts
 - Ollama integration for local LLMs with GPU acceleration
 - Full tool calling (exec, read, write, process, browser, web)
@@ -61,10 +63,23 @@ XmetaV/
 |   |-- openclaw-fix.sh       # Main fix script (gateway + ollama + locks)
 |   |-- start-gateway.sh      # Start gateway in background
 |   |-- stop-all.sh           # Stop processes + clear stale locks
-|   +-- health-check.sh       # Quick system health verification
+|   |-- health-check.sh       # Quick system health verification
+|   |-- agent-task.sh         # Single atomic task wrapper
+|   |-- agent-pipeline.sh     # Multi-step pipeline workflows
+|   |-- create-agent.sh       # [NEW] Agent Factory — create agents
+|   |-- build-app.sh          # [NEW] Agent Factory — scaffold apps
+|   +-- manage-agents.sh      # [NEW] Agent Factory — manage fleet
 |
 |-- configs/                  # Configuration files & templates
 |   +-- openclaw.json.fixed   # Known-good config for WSL2 + Ollama
+|
+|-- templates/                # [NEW] Agent identity templates
+|   +-- agents/               # Per-template identity files
+|       |-- general.md        # Generic agent template
+|       |-- coding.md         # Software development agent
+|       |-- bot.md            # Discord/Telegram bot agent
+|       |-- research.md       # Web research agent
+|       +-- devops.md         # Infrastructure/ops agent
 |
 |-- capabilities/             # Quick-reference command guides
 |   |-- README.md             # Capabilities overview
@@ -72,7 +87,7 @@ XmetaV/
 |   |-- agent-tasks.md        # AI agent usage examples
 |   |-- cheatsheet.md         # One-page reference card
 |   |-- management.md         # System administration commands
-|   +-- expand.md             # How to add models, skills, channels
+|   +-- expand.md             # How to add models, skills, channels, agents
 |
 +-- docs/                     # Documentation & runbooks
     |-- ARCHITECTURE.md       # System architecture overview
@@ -86,7 +101,8 @@ XmetaV/
         |-- README.md
         |-- main.md           # main agent runbook
         |-- basedintern.md    # basedintern agent runbook
-        +-- akua.md           # akua agent runbook
+        |-- akua.md           # akua agent runbook
+        +-- dynamic.md        # [NEW] Dynamic agent runbook
 ```
 
 ---
@@ -148,6 +164,11 @@ openclaw agent --agent main --local --thinking off \
 | `start-gateway.sh` | Start gateway in background on port 18789 | `./scripts/start-gateway.sh` |
 | `stop-all.sh` | Stop all OpenClaw processes | `./scripts/stop-all.sh` |
 | `health-check.sh` | Quick health verification | `./scripts/health-check.sh` |
+| `agent-task.sh` | Single atomic task (fresh session, anti-stall) | `./scripts/agent-task.sh basedintern "task"` |
+| `agent-pipeline.sh` | Multi-step workflows (health, ship, fix, evolve) | `./scripts/agent-pipeline.sh health` |
+| **`create-agent.sh`** | **Agent Factory** -- create new agents | `./scripts/create-agent.sh --id myagent` |
+| **`build-app.sh`** | **Agent Factory** -- scaffold apps | `./scripts/build-app.sh --type node --workspace /path` |
+| **`manage-agents.sh`** | **Agent Factory** -- manage agent fleet | `./scripts/manage-agents.sh list` |
 
 ---
 
@@ -271,26 +292,39 @@ openclaw agent --agent akua_web --local --thinking off \
   --session-id akuaweb_$(date +%s) --message "Use web_fetch to check a URL."
 ```
 
-### Creating New Agents
+### Creating New Agents (Agent Factory)
 
-Add an agent to `~/.openclaw/openclaw.json` under `agents.list`:
-
-```json
-{
-  "id": "my-agent",
-  "workspace": "/path/to/workspace",
-  "model": {
-    "primary": "ollama/qwen2.5:7b-instruct"
-  }
-}
-```
-
-Then verify:
+The `main` agent can create agents autonomously, or you can use the scripts directly:
 
 ```bash
-openclaw agents list
-openclaw agent --agent my-agent --local --message "Hello"
+# Create a new agent with workspace, identity files, and config entry
+./scripts/create-agent.sh --id researcher \
+  --template research \
+  --description "Web research and data gathering" \
+  --web  # also create researcher_web companion
+
+# Scaffold a project in the agent's workspace
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Check the fleet
+./scripts/manage-agents.sh list
+
+# Run it
+./scripts/agent-task.sh researcher "What can you do?"
 ```
+
+Or ask the main agent to do it:
+
+```bash
+openclaw agent --agent main --local \
+  --message "Create a Discord bot agent called social-bot and scaffold a bot project for it"
+```
+
+**Templates:** `coding`, `bot`, `research`, `devops`, `general`
+
+**App types:** `node`, `python`, `nextjs`, `hardhat`, `bot`, `fastapi`, `script`
+
+See [docs/agents/dynamic.md](docs/agents/dynamic.md) for full documentation.
 
 ---
 
@@ -300,7 +334,7 @@ openclaw agent --agent my-agent --local --message "Hello"
 +-------------------------------------------------------------------------+
 |                          XmetaV (This Repo)                             |
 |  +-----------+  +-----------+  +-----------+  +-----------+             |
-|  |  Scripts  |  |  Configs  |  |   Docs    |  |  Agents   |             |
+|  |  Scripts  |  |  Configs  |  |   Docs    |  | Templates |             |
 |  +-----+-----+  +-----+-----+  +-----------+  +-----------+             |
 +---------+------------+-------------------------------------------------+
           |            |
@@ -314,6 +348,18 @@ openclaw agent --agent my-agent --local --message "Hello"
 |  |  |  Runtime  |  |  Manager  |  |  Router   |  |  Executor |       |  |
 |  |  +-----+-----+  +-----------+  +-----------+  +-----------+       |  |
 |  +--------+----------------------------------------------------------+  |
+|            |                                                             |
+|  +--------v----------------------------------------------------------+  |
+|  |             main agent (ORCHESTRATOR)                              |  |
+|  |  +------------------+  +---------------+  +------------------+    |  |
+|  |  | Agent Factory    |  | Build App     |  | Manage Agents    |    |  |
+|  |  | (create-agent.sh)|  | (build-app.sh)|  | (manage-agents)  |    |  |
+|  |  +--------+---------+  +-------+-------+  +--------+---------+    |  |
+|  |           |                    |                    |              |  |
+|  |           v                    v                    v              |  |
+|  |     openclaw.json        workspaces/          fleet health        |  |
+|  |     (agent entries)     (scaffolded apps)      (status)           |  |
+|  +-------------------------------------------------------------------+  |
 +-----------|-------------------------------------------------------------+
             |
             v
@@ -444,6 +490,17 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-06 (v2)
+- **Agent Factory** — main agent can now create/manage agents and scaffold apps
+- Added `scripts/create-agent.sh` — programmatic agent creation
+- Added `scripts/build-app.sh` — app scaffolding (node, python, nextjs, hardhat, bot, fastapi, script)
+- Added `scripts/manage-agents.sh` — fleet management (list, status, remove, update)
+- Added `templates/agents/` — identity templates (coding, bot, research, devops, general)
+- Added Agent Factory skill for the main agent (`~/.openclaw/workspace/skills/agent-factory/`)
+- Updated main agent identity with orchestrator role
+- Added `docs/agents/dynamic.md` — runbook for dynamically created agents
+- Updated architecture diagram with orchestrator layer
 
 ### 2026-02-06
 - Added `akua` + `akua_web` agents (Solidity/Hardhat repo, Kimi K2.5, full tooling + browser)

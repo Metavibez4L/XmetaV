@@ -4,13 +4,19 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 
 > Note: These docs intentionally avoid including any secrets (gateway tokens, API keys). Use `openclaw config get ...` locally when you need exact values.
 
-## Agents
+## Static Agents
 
-- [`main`](./main.md) — primary command-center agent (general ops)
+- [`main`](./main.md) — **orchestrator** + command-center agent (general ops, agent factory)
 - [`basedintern`](./basedintern.md) — repo agent (coding tools, lean) pinned to `/home/manifest/basedintern`
 - [`basedintern_web`](./basedintern.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
 - [`akua`](./akua.md) — repo agent (coding tools, lean) pinned to `/home/manifest/akua`
 - [`akua_web`](./akua.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
+
+## Dynamic Agents
+
+- [`dynamic`](./dynamic.md) — runbook for agents created at runtime by the Agent Factory
+
+Dynamic agents are created by the `main` agent using the Agent Factory skill. Each gets its own runbook auto-generated at `docs/agents/<agent-id>.md`.
 
 ## Common commands (applies to all agents)
 

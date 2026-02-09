@@ -11,11 +11,14 @@ For per-agent runbooks, see `docs/agents/`:
 
 ## Quick reference
 
-- List agents: `openclaw agents list`
+- List agents: `openclaw agents list` or `./scripts/manage-agents.sh list`
 - Run default agent: `openclaw agent --message "Hello"`
 - Run specific agent: `openclaw agent --agent basedintern --message "Hello"`
 - Use a stable session id: `openclaw agent --session-id my_session --message "..."`
 - Browser automation (CLI): `openclaw browser open https://example.com`
+- **Create agent**: `./scripts/create-agent.sh --id myagent --template coding --web`
+- **Build app**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent`
+- **Fleet status**: `./scripts/manage-agents.sh status`
 
 ## How agent routing works
 
@@ -115,3 +118,38 @@ The repo agents are configured in `~/.openclaw/openclaw.json`:
 | `akua_web` | `full` (all tools + browser + web) | `/home/manifest/akua` | Web automation only |
 
 All repo agents use model `ollama/kimi-k2.5:cloud` (256k context, maxTokens 8192).
+
+## Dynamic Agents (Agent Factory)
+
+The `main` agent can create new agents at runtime via the Agent Factory skill. This includes:
+
+- Workspace creation and identity seeding (AGENTS.md + SOUL.md)
+- Config injection into `~/.openclaw/openclaw.json`
+- Optional `_web` companion agents
+- App scaffolding (Node.js, Python, bots, FastAPI, Hardhat, etc.)
+
+For full details, see `docs/agents/dynamic.md`.
+
+### Creating agents manually
+
+```bash
+# Create a research agent with web companion
+./scripts/create-agent.sh --id researcher --template research --web \
+  --description "Web research and data gathering"
+
+# Scaffold a Node.js app in its workspace
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Check the fleet
+./scripts/manage-agents.sh list
+```
+
+### Templates
+
+| Template | Best for |
+|----------|----------|
+| `coding` | Repo work, code, tests |
+| `bot` | Discord, Telegram bots |
+| `research` | Web research, data gathering |
+| `devops` | Infrastructure, deployment |
+| `general` | Everything else |

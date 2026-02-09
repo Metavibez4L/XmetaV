@@ -67,6 +67,34 @@ nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv
 openclaw doctor
 ```
 
+## Agent Factory Commands
+
+```bash
+# Create a new agent
+./scripts/create-agent.sh --id myagent --template coding --description "My agent" --web
+
+# Scaffold an app in agent workspace
+./scripts/build-app.sh --type node --workspace /home/manifest/myagent
+
+# List all agents
+./scripts/manage-agents.sh list
+
+# Health check all agents
+./scripts/manage-agents.sh status
+
+# Get info on one agent
+./scripts/manage-agents.sh info myagent
+
+# Update agent model
+./scripts/manage-agents.sh update myagent --model ollama/qwen2.5:7b-instruct
+
+# Remove agent (keeps workspace)
+./scripts/manage-agents.sh remove myagent
+
+# Or let main agent do it
+ocm "Create a Discord bot agent called social-bot"
+```
+
 ## Quick Aliases
 
 Add to your `~/.bashrc`:

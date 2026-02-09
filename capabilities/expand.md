@@ -153,6 +153,38 @@ openclaw channels login whatsapp
 
 ## Creating Custom Agents
 
+### Automated (Agent Factory — recommended)
+
+Use the Agent Factory scripts to create fully configured agents:
+
+```bash
+# Create agent with identity files and config entry
+./scripts/create-agent.sh --id my-agent \
+  --template coding \
+  --description "My custom coding agent" \
+  --web  # also create my-agent_web companion
+
+# Scaffold a project in the agent's workspace
+./scripts/build-app.sh --type node --workspace /home/manifest/my-agent
+
+# Check agent was created
+./scripts/manage-agents.sh list
+```
+
+Available templates: `coding`, `bot`, `research`, `devops`, `general`
+
+Available app types: `node`, `python`, `nextjs`, `hardhat`, `bot`, `fastapi`, `script`
+
+### Via the main agent (AI-driven)
+
+Ask the main agent directly — it has the Agent Factory skill:
+
+```bash
+openclaw agent --agent main --local --message "Create a Discord bot agent called social-bot"
+```
+
+### Manual
+
 Add an agent to `~/.openclaw/openclaw.json` under `agents.list`:
 
 ```json
@@ -160,7 +192,7 @@ Add an agent to `~/.openclaw/openclaw.json` under `agents.list`:
   "id": "my-agent",
   "workspace": "/path/to/workspace",
   "model": {
-    "primary": "ollama/qwen2.5:7b-instruct"
+    "primary": "ollama/kimi-k2.5:cloud"
   }
 }
 ```
@@ -169,6 +201,22 @@ Optionally, create agent personality files in the workspace:
 - `AGENTS.md` — identity, capabilities, rules
 - `SOUL.md` — personality and operating principles
 - `TOOLS.md` — local setup notes
+
+### Managing Agents
+
+```bash
+# List all agents
+./scripts/manage-agents.sh list
+
+# Health check all agents
+./scripts/manage-agents.sh status
+
+# Remove an agent (preserves workspace)
+./scripts/manage-agents.sh remove my-agent
+
+# Update agent model
+./scripts/manage-agents.sh update my-agent --model ollama/qwen2.5:7b-instruct
+```
 
 ## Adding Tools
 

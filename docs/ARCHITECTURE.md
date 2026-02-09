@@ -37,13 +37,42 @@ Important practical details:
 
 ### Agents
 
-Two agents are configured:
+Static agents are defined in `openclaw.json`. Dynamic agents can be created at runtime by the `main` agent via the Agent Factory.
 
 | Agent | Model | Workspace | Tools | Purpose |
 |-------|-------|-----------|-------|---------|
-| `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | default | General-purpose command-center agent |
+| `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | default | **Orchestrator** — command center + agent factory |
 | `basedintern` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | coding | Repo agent — code/tests/commits (lean, fast) |
 | `basedintern_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | full | Same repo — browser/web automation only |
+| `akua` | `kimi-k2.5:cloud` (256k) | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
+| `akua_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/akua` | full | Same repo — browser/web automation only |
+| _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(per-agent)_ | Created on-demand by Agent Factory |
+
+### Agent Factory (Orchestrator Layer)
+
+The `main` agent has an **Agent Factory** skill that enables it to:
+
+1. **Create agents** — add new entries to `openclaw.json` with workspace + identity files
+2. **Scaffold apps** — generate project starters (Node.js, Python, bots, etc.) in agent workspaces
+3. **Manage the fleet** — list, update, remove, health-check all agents
+4. **Self-spawn** — autonomously create agents when it identifies the need
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                     main agent (orchestrator)                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐    │
+│  │ Agent Factory │  │  Build App   │  │  Manage Agents    │    │
+│  │    Skill      │  │   Script     │  │    Script         │    │
+│  └──────┬───────┘  └──────┬───────┘  └───────┬───────────┘    │
+└─────────┼──────────────────┼──────────────────┼────────────────┘
+          │                  │                  │
+          v                  v                  v
+   openclaw.json        workspace/        fleet health
+   (agent entries)     (scaffolded apps)    (status checks)
+```
+
+Scripts: `XmetaV/scripts/create-agent.sh`, `build-app.sh`, `manage-agents.sh`
+Templates: `XmetaV/templates/agents/` (coding, bot, research, devops, general)
 
 ### Model provider: Ollama (local)
 OpenClaw talks to Ollama through its OpenAI-compatible API.
@@ -80,3 +109,6 @@ Practical note for small local models (e.g. 7B):
 - **Stale locks**: `*.jsonl.lock` left behind can block forever.
 
 This repo provides scripts and runbooks to make these problems quick to detect and fix.
+
+- **Agent limit exceeded**: MAX_AGENTS guard prevents runaway self-spawning (default: 10). Increase with `MAX_AGENTS=20` env var.
+- **Duplicate agent**: `create-agent.sh` is idempotent — running twice with the same ID updates rather than duplicates.

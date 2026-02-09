@@ -2,11 +2,13 @@
 
 ## Purpose
 
-`main` is the **primary command-center agent** for this machine. Use it for:
+`main` is the **orchestrator and primary command-center agent** for this machine. Use it for:
 
+- **Agent Factory** — creating new agents, scaffolding apps, managing the fleet
 - OpenClaw configuration and operations (gateway, models, tools)
 - Local system automation via tools (`exec`, `read`, `write`, `process`)
 - "Glue" tasks: quick diagnostics, log inspection, scripted fixes, doc updates
+- Delegating specialized work to purpose-built agents
 
 ## Identity and workspace
 
@@ -73,6 +75,36 @@ openclaw agent --agent main --local --thinking off \
 ```bash
 openclaw agent --agent main --local --thinking off \
   --message "Call the exec tool with command: date +%Y-%m-%d"
+```
+
+## Agent Factory (orchestrator)
+
+The main agent has the **Agent Factory** skill installed. It can:
+
+- Create new agents: `/spawn-agent <id> --template <type>`
+- Scaffold apps: `/build-app <type> <workspace>`
+- List agents: `/list-agents`
+- Health check: `/agent-status`
+
+### Create an agent via prompt
+
+```bash
+openclaw agent --agent main --local --thinking off \
+  --message "Create a research agent and scaffold a Node.js project for it"
+```
+
+### Create an agent via script
+
+```bash
+/home/manifest/XmetaV/scripts/create-agent.sh --id researcher --template research --web
+/home/manifest/XmetaV/scripts/build-app.sh --type node --workspace /home/manifest/researcher
+```
+
+### Manage the fleet
+
+```bash
+/home/manifest/XmetaV/scripts/manage-agents.sh list
+/home/manifest/XmetaV/scripts/manage-agents.sh status
 ```
 
 ## Browser automation (optional)
