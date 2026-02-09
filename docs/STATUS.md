@@ -24,7 +24,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 
 | Agent | Model | Workspace | Tools | Role |
 |-------|-------|-----------|-------|------|
-| `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | default | **Orchestrator** — agent factory + swarm |
+| `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
 | `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
 | `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |

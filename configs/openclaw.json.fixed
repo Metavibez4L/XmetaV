@@ -28,6 +28,14 @@
         "workspace": "/home/manifest/.openclaw/workspace",
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "deny": ["tts"],
+          "elevated": {
+            "enabled": true
+          }
         }
       },
       {

@@ -41,7 +41,7 @@ Static agents are defined in `openclaw.json`. Dynamic agents can be created at r
 
 | Agent | Model | Workspace | Tools | Purpose |
 |-------|-------|-----------|-------|---------|
-| `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | default | **Orchestrator** — command center + agent factory |
+| `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | **full** | **Orchestrator** — command center + agent factory + swarm |
 | `basedintern` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | coding | Repo agent — code/tests/commits (lean, fast) |
 | `basedintern_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | full | Same repo — browser/web automation only |
 | `akua` | `kimi-k2.5:cloud` (256k) | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |

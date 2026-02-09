@@ -257,7 +257,8 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 | ID | `main` |
 | Model | `ollama/kimi-k2.5:cloud` (256k context) |
 | Workspace | `~/.openclaw/workspace` |
-| Tools | default (inherits global config) |
+| Tools | `full` (fs, runtime, web, browser, sessions, automation) |
+| Role | **Orchestrator** — agent factory + swarm + command center |
 
 ```bash
 openclaw agent --agent main --local --thinking off --message "Hello!"

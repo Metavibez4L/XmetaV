@@ -36,14 +36,12 @@ Typical value in this setup:
 
 ## Tools
 
-`main` inherits the profile-level tool configuration (see `docs/STATUS.md`).
+`main` has the **full** tool profile — all tools available for orchestration, web research, and automation.
 
-Typical baseline:
-
-- **Tools profile**: `coding`
-- **Allowed**: `exec`, `process`, `read`, `write` (plus `browser` if enabled)
-- **Denied**: `tts` (prevents small-model tool-loop failure modes)
-- **Exec host**: `gateway` (runs shell commands on the machine via the gateway)
+- **Tools profile**: `full`
+- **Allowed**: `group:fs`, `group:runtime`, `group:ui`, `group:web`, `group:sessions`, `group:automation`
+- **Denied**: `tts` (prevents tool-loop failure modes)
+- **Elevated**: enabled (can perform privileged operations)
 
 Verify:
 

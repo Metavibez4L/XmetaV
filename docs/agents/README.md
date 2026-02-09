@@ -65,7 +65,7 @@ This command center uses:
 - **Ollama** OpenAI-compatible API at `http://127.0.0.1:11434/v1`
 - **API mode**: `openai-responses` (required for tool calling)
 - **API key**: `"local"` (required placeholder for OpenClaw auth checks)
-- **Tools profile**: `coding` for `main`, `full` for `basedintern`
+- **Tools profile**: `full` for `main`, `coding` for repo agents, `full` for `_web` companions
 
 Quick sanity checks:
 
