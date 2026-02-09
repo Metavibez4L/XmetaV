@@ -184,6 +184,51 @@ openclaw agent --agent akua_web --local --thinking off \
 | Oracles | Chainlink (Price, Automation, CCIP) |
 | Deployment | Arbitrum Sepolia |
 
+## CRE troubleshooting: “Trigger Success” but Execution Failure
+
+### Symptom (CRE dashboard)
+
+- Execution shows **trigger: Success** but overall **Status: Failure**
+- Downstream compute/consensus steps may be missing
+- Yet you still see rows in Supabase (e.g. `cre_events`) because at least one DON node delivered the webhook
+
+### Root cause (common)
+
+CRE DON nodes call the webhook independently and reach consensus on the HTTP result. If the webhook response body differs across nodes (non-deterministic), **HTTP consensus fails**.
+
+We hit this when the Supabase Edge Function returned:
+
+- `eventId = <db uuid>` on first insert
+- `eventId = <dedupeKey>` on duplicate calls (`ignoreDuplicates`)
+
+Different JSON ⇒ consensus fails ⇒ CRE UI shows Failure.
+
+### Fix (required pattern)
+
+Webhook responses **must be deterministic** for the same request payload. For Supabase ingest endpoints, always return a stable identifier (e.g. `dedupeKey`) rather than a DB-generated UUID.
+
+In the akua repo this was fixed by always returning `eventId = dedupeKey` in:
+
+- `supabase/functions/cre-webhook-ingest`
+- `supabase/functions/dta-webhook-ingest`
+
+### Deploy (Supabase Edge Functions)
+
+Deploying functions requires a **Supabase Personal Access Token** (`sbp_*`) — not the anon key or service role key.
+
+```bash
+# From /home/manifest/akua
+export PATH="/home/manifest/.nvm/versions/node/v22.22.0/bin:$PATH"
+export SUPABASE_ACCESS_TOKEN="sbp_..."
+
+npx supabase functions deploy cre-webhook-ingest --project-ref uisdairqmxtgpeymkvxt --no-verify-jwt
+npx supabase functions deploy dta-webhook-ingest --project-ref uisdairqmxtgpeymkvxt --no-verify-jwt
+```
+
+### Verify (determinism check)
+
+Call the same webhook payload multiple times and confirm the JSON responses are identical (especially `eventId`).
+
 ## Anti-stall best practices
 
 The agent stalls on complex multi-step prompts. Avoid this by:
