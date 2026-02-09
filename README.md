@@ -387,69 +387,73 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 
 ## System Architecture
 
-```
-+=========================================================================+
-|                          XmetaV (This Repo)                             |
-|  +-----------+  +-----------+  +-----------+  +-----------+             |
-|  |  Scripts  |  |  Configs  |  |   Docs    |  | Templates |             |
-|  +-----+-----+  +-----+-----+  +-----------+  +-----------+             |
-+---------+------------+-------------------------------------------------+
-          |            |
-          v            v
-+=========================================================================+
-|                       OpenClaw Runtime                                   |
-|  +-------------------------------------------------------------------+  |
-|  |                  Gateway (ws://127.0.0.1:18789)                    |  |
-|  |  +-----------+  +-----------+  +-----------+  +-----------+       |  |
-|  |  |  Agent    |  |  Session  |  |  Channel  |  |   Skill   |       |  |
-|  |  |  Runtime  |  |  Manager  |  |  Router   |  |  Executor |       |  |
-|  |  +-----+-----+  +-----------+  +-----------+  +-----------+       |  |
-|  +--------+----------------------------------------------------------+  |
-|            |                                                             |
-|  +--------v----------------------------------------------------------+  |
-|  |             main agent (ORCHESTRATOR)                              |  |
-|  |                                                                    |  |
-|  |  +------------------+  +---------------+  +------------------+    |  |
-|  |  | Agent Factory    |  | Build App     |  | Manage Agents    |    |  |
-|  |  | (create-agent.sh)|  | (build-app.sh)|  | (manage-agents)  |    |  |
-|  |  +--------+---------+  +-------+-------+  +--------+---------+    |  |
-|  |           |                    |                    |              |  |
-|  |           v                    v                    v              |  |
-|  |     openclaw.json        workspaces/          fleet health        |  |
-|  |                                                                    |  |
-|  |  +-------- SWARM ENGINE (swarm.sh) ----------------------------+  |  |
-|  |  |                                                              |  |  |
-|  |  |  PARALLEL         PIPELINE          COLLABORATIVE           |  |  |
-|  |  |  ┌──┬──┐         A -> B -> C       ┌──┬──┐                 |  |  |
-|  |  |  A  B  C                            A  B  |                 |  |  |
-|  |  |  └──┴──┘                            └──┴──> synthesize      |  |  |
-|  |  |         \             |             /                       |  |  |
-|  |  |          v            v            v                        |  |  |
-|  |  |       ~/.openclaw/swarm/<run-id>/                           |  |  |
-|  |  |         manifest.json | *.out | summary.md                  |  |  |
-|  |  +----------------------------------------------------------+  |  |
-|  +-------------------------------------------------------------------+  |
-|            |                                                             |
-|  +---------v---------------------------------------------------------+  |
-|  |                      Agent Fleet                                   |  |
-|  |  +----------+  +-----------+  +------+  +--------+  +--------+   |  |
-|  |  |   main   |  |basedintern|  | akua |  |  akua  |  |dynamic |   |  |
-|  |  | (orch.)  |  |  + _web   |  |+ _web|  |        |  | agents |   |  |
-|  |  +----------+  +-----------+  +------+  +--------+  +--------+   |  |
-|  +-------------------------------------------------------------------+  |
-+---------|---------------------------------------------------------------+
-          |
-          v
-+=========================================================================+
-|                       Model Providers                                    |
-|  +---------------------------+  +---------------------------+           |
-|  |    Ollama (Local Host)    |  |   Cloud Providers         |           |
-|  |  http://127.0.0.1:11434  |  |   (Anthropic, OpenAI)     |           |
-|  |  +- qwen2.5:7b-instruct  |  |                           |           |
-|  |  +- kimi-k2.5:cloud      |  |                           |           |
-|  |     (Ollama Cloud, 256k) |  |                           |           |
-|  +---------------------------+  +---------------------------+           |
-+=========================================================================+
+```mermaid
+flowchart TB
+    subgraph XMETAV["XmetaV (This Repo)"]
+        direction LR
+        SCRIPTS["Scripts"] ~~~ CONFIGS["Configs"] ~~~ DOCS["Docs"] ~~~ TEMPLATES["Templates"]
+    end
+
+    subgraph RUNTIME["OpenClaw Runtime"]
+        GW["Gateway — ws://127.0.0.1:18789"]
+        subgraph GWSVC[" "]
+            direction LR
+            AR["Agent\nRuntime"]
+            SM["Session\nManager"]
+            CR["Channel\nRouter"]
+            SE["Skill\nExecutor"]
+        end
+
+        subgraph ORCH["main agent (ORCHESTRATOR)"]
+            direction TB
+            subgraph FAC["Agent Factory"]
+                direction LR
+                CA["create-agent.sh"]
+                BA2["build-app.sh"]
+                MG["manage-agents.sh"]
+            end
+            subgraph SWE["Swarm Engine — swarm.sh"]
+                direction LR
+                S_P["Parallel\n⫘ A B C"]
+                S_PI["Pipeline\nA → B → C"]
+                S_C["Collaborative\nA + B → synth"]
+            end
+        end
+
+        subgraph FLEET["Agent Fleet"]
+            direction LR
+            F_MAIN["main\n(orch.)"]
+            F_BI["basedintern\n+ _web"]
+            F_AKUA["akua\n+ _web"]
+            F_DYN["dynamic\nagents"]
+        end
+    end
+
+    subgraph PROV["Model Providers"]
+        direction LR
+        OLL["Ollama (Local)\nhttp://127.0.0.1:11434\nqwen2.5 · kimi-k2.5:cloud"]
+        CLD["Cloud Providers\nAnthropic · OpenAI"]
+    end
+
+    subgraph EXT["External"]
+        GH["GitHub\nMetavibez4L"]
+    end
+
+    XMETAV ==> GW
+    GW --> GWSVC --> ORCH
+    ORCH --> FLEET
+    FAC -.->|--github| GH
+    FLEET ==> PROV
+
+    style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
+    style RUNTIME fill:#16213e,stroke:#e94560,color:#fff
+    style ORCH fill:#0f3460,stroke:#e94560,color:#fff
+    style FAC fill:#1a1a4e,stroke:#16c79a,color:#fff
+    style SWE fill:#1a1a4e,stroke:#f7b731,color:#fff
+    style FLEET fill:#1a1a3e,stroke:#a29bfe,color:#fff
+    style PROV fill:#222,stroke:#888,color:#fff
+    style EXT fill:#161b22,stroke:#58a6ff,color:#fff
+    style GH fill:#161b22,stroke:#58a6ff,color:#fff
 ```
 
 ---

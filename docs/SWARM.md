@@ -35,12 +35,16 @@ The swarm system enables the main agent (or you directly) to decompose complex t
 
 All tasks run simultaneously. Best for independent operations.
 
-```
-  ┌──── agent A ──── result A ────┐
-  │                                │
-  ├──── agent B ──── result B ────├──── summary
-  │                                │
-  └──── agent C ──── result C ────┘
+```mermaid
+flowchart LR
+    SW((swarm)) --> A["Agent A"] & B["Agent B"] & C["Agent C"]
+    A --> RA["result A"]
+    B --> RB["result B"]
+    C --> RC["result C"]
+    RA & RB & RC --> SUM["summary"]
+
+    style SW fill:#0f3460,stroke:#16c79a,color:#fff
+    style SUM fill:#1a1a2e,stroke:#e94560,color:#fff
 ```
 
 **Use when:** Tasks don't depend on each other (health checks, status across repos, data gathering).
@@ -49,8 +53,13 @@ All tasks run simultaneously. Best for independent operations.
 
 Tasks run sequentially. Each task's output becomes context for the next.
 
-```
-  agent A ──── result A ──→ agent B ──── result B ──→ agent C ──── result C
+```mermaid
+flowchart LR
+    A["Agent A"] -->|result A| B["Agent B"] -->|result B| C["Agent C"] --> R["result C"]
+
+    style A fill:#0f3460,stroke:#f7b731,color:#fff
+    style B fill:#0f3460,stroke:#f7b731,color:#fff
+    style C fill:#0f3460,stroke:#f7b731,color:#fff
 ```
 
 **Use when:** Later steps need output from earlier ones (research -> implement, analyze -> fix -> verify).
@@ -59,10 +68,16 @@ Tasks run sequentially. Each task's output becomes context for the next.
 
 Same task sent to multiple agents. A synthesizer merges the responses.
 
-```
-  ┌──── agent A ──── perspective A ────┐
-  │                                     │
-  └──── agent B ──── perspective B ────┘──→ synthesizer ──── unified summary
+```mermaid
+flowchart LR
+    T["Same Task"] --> A["Agent A"] & B["Agent B"]
+    A --> PA["perspective A"]
+    B --> PB["perspective B"]
+    PA & PB --> SYN["Synthesizer"] --> OUT["unified summary"]
+
+    style T fill:#1a1a2e,stroke:#a29bfe,color:#fff
+    style SYN fill:#0f3460,stroke:#a29bfe,color:#fff
+    style OUT fill:#1a1a2e,stroke:#e94560,color:#fff
 ```
 
 **Use when:** Multiple viewpoints improve quality (code review, security audit, architecture analysis).
@@ -152,13 +167,21 @@ Ready-to-use manifests in `templates/swarms/`:
 
 All output is stored in `~/.openclaw/swarm/<run-id>/`:
 
-```
-~/.openclaw/swarm/swarm_20260206_143022_12345/
-  manifest.json         # The manifest that was executed
-  task_0.out            # Output from first task
-  task_1.out            # Output from second task
-  synthesis.out         # Synthesis output (if requested)
-  summary.md            # Human-readable summary
+```mermaid
+flowchart TD
+    DIR["~/.openclaw/swarm/&lt;run-id&gt;/"]
+    DIR --> MF["manifest.json\n(executed manifest)"]
+    DIR --> T0["task_0.out\n(first task output)"]
+    DIR --> T1["task_1.out\n(second task output)"]
+    DIR --> SY["synthesis.out\n(synthesis, if requested)"]
+    DIR --> SM["summary.md\n(human-readable summary)"]
+
+    style DIR fill:#1a1a2e,stroke:#e94560,color:#fff
+    style MF fill:#222,stroke:#888,color:#fff
+    style T0 fill:#222,stroke:#888,color:#fff
+    style T1 fill:#222,stroke:#888,color:#fff
+    style SY fill:#0f3460,stroke:#a29bfe,color:#fff
+    style SM fill:#0f3460,stroke:#16c79a,color:#fff
 ```
 
 ```bash

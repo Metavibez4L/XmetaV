@@ -4,11 +4,33 @@
 
 `main` is the **orchestrator and primary command-center agent** for this machine. Use it for:
 
-- **Agent Factory** — creating new agents, scaffolding apps, managing the fleet
+- **Agent Factory** — creating new agents, scaffolding apps, creating GitHub repos, managing the fleet
+- **Swarm** — multi-agent orchestration (parallel, pipeline, collaborative)
 - OpenClaw configuration and operations (gateway, models, tools)
 - Local system automation via tools (`exec`, `read`, `write`, `process`)
 - "Glue" tasks: quick diagnostics, log inspection, scripted fixes, doc updates
 - Delegating specialized work to purpose-built agents
+
+```mermaid
+flowchart LR
+    MAIN["main\n(orchestrator)"]
+
+    MAIN --> FAC["Agent Factory\ncreate · build · manage"]
+    MAIN --> SWM["Swarm Engine\nparallel · pipeline · collab"]
+    MAIN --> SYS["System Ops\nexec · read · write"]
+
+    FAC --> FLEET["Agent Fleet"]
+    FAC -.->|--github| GH["GitHub"]
+    SWM --> FLEET
+    FLEET --> BI["basedintern"] & AK["akua"] & DYN["dynamic agents"]
+
+    style MAIN fill:#1a1a2e,stroke:#e94560,color:#fff
+    style FAC fill:#0f3460,stroke:#16c79a,color:#fff
+    style SWM fill:#0f3460,stroke:#f7b731,color:#fff
+    style SYS fill:#0f3460,stroke:#a29bfe,color:#fff
+    style FLEET fill:#1a1a3e,stroke:#888,color:#fff
+    style GH fill:#161b22,stroke:#58a6ff,color:#fff
+```
 
 ## Identity and workspace
 

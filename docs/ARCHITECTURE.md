@@ -2,6 +2,83 @@
 
 This repo is a thin operational layer around OpenClaw. It does **not** replace OpenClaw; it makes OpenClaw easier to run, debug, and keep stable on this machine (WSL2/Linux).
 
+## System Overview
+
+```mermaid
+flowchart TB
+    subgraph XMETAV["XmetaV (This Repo)"]
+        direction LR
+        SCRIPTS["Scripts"]
+        CONFIGS["Configs"]
+        DOCS["Docs"]
+        TEMPLATES["Templates"]
+    end
+
+    subgraph RUNTIME["OpenClaw Runtime"]
+        GW["Gateway\nws://127.0.0.1:18789"]
+
+        subgraph GWSVC["Gateway Services"]
+            direction LR
+            AR["Agent Runtime"]
+            SM["Session Manager"]
+            CR["Channel Router"]
+            SE["Skill Executor"]
+        end
+
+        subgraph MAIN_AGENT["main agent (ORCHESTRATOR)"]
+            direction TB
+            subgraph FACTORY["Agent Factory"]
+                direction LR
+                CREATE["create-agent.sh"]
+                BUILD["build-app.sh"]
+                MANAGE["manage-agents.sh"]
+            end
+            subgraph SWARM["Swarm Engine"]
+                direction LR
+                S_PAR["Parallel"]
+                S_PIPE["Pipeline"]
+                S_COLLAB["Collaborative"]
+            end
+        end
+
+        subgraph FLEET["Agent Fleet"]
+            direction LR
+            A_MAIN["main\n(orchestrator)"]
+            A_BI["basedintern\n+ _web"]
+            A_AKUA["akua\n+ _web"]
+            A_DYN["dynamic\nagents"]
+        end
+    end
+
+    subgraph PROVIDERS["Model Providers"]
+        direction LR
+        OLLAMA["Ollama (Local)\nhttp://127.0.0.1:11434\n• qwen2.5:7b-instruct\n• kimi-k2.5:cloud (256k)"]
+        CLOUD["Cloud Providers\n(Anthropic, OpenAI)"]
+    end
+
+    subgraph EXTERNAL["External Services"]
+        direction LR
+        GITHUB["GitHub\n(gh CLI → Metavibez4L)"]
+    end
+
+    XMETAV --> RUNTIME
+    GW --> GWSVC
+    GWSVC --> MAIN_AGENT
+    MAIN_AGENT --> FLEET
+    FACTORY -->|--github| GITHUB
+    FLEET --> PROVIDERS
+
+    style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
+    style RUNTIME fill:#16213e,stroke:#e94560,color:#fff
+    style MAIN_AGENT fill:#0f3460,stroke:#e94560,color:#fff
+    style FACTORY fill:#1a1a4e,stroke:#16c79a,color:#fff
+    style SWARM fill:#1a1a4e,stroke:#f7b731,color:#fff
+    style FLEET fill:#1a1a3e,stroke:#a29bfe,color:#fff
+    style PROVIDERS fill:#222,stroke:#888,color:#fff
+    style EXTERNAL fill:#161b22,stroke:#58a6ff,color:#fff
+    style GITHUB fill:#161b22,stroke:#58a6ff,color:#fff
+```
+
 ## Components
 
 ### OpenClaw CLI
@@ -57,18 +134,25 @@ The `main` agent has an **Agent Factory** skill that enables it to:
 3. **Manage the fleet** — list, update, remove, health-check all agents
 4. **Self-spawn** — autonomously create agents when it identifies the need
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                     main agent (orchestrator)                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐    │
-│  │ Agent Factory │  │  Build App   │  │  Manage Agents    │    │
-│  │    Skill      │  │   Script     │  │    Script         │    │
-│  └──────┬───────┘  └──────┬───────┘  └───────┬───────────┘    │
-└─────────┼──────────────────┼──────────────────┼────────────────┘
-          │                  │                  │
-          v                  v                  v
-   openclaw.json        workspace/        fleet health
-   (agent entries)     (scaffolded apps)    (status checks)
+```mermaid
+flowchart TD
+    subgraph ORCH["main agent (orchestrator)"]
+        AF["Agent Factory\ncreate-agent.sh"]
+        BA["Build App\nbuild-app.sh"]
+        MA["Manage Agents\nmanage-agents.sh"]
+    end
+
+    AF -->|upsert| CFG["openclaw.json\n(agent entries)"]
+    AF -->|--github| GH["GitHub Repo\n(gh repo create)"]
+    BA -->|scaffold| WS["workspace/\n(scaffolded apps)"]
+    BA -->|--github| GH
+    MA -->|query| FLEET["Fleet Health\n(status checks)"]
+
+    style ORCH fill:#1a1a2e,stroke:#e94560,color:#fff
+    style AF fill:#0f3460,stroke:#e94560,color:#fff
+    style BA fill:#0f3460,stroke:#e94560,color:#fff
+    style MA fill:#0f3460,stroke:#e94560,color:#fff
+    style GH fill:#161b22,stroke:#58a6ff,color:#fff
 ```
 
 Scripts: `XmetaV/scripts/create-agent.sh`, `build-app.sh`, `manage-agents.sh`
@@ -82,20 +166,33 @@ The main agent has a **Swarm** skill that enables multi-agent task execution:
 2. **Pipeline** — chain agents sequentially, passing output as context to the next
 3. **Collaborative** — send the same task to multiple agents, then synthesize responses
 
-```
-                        swarm.sh
-                           │
-              ┌────────────┼────────────┐
-              v            v            v
-          PARALLEL      PIPELINE    COLLABORATIVE
-         ┌──┬──┐       A → B → C    ┌──┬──┐
-         A  B  C                     A  B  │
-         │  │  │                     │  │  v
-         └──┴──┘                     └──┴── synthesize
-              │            │            │
-              v            v            v
-         ~/.openclaw/swarm/<run-id>/
-           manifest.json | *.out | summary.md
+```mermaid
+flowchart TD
+    SW["swarm.sh"] --> PAR & PIPE & COLLAB
+
+    subgraph PAR["Parallel"]
+        direction LR
+        PA["Agent A"] & PB["Agent B"] & PC["Agent C"]
+    end
+
+    subgraph PIPE["Pipeline"]
+        direction LR
+        PIA["Agent A"] -->|output| PIB["Agent B"] -->|output| PIC["Agent C"]
+    end
+
+    subgraph COLLAB["Collaborative"]
+        direction LR
+        CA["Agent A"] & CB["Agent B"]
+        CA & CB -->|merge| SYN["Synthesize"]
+    end
+
+    PAR & PIPE & COLLAB --> OUT["~/.openclaw/swarm/&lt;run-id&gt;/\nmanifest.json | *.out | summary.md"]
+
+    style SW fill:#1a1a2e,stroke:#e94560,color:#fff
+    style PAR fill:#0f3460,stroke:#16c79a,color:#fff
+    style PIPE fill:#0f3460,stroke:#f7b731,color:#fff
+    style COLLAB fill:#0f3460,stroke:#a29bfe,color:#fff
+    style OUT fill:#222,stroke:#888,color:#fff
 ```
 
 Script: `XmetaV/scripts/swarm.sh`
@@ -119,23 +216,98 @@ Practical note for small local models (e.g. 7B):
 ## Data flow
 
 ### Single agent turn
-1. You run a CLI command (`openclaw agent ...`).
-2. CLI reads `~/.openclaw/openclaw.json`.
-3. CLI connects to the Gateway at `ws://127.0.0.1:18789`.
-4. Gateway routes the turn to the agent runtime.
-5. Agent runtime calls the configured model provider (Ollama/Kimi K2.5) using the `openai-responses` API mode.
-6. The response is written to the session JSONL and returned to CLI.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant CLI as OpenClaw CLI
+    participant CFG as openclaw.json
+    participant GW as Gateway :18789
+    participant AGT as Agent Runtime
+    participant LLM as Ollama / Kimi K2.5
+    participant SESS as Session JSONL
+
+    User->>CLI: openclaw agent --message "..."
+    CLI->>CFG: Read config
+    CLI->>GW: WebSocket connect
+    GW->>AGT: Route to agent
+    AGT->>LLM: openai-responses API call
+    LLM-->>AGT: Model response (+ tool calls)
+    AGT->>SESS: Persist turn
+    AGT-->>GW: Return response
+    GW-->>CLI: WebSocket message
+    CLI-->>User: Print output
+```
 
 ### Swarm execution
-1. You run `swarm.sh` with a manifest or quick mode (`--parallel`, `--pipeline`, `--collab`).
-2. Swarm engine reads the manifest and creates a run directory (`~/.openclaw/swarm/<run-id>/`).
-3. For each task, swarm spawns an `openclaw agent` call (via `agent-task.sh` patterns: fresh session, `--local`, `--thinking off`).
-4. **Parallel**: all tasks run as background processes simultaneously (up to `SWARM_MAX_PARALLEL`).
-5. **Pipeline**: tasks run sequentially; each task's output is injected as context into the next.
-6. **Collaborative**: same task sent to all agents in parallel, then a synthesis agent merges responses.
-7. Per-task output captured to `<run-id>/<task-id>.out`.
-8. Optional synthesis step produces `synthesis.out`.
-9. `summary.md` generated with status of all tasks.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant SW as swarm.sh
+    participant DIR as ~/.openclaw/swarm/
+    participant AT as agent-task.sh
+    participant OC as openclaw agent
+    participant LLM as Kimi K2.5
+
+    User->>SW: swarm.sh --parallel / --pipeline / --collab
+    SW->>DIR: Create run directory (run-id)
+    SW->>DIR: Save manifest.json
+
+    alt Parallel mode
+        SW->>AT: Task A (background)
+        SW->>AT: Task B (background)
+        SW->>AT: Task C (background)
+        AT->>OC: openclaw agent (fresh session)
+        OC->>LLM: API call
+        LLM-->>OC: Response
+        OC-->>AT: Output
+        AT-->>DIR: Write task-id.out
+    else Pipeline mode
+        SW->>AT: Task A
+        AT-->>DIR: Write A.out
+        SW->>AT: Task B (with A.out as context)
+        AT-->>DIR: Write B.out
+    else Collaborative mode
+        SW->>AT: Same task → Agent A (background)
+        SW->>AT: Same task → Agent B (background)
+        AT-->>DIR: Write per-agent .out
+        SW->>AT: Synthesis agent merges results
+        AT-->>DIR: Write synthesis.out
+    end
+
+    SW->>DIR: Generate summary.md
+    SW-->>User: Print results
+```
+
+### Agent Factory flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant MAIN as main agent
+    participant CS as create-agent.sh
+    participant BS as build-app.sh
+    participant CFG as openclaw.json
+    participant WS as Agent Workspace
+    participant GH as GitHub (gh CLI)
+
+    User->>MAIN: "Create an API agent with a GitHub repo"
+    MAIN->>CS: exec create-agent.sh --id api --github --private
+    CS->>CFG: Upsert agent entry
+    CS->>WS: Create workspace + identity files
+    CS->>GH: gh repo create Metavibez4L/api --private
+    GH-->>CS: Repo created
+    CS->>GH: git push -u origin HEAD
+    CS-->>MAIN: Agent ready
+
+    MAIN->>BS: exec build-app.sh --type fastapi --workspace ...
+    BS->>WS: Scaffold FastAPI project
+    BS->>WS: git init + commit
+    BS->>GH: git push
+    BS-->>MAIN: App scaffolded + pushed
+    MAIN-->>User: Report: agent ID, repo URL, next steps
+```
 
 All agents use **Kimi K2.5** (256k context) via Ollama as the model provider.
 
