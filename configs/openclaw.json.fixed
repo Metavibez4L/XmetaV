@@ -1,104 +1,148 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.2.1",
-    "lastTouchedAt": "2026-02-03T12:00:00.000Z"
-  },
-  "models": {
-    "providers": {
-      "ollama": {
-        "baseUrl": "http://127.0.0.1:11434/v1",
-        "apiKey": "ollama-local",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "qwen2.5:7b-instruct",
-            "name": "qwen2.5:7b-instruct",
-            "reasoning": false,
-            "input": [
-              "text"
-            ],
-            "cost": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0
-            },
-            "contextWindow": 32768,
-            "maxTokens": 4096
-          },
-          {
-            "id": "qwen2.5vl:7b",
-            "name": "qwen2.5vl:7b",
-            "reasoning": false,
-            "input": [
-              "text"
-            ],
-            "cost": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0
-            },
-            "contextWindow": 32768,
-            "maxTokens": 4096
-          }
-        ]
-      }
-    }
+    "lastTouchedAt": "2026-02-06T00:00:00.000Z"
   },
   "agents": {
     "defaults": {
+      "models": {
+        "ollama:qwen2.5:7b-instruct": {},
+        "ollama:kimi-k2.5:cloud": {}
+      },
+      "workspace": "/home/manifest/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 2,
+      "subagents": {
+        "maxConcurrent": 4
+      },
       "model": {
         "primary": "ollama/qwen2.5:7b-instruct"
-      },
-      "workspace": "/home/manifest/.openclaw/workspace-dev",
-      "skipBootstrap": true,
-      "maxConcurrent": 4,
-      "subagents": {
-        "maxConcurrent": 8
       }
     },
     "list": [
       {
-        "id": "dev",
+        "id": "main",
         "default": true,
-        "workspace": "/home/manifest/.openclaw/workspace-dev",
-        "identity": {
-          "name": "C3-PO",
-          "theme": "protocol droid",
-          "emoji": "🤖"
+        "workspace": "/home/manifest/.openclaw/workspace",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "deny": ["tts"],
+          "elevated": {
+            "enabled": true
+          }
+        }
+      },
+      {
+        "id": "basedintern",
+        "workspace": "/home/manifest/basedintern",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "basedintern_web",
+        "workspace": "/home/manifest/basedintern",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "elevated": {
+            "enabled": true
+          }
+        }
+      },
+      {
+        "id": "akua",
+        "workspace": "/home/manifest/akua",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "akua_web",
+        "workspace": "/home/manifest/akua",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "full",
+          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "elevated": {
+            "enabled": true
+          }
         }
       }
     ]
   },
-  "tools": {
-    "profile": "minimal",
-    "deny": [
-      "tts"
-    ]
-  },
   "messages": {
-    "ackReactionScope": "group-mentions",
-    "tts": {
-      "auto": "off",
-      "edge": {
-        "enabled": false
-      },
-      "modelOverrides": {
-        "enabled": false
-      }
-    }
+    "ackReactionScope": "group-mentions"
   },
   "commands": {
     "native": "auto",
     "nativeSkills": "auto"
   },
   "gateway": {
+    "port": 18789,
     "mode": "local",
     "bind": "loopback",
-    "remote": {
-      "url": "ws://127.0.0.1:19011",
+    "auth": {
+      "mode": "token",
       "token": "REPLACE_ME"
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm"
+    }
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "api": "openai-responses",
+        "apiKey": "local",
+        "models": [
+          {
+            "id": "qwen2.5:7b-instruct",
+            "name": "qwen2.5:7b-instruct",
+            "contextWindow": 32768,
+            "maxTokens": 4096
+          },
+          {
+            "id": "kimi-k2.5:cloud",
+            "name": "kimi-k2.5:cloud",
+            "input": ["text", "image"],
+            "contextWindow": 262144,
+            "maxTokens": 8192
+          }
+        ]
+      }
     }
   }
 }

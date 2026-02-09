@@ -1,0 +1,858 @@
+#!/usr/bin/env bash
+# build-app.sh — Scaffold an app project in an agent's workspace
+#
+# Creates a minimal but functional starter project of the given type,
+# installs dependencies, and optionally creates a repo-ops skill.
+#
+# Usage:
+#   ./scripts/build-app.sh --type <type> --workspace <path> [options]
+#
+# Required:
+#   --type <type>          Project type: node | python | nextjs | hardhat | bot | fastapi | script
+#   --workspace <path>     Target workspace directory
+#
+# Options:
+#   --name <name>          Project name (default: derived from workspace dir name)
+#   --skip-install         Skip dependency installation
+#   --skip-skill           Skip repo-ops skill creation
+#   --github               Create a GitHub repo and push the initial scaffold
+#   --github-org <org>     GitHub org/user for the repo (default: Metavibez4L)
+#   --private              Make the GitHub repo private (default: public)
+#   --dry-run              Show what would be done without making changes
+#
+# Examples:
+#   ./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+#   ./scripts/build-app.sh --type bot --workspace /home/manifest/social-bot --name "social-bot"
+#   ./scripts/build-app.sh --type fastapi --workspace /home/manifest/api-server
+#   ./scripts/build-app.sh --type hardhat --workspace /home/manifest/contracts
+#   ./scripts/build-app.sh --type node --workspace /home/manifest/my-api --github --private
+#
+set -euo pipefail
+
+# Ensure modern Node.js (>= 16) is available — load nvm if system node is too old
+if [[ "$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)" -lt 16 ]] 2>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm use default --silent 2>/dev/null || nvm use node --silent 2>/dev/null || true
+  fi
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── Defaults ───
+APP_TYPE=""
+WORKSPACE=""
+PROJECT_NAME=""
+SKIP_INSTALL=false
+SKIP_SKILL=false
+CREATE_GITHUB=false
+GITHUB_ORG="Metavibez4L"
+GITHUB_PRIVATE=false
+DRY_RUN=false
+
+# ─── Parse arguments ───
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --type)         APP_TYPE="$2"; shift 2 ;;
+    --workspace)    WORKSPACE="$2"; shift 2 ;;
+    --name)         PROJECT_NAME="$2"; shift 2 ;;
+    --skip-install) SKIP_INSTALL=true; shift ;;
+    --skip-skill)   SKIP_SKILL=true; shift ;;
+    --github)       CREATE_GITHUB=true; shift ;;
+    --github-org)   GITHUB_ORG="$2"; shift 2 ;;
+    --private)      GITHUB_PRIVATE=true; shift ;;
+    --dry-run)      DRY_RUN=true; shift ;;
+    -h|--help)
+      sed -n '2,/^$/p' "$0" | sed 's/^# *//'
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# ─── Validate ───
+if [[ -z "$APP_TYPE" ]]; then
+  echo "ERROR: --type is required" >&2
+  exit 1
+fi
+
+if [[ -z "$WORKSPACE" ]]; then
+  echo "ERROR: --workspace is required" >&2
+  exit 1
+fi
+
+VALID_TYPES=("node" "python" "nextjs" "hardhat" "bot" "fastapi" "script")
+TYPE_VALID=false
+for t in "${VALID_TYPES[@]}"; do
+  if [[ "$APP_TYPE" == "$t" ]]; then
+    TYPE_VALID=true
+    break
+  fi
+done
+if [[ "$TYPE_VALID" == "false" ]]; then
+  echo "ERROR: --type must be one of: ${VALID_TYPES[*]}" >&2
+  exit 1
+fi
+
+# Default project name from workspace basename
+if [[ -z "$PROJECT_NAME" ]]; then
+  PROJECT_NAME="$(basename "$WORKSPACE")"
+fi
+
+# ─── Summary ───
+echo "╔═══════════════════════════════════════════╗"
+echo "║         AGENT FACTORY — BUILD APP          ║"
+echo "╠═══════════════════════════════════════════╣"
+echo "  Type:        $APP_TYPE"
+echo "  Workspace:   $WORKSPACE"
+echo "  Name:        $PROJECT_NAME"
+echo "  Install:     $( [[ "$SKIP_INSTALL" == "true" ]] && echo "skip" || echo "yes" )"
+echo "  Skill:       $( [[ "$SKIP_SKILL" == "true" ]] && echo "skip" || echo "yes" )"
+echo "  GitHub repo: $CREATE_GITHUB"
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo "  GitHub org:  $GITHUB_ORG"
+  echo "  Visibility:  $( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" )"
+fi
+echo "╚═══════════════════════════════════════════╝"
+echo ""
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "[DRY RUN] No changes made."
+  exit 0
+fi
+
+mkdir -p "$WORKSPACE"
+
+# ─────────────────────────────────────────────────────
+# Scaffold functions
+# ─────────────────────────────────────────────────────
+
+scaffold_node() {
+  echo "→ Scaffolding Node.js/TypeScript project"
+
+  # package.json
+  if [[ ! -f "$WORKSPACE/package.json" ]]; then
+    cat > "$WORKSPACE/package.json" << EOF
+{
+  "name": "$PROJECT_NAME",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/**/*.test.ts",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
+EOF
+    echo "  ✓ package.json"
+  fi
+
+  # tsconfig.json
+  if [[ ! -f "$WORKSPACE/tsconfig.json" ]]; then
+    cat > "$WORKSPACE/tsconfig.json" << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
+EOF
+    echo "  ✓ tsconfig.json"
+  fi
+
+  # src/index.ts
+  mkdir -p "$WORKSPACE/src"
+  if [[ ! -f "$WORKSPACE/src/index.ts" ]]; then
+    cat > "$WORKSPACE/src/index.ts" << 'EOF'
+/**
+ * Main entry point
+ * Auto-generated by Agent Factory
+ */
+
+async function main(): Promise<void> {
+  console.log("Agent app started");
+  // Your code here
+}
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
+EOF
+    echo "  ✓ src/index.ts"
+  fi
+
+  # .gitignore
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+node_modules/
+dist/
+*.log
+.env
+.env.local
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+scaffold_python() {
+  echo "→ Scaffolding Python project"
+
+  # requirements.txt
+  if [[ ! -f "$WORKSPACE/requirements.txt" ]]; then
+    cat > "$WORKSPACE/requirements.txt" << 'EOF'
+# Core dependencies
+python-dotenv>=1.0.0
+httpx>=0.27.0
+EOF
+    echo "  ✓ requirements.txt"
+  fi
+
+  # src/main.py
+  mkdir -p "$WORKSPACE/src"
+  if [[ ! -f "$WORKSPACE/src/main.py" ]]; then
+    cat > "$WORKSPACE/src/main.py" << 'EOF'
+"""
+Main entry point
+Auto-generated by Agent Factory
+"""
+
+import asyncio
+import sys
+
+
+async def main() -> None:
+    print("Agent app started")
+    # Your code here
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Fatal error: {e}", file=sys.stderr)
+        sys.exit(1)
+EOF
+    echo "  ✓ src/main.py"
+  fi
+
+  # pyproject.toml
+  if [[ ! -f "$WORKSPACE/pyproject.toml" ]]; then
+    cat > "$WORKSPACE/pyproject.toml" << EOF
+[project]
+name = "$PROJECT_NAME"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+EOF
+    echo "  ✓ pyproject.toml"
+  fi
+
+  # .gitignore
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+scaffold_nextjs() {
+  echo "→ Scaffolding Next.js project"
+  if [[ ! -f "$WORKSPACE/package.json" ]]; then
+    echo "  Running npx create-next-app (this may take a moment)..."
+    cd "$WORKSPACE"
+    npx --yes create-next-app@latest . \
+      --typescript \
+      --tailwind \
+      --eslint \
+      --app \
+      --src-dir \
+      --import-alias "@/*" \
+      --use-npm \
+      2>&1 | tail -5
+    echo "  ✓ Next.js app created"
+  else
+    echo "  ⊘ package.json already exists (skipping scaffold)"
+  fi
+}
+
+scaffold_hardhat() {
+  echo "→ Scaffolding Hardhat/Solidity project"
+
+  if [[ ! -f "$WORKSPACE/package.json" ]]; then
+    cat > "$WORKSPACE/package.json" << EOF
+{
+  "name": "$PROJECT_NAME",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy": "npx hardhat run scripts/deploy.ts --network localhost",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
+EOF
+    echo "  ✓ package.json"
+  fi
+
+  # hardhat.config.ts
+  if [[ ! -f "$WORKSPACE/hardhat.config.ts" ]]; then
+    cat > "$WORKSPACE/hardhat.config.ts" << 'EOF'
+import { HardhatUserConfig } from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox";
+
+const config: HardhatUserConfig = {
+  solidity: "0.8.27",
+};
+
+export default config;
+EOF
+    echo "  ✓ hardhat.config.ts"
+  fi
+
+  # contracts/
+  mkdir -p "$WORKSPACE/contracts"
+  if [[ ! -f "$WORKSPACE/contracts/Lock.sol" ]]; then
+    cat > "$WORKSPACE/contracts/Lock.sol" << 'EOF'
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.27;
+
+contract Lock {
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+}
+EOF
+    echo "  ✓ contracts/Lock.sol"
+  fi
+
+  # scripts/ and test/
+  mkdir -p "$WORKSPACE/scripts" "$WORKSPACE/test"
+
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+node_modules/
+artifacts/
+cache/
+typechain-types/
+coverage/
+.env
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+scaffold_bot() {
+  echo "→ Scaffolding Bot project (Discord/Telegram)"
+
+  if [[ ! -f "$WORKSPACE/package.json" ]]; then
+    cat > "$WORKSPACE/package.json" << EOF
+{
+  "name": "$PROJECT_NAME",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
+EOF
+    echo "  ✓ package.json"
+  fi
+
+  # tsconfig
+  if [[ ! -f "$WORKSPACE/tsconfig.json" ]]; then
+    cat > "$WORKSPACE/tsconfig.json" << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
+EOF
+    echo "  ✓ tsconfig.json"
+  fi
+
+  # src/index.ts (Discord bot template)
+  mkdir -p "$WORKSPACE/src"
+  if [[ ! -f "$WORKSPACE/src/index.ts" ]]; then
+    cat > "$WORKSPACE/src/index.ts" << 'EOF'
+/**
+ * Bot entry point
+ * Auto-generated by Agent Factory
+ *
+ * Supports Discord out of the box. Swap or add Telegram (telegraf) as needed.
+ */
+
+import { Client, GatewayIntentBits, Events } from "discord.js";
+import "dotenv/config";
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
+
+client.once(Events.ClientReady, (c) => {
+  console.log(`Bot ready! Logged in as ${c.user.tag}`);
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+
+  // Simple ping-pong example — replace with your logic
+  if (message.content === "!ping") {
+    await message.reply("Pong!");
+  }
+});
+
+const token = process.env.DISCORD_TOKEN;
+if (!token) {
+  console.error("ERROR: DISCORD_TOKEN not set in .env");
+  process.exit(1);
+}
+
+client.login(token);
+EOF
+    echo "  ✓ src/index.ts"
+  fi
+
+  # .env.example
+  if [[ ! -f "$WORKSPACE/.env.example" ]]; then
+    cat > "$WORKSPACE/.env.example" << 'EOF'
+DISCORD_TOKEN=your_discord_bot_token_here
+# TELEGRAM_TOKEN=your_telegram_bot_token_here
+EOF
+    echo "  ✓ .env.example"
+  fi
+
+  # .gitignore
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+node_modules/
+dist/
+*.log
+.env
+.env.local
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+scaffold_fastapi() {
+  echo "→ Scaffolding FastAPI project"
+
+  # requirements.txt
+  if [[ ! -f "$WORKSPACE/requirements.txt" ]]; then
+    cat > "$WORKSPACE/requirements.txt" << 'EOF'
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-dotenv>=1.0.0
+httpx>=0.27.0
+pydantic>=2.10.0
+EOF
+    echo "  ✓ requirements.txt"
+  fi
+
+  # app/main.py
+  mkdir -p "$WORKSPACE/app"
+  if [[ ! -f "$WORKSPACE/app/main.py" ]]; then
+    cat > "$WORKSPACE/app/main.py" << 'EOF'
+"""
+FastAPI application
+Auto-generated by Agent Factory
+"""
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Agent API", version="0.1.0")
+
+
+class HealthResponse(BaseModel):
+    status: str
+    version: str
+
+
+@app.get("/")
+async def root() -> dict:
+    return {"message": "Agent API is running"}
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    return HealthResponse(status="ok", version="0.1.0")
+EOF
+    echo "  ✓ app/main.py"
+  fi
+
+  # pyproject.toml
+  if [[ ! -f "$WORKSPACE/pyproject.toml" ]]; then
+    cat > "$WORKSPACE/pyproject.toml" << EOF
+[project]
+name = "$PROJECT_NAME"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+EOF
+    echo "  ✓ pyproject.toml"
+  fi
+
+  # .gitignore
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+scaffold_script() {
+  echo "→ Scaffolding Script/Task project"
+
+  # Main script
+  mkdir -p "$WORKSPACE/scripts"
+  if [[ ! -f "$WORKSPACE/scripts/run.sh" ]]; then
+    cat > "$WORKSPACE/scripts/run.sh" << 'EOF'
+#!/usr/bin/env bash
+# Main task script
+# Auto-generated by Agent Factory
+set -euo pipefail
+
+echo "=== Task Runner ==="
+echo "Started: $(date)"
+
+# Your task logic here
+
+echo "=== Done ==="
+EOF
+    chmod +x "$WORKSPACE/scripts/run.sh"
+    echo "  ✓ scripts/run.sh"
+  fi
+
+  # Node helper
+  mkdir -p "$WORKSPACE/src"
+  if [[ ! -f "$WORKSPACE/src/task.ts" ]]; then
+    cat > "$WORKSPACE/src/task.ts" << 'EOF'
+/**
+ * Task helper script
+ * Auto-generated by Agent Factory
+ * Run with: npx tsx src/task.ts
+ */
+
+async function run(): Promise<void> {
+  console.log("Task started:", new Date().toISOString());
+  // Your task logic here
+  console.log("Task complete");
+}
+
+run().catch(console.error);
+EOF
+    echo "  ✓ src/task.ts"
+  fi
+
+  # package.json (minimal)
+  if [[ ! -f "$WORKSPACE/package.json" ]]; then
+    cat > "$WORKSPACE/package.json" << EOF
+{
+  "name": "$PROJECT_NAME",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "task": "tsx src/task.ts",
+    "run": "bash scripts/run.sh"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
+EOF
+    echo "  ✓ package.json"
+  fi
+
+  # .gitignore
+  if [[ ! -f "$WORKSPACE/.gitignore" ]]; then
+    cat > "$WORKSPACE/.gitignore" << 'EOF'
+node_modules/
+*.log
+.env
+EOF
+    echo "  ✓ .gitignore"
+  fi
+}
+
+# ─── Run scaffold ───
+case "$APP_TYPE" in
+  node)     scaffold_node ;;
+  python)   scaffold_python ;;
+  nextjs)   scaffold_nextjs ;;
+  hardhat)  scaffold_hardhat ;;
+  bot)      scaffold_bot ;;
+  fastapi)  scaffold_fastapi ;;
+  script)   scaffold_script ;;
+esac
+
+# ─── Install dependencies ───
+if [[ "$SKIP_INSTALL" == "false" ]]; then
+  echo ""
+  echo "→ Installing dependencies..."
+  cd "$WORKSPACE"
+
+  case "$APP_TYPE" in
+    node|bot|hardhat|script|nextjs)
+      if [[ -f "package.json" ]]; then
+        npm install 2>&1 | tail -3
+        echo "  ✓ npm install complete"
+      fi
+      ;;
+    python|fastapi)
+      if [[ -f "requirements.txt" ]]; then
+        if [[ ! -d ".venv" ]]; then
+          python3 -m venv .venv 2>/dev/null || echo "  ⚠ venv creation failed (python3-venv may not be installed)"
+        fi
+        if [[ -d ".venv" ]]; then
+          .venv/bin/pip install -r requirements.txt 2>&1 | tail -3
+          echo "  ✓ pip install complete"
+        fi
+      fi
+      ;;
+  esac
+fi
+
+# ─── Create repo-ops skill ───
+if [[ "$SKIP_SKILL" == "false" ]]; then
+  echo ""
+  echo "→ Creating repo-ops skill"
+  SKILL_DIR="$WORKSPACE/.openclaw/skills/repo-ops"
+  mkdir -p "$SKILL_DIR"
+
+  if [[ ! -f "$SKILL_DIR/SKILL.md" ]]; then
+    # Build commands based on app type
+    case "$APP_TYPE" in
+      node|script)
+        SKILL_COMMANDS='- `/repo-ops typecheck` — Run `tsc --noEmit`
+- `/repo-ops test` — Run `npm test`
+- `/repo-ops build` — Run `npm run build`
+- `/repo-ops lint` — Run `npm run lint`
+- `/repo-ops status` — Run `git status`
+- `/repo-ops commit "message"` — Stage all, commit, report
+- `/repo-ops push` — Push to remote'
+        ;;
+      python|fastapi)
+        SKILL_COMMANDS='- `/repo-ops test` — Run `python -m pytest`
+- `/repo-ops lint` — Run `ruff check .`
+- `/repo-ops format` — Run `ruff format .`
+- `/repo-ops status` — Run `git status`
+- `/repo-ops commit "message"` — Stage all, commit, report
+- `/repo-ops push` — Push to remote'
+        ;;
+      hardhat)
+        SKILL_COMMANDS='- `/repo-ops compile` — Run `npx hardhat compile`
+- `/repo-ops test` — Run `npx hardhat test`
+- `/repo-ops typecheck` — Run `tsc --noEmit`
+- `/repo-ops status` — Run `git status`
+- `/repo-ops commit "message"` — Stage all, commit, report
+- `/repo-ops push` — Push to remote'
+        ;;
+      bot)
+        SKILL_COMMANDS='- `/repo-ops typecheck` — Run `tsc --noEmit`
+- `/repo-ops build` — Run `npm run build`
+- `/repo-ops start` — Run `npm start`
+- `/repo-ops status` — Run `git status`
+- `/repo-ops commit "message"` — Stage all, commit, report
+- `/repo-ops push` — Push to remote'
+        ;;
+      nextjs)
+        SKILL_COMMANDS='- `/repo-ops build` — Run `npm run build`
+- `/repo-ops dev` — Run `npm run dev`
+- `/repo-ops lint` — Run `npm run lint`
+- `/repo-ops typecheck` — Run `tsc --noEmit`
+- `/repo-ops status` — Run `git status`
+- `/repo-ops commit "message"` — Stage all, commit, report
+- `/repo-ops push` — Push to remote'
+        ;;
+    esac
+
+    cat > "$SKILL_DIR/SKILL.md" << SKILL_EOF
+# repo-ops — Atomic Repo Operations
+
+> Auto-generated by Agent Factory for project type: $APP_TYPE
+
+## Description
+
+Single-command repo operations for the $PROJECT_NAME workspace.
+
+## Commands
+
+$SKILL_COMMANDS
+
+## Instructions
+
+When the user runs a \`/repo-ops\` command, execute the corresponding shell command using the \`exec\` tool. Report the result concisely (pass/fail + key output). Do not add commentary unless there are errors to explain.
+SKILL_EOF
+    echo "  ✓ repo-ops skill created"
+  else
+    echo "  ⊘ repo-ops skill already exists (skipped)"
+  fi
+fi
+
+# ─── Git init if needed ───
+if [[ ! -d "$WORKSPACE/.git" ]]; then
+  echo ""
+  echo "→ Initializing git repository"
+  cd "$WORKSPACE"
+  git init -q
+  git add -A
+  git commit -q -m "Initial scaffold ($APP_TYPE) — created by Agent Factory" 2>/dev/null || true
+  echo "  ✓ Git repo initialized with initial commit"
+fi
+
+# ─── GitHub repo creation ───
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo ""
+  echo "→ Creating GitHub repository"
+
+  if ! command -v gh &>/dev/null; then
+    echo "  ⚠ gh CLI not found — skipping GitHub repo creation"
+    echo "  Install: https://cli.github.com/"
+  elif ! gh auth status &>/dev/null 2>&1; then
+    echo "  ⚠ gh not authenticated — skipping GitHub repo creation"
+    echo "  Run: gh auth login"
+  else
+    REPO_NAME="$PROJECT_NAME"
+    REPO_FULL="$GITHUB_ORG/$REPO_NAME"
+    VISIBILITY="$( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "--private" || echo "--public" )"
+
+    # Check if repo already exists
+    if gh repo view "$REPO_FULL" &>/dev/null 2>&1; then
+      echo "  ⊘ Repository $REPO_FULL already exists"
+
+      # Make sure remote is set
+      cd "$WORKSPACE"
+      if ! git remote get-url origin &>/dev/null 2>&1; then
+        git remote add origin "https://github.com/$REPO_FULL.git" 2>/dev/null || true
+        echo "  ✓ Remote origin set"
+      fi
+    else
+      echo "  Creating: $REPO_FULL ($( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" ))"
+      cd "$WORKSPACE"
+      gh repo create "$REPO_FULL" $VISIBILITY \
+        --description "Agent workspace: $PROJECT_NAME ($APP_TYPE) — created by Agent Factory" \
+        --source . \
+        --remote origin \
+        2>&1 | sed 's/^/  /'
+
+      if [[ $? -eq 0 ]]; then
+        echo "  ✓ Repository created: https://github.com/$REPO_FULL"
+      else
+        echo "  ⚠ Repository creation may have failed — check gh output above"
+      fi
+    fi
+
+    # Push initial commit
+    cd "$WORKSPACE"
+    if git rev-parse HEAD &>/dev/null 2>&1; then
+      echo "  → Pushing initial commit..."
+      git push -u origin HEAD 2>&1 | sed 's/^/  /' || echo "  ⚠ Push failed"
+      echo "  ✓ Pushed to https://github.com/$REPO_FULL"
+    fi
+  fi
+fi
+
+echo ""
+echo "═══ BUILD COMPLETE ═══"
+echo "App type:    $APP_TYPE"
+echo "Workspace:   $WORKSPACE"
+echo ""
+echo "Next steps:"
+case "$APP_TYPE" in
+  node|script)   echo "  cd $WORKSPACE && npm run dev" ;;
+  python)        echo "  cd $WORKSPACE && source .venv/bin/activate && python src/main.py" ;;
+  nextjs)        echo "  cd $WORKSPACE && npm run dev" ;;
+  hardhat)       echo "  cd $WORKSPACE && npx hardhat compile" ;;
+  bot)           echo "  1. Set DISCORD_TOKEN in $WORKSPACE/.env"
+                 echo "  2. cd $WORKSPACE && npm run dev" ;;
+  fastapi)       echo "  cd $WORKSPACE && source .venv/bin/activate && uvicorn app.main:app --reload" ;;
+esac

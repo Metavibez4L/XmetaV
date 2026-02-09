@@ -1,6 +1,6 @@
 # Agent Tasks
 
-Examples of what you can ask your AI agent to do.
+Examples of what you can ask your AI agents to do.
 
 ## Code Help
 
@@ -14,6 +14,8 @@ ocm "Why am I getting 'TypeError: NoneType object is not iterable'?"
 # Code review
 ocm "Review this code for bugs and improvements: $(cat myfile.py)"
 ```
+
+Note: `ocm` is an alias for `openclaw agent --agent main --local --message`. See `capabilities/quick-commands.md` for alias setup.
 
 ## Generate Code
 
@@ -41,7 +43,62 @@ ocm "My SSH connection keeps timing out, how do I fix it?"
 ocm "Write an nginx config for reverse proxy to localhost:3000"
 ```
 
-## Writing & Documentation
+## Repo Agent Tasks (basedintern)
+
+### Using skills (recommended — no stalling)
+
+```bash
+# Health check (typecheck + test + git status in one shot)
+ocbi "Run /repo-health"
+
+# Typecheck only
+ocbi "Run /repo-ops typecheck"
+
+# Run tests only
+ocbi "Run /repo-ops test"
+
+# Full check (typecheck + test)
+ocbi "Run /repo-ops check"
+
+# Git status
+ocbi "Run /repo-ops status"
+
+# Commit changes
+ocbi "Run /repo-ops commit 'feat: add new feature'"
+
+# Push
+ocbi "Run /repo-ops push"
+```
+
+### Using wrapper scripts (best for pipelines)
+
+```bash
+# Single atomic task
+./scripts/agent-task.sh basedintern "Run /repo-health"
+
+# Ship pipeline (typecheck + test + commit + push)
+./scripts/agent-pipeline.sh ship "feat: add LP support"
+
+# Evolve pipeline (health + implement + health)
+./scripts/agent-pipeline.sh evolve "add retry logic to moltbook posting"
+
+# Health check pipeline
+./scripts/agent-pipeline.sh health
+```
+
+### Manual commands (legacy — can stall on complex tasks)
+
+```bash
+# Docs update
+ocbi "Read docs/STATUS.md and suggest improvements."
+
+# Full end-to-end
+ocbi "Pull latest, run typecheck, run tests, and summarize results."
+```
+
+Note: `ocbi` is an alias for `openclaw agent --agent basedintern --local --message`.
+
+## Writing and Documentation
 
 ```bash
 # Documentation
@@ -54,7 +111,7 @@ ocm "Explain Docker containers to a beginner"
 ocm "Summarize the key points of this article: $(cat article.txt)"
 ```
 
-## Data & Analysis
+## Data and Analysis
 
 ```bash
 # Data parsing
@@ -73,7 +130,7 @@ For complex, multi-turn conversations:
 
 ```bash
 # Start interactive mode
-openclaw --profile dev agent --agent dev --local
+openclaw agent --agent main --local
 
 # Now chat naturally:
 # > Let's build a web scraper

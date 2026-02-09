@@ -1,5 +1,5 @@
-# Status — XmetaV / OpenClaw (dev profile)
-Last verified: 2026-02-04
+# Status — XmetaV / OpenClaw (local config)
+Last verified: 2026-02-06
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -11,52 +11,187 @@ This file captures the **known-good** runtime settings for this machine/profile 
 
 ## Active profile and paths
 
-- Profile: `dev`
-- State dir: `~/.openclaw-dev/`
-- Config file: `~/.openclaw-dev/openclaw.json`
-- Workspace: `~/.openclaw/workspace-dev`
-- Gateway: `ws://127.0.0.1:19001`
+- Profile: (none; using default `~/.openclaw/` config)
+- State dir: `~/.openclaw/`
+- Config file: `~/.openclaw/openclaw.json`
+- Workspace(s): per-agent (`openclaw agents list`)
+- Gateway: local (`gateway.mode: local`)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
+
+## Configured agents (this machine)
+
+This command center is set up for **multiple isolated agents**, all powered by **Kimi K2.5** (256k context):
+
+| Agent | Model | Workspace | Tools | Role |
+|-------|-------|-----------|-------|------|
+| `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
+| `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
+| `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
+| `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
+| `akua_web` | `kimi-k2.5:cloud` | `/home/manifest/akua` | full | Same repo — browser/web only |
+| _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
+
+\* = default agent
+
+Detailed agent runbooks:
+- `docs/agents/main.md`
+- `docs/agents/basedintern.md`
+- `docs/agents/akua.md`
+- `docs/agents/dynamic.md`
+
+List agents:
+
+```bash
+openclaw agents list
+# or
+./scripts/manage-agents.sh list
+```
+
+Run the repo agent:
+
+```bash
+openclaw agent --agent basedintern --local --thinking off \
+  --message "Summarize this repo and run npm test."
+```
+
+## Orchestrator capabilities (main agent)
+
+The `main` agent has two power skills installed:
+
+### Agent Factory
+
+Create agents, scaffold apps, manage the fleet, and create GitHub repos:
+
+```bash
+# Create a new agent
+./scripts/create-agent.sh --id researcher --template research --web
+
+# Create agent + GitHub repo (auto-creates + pushes)
+./scripts/create-agent.sh --id researcher --template research --web --github --private
+
+# Scaffold an app
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Scaffold an app + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
+
+# Fleet status
+./scripts/manage-agents.sh list
+./scripts/manage-agents.sh status
+```
+
+### Swarm (multi-agent orchestration)
+
+Dispatch tasks across multiple agents with three execution modes:
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| Parallel | `./scripts/swarm.sh --parallel` | Run tasks simultaneously across agents |
+| Pipeline | `./scripts/swarm.sh --pipeline` | Chain agents, output flows to next step |
+| Collaborative | `./scripts/swarm.sh --collab` | Same task to multiple agents, then synthesize |
+
+```bash
+# Parallel health check across all repos
+./scripts/swarm.sh --parallel \
+  basedintern "Run /repo-health" \
+  akua "Run /repo-health"
+
+# Pipeline: research then implement
+./scripts/swarm.sh --pipeline \
+  main "Research best practices for X" \
+  basedintern "Apply the findings"
+
+# Collaborative code review
+./scripts/swarm.sh --collab \
+  "Review the last commit for bugs" \
+  basedintern akua
+
+# Pre-built templates
+./scripts/swarm.sh templates/swarms/health-all.json
+
+# Check past runs and results
+./scripts/swarm.sh --status
+./scripts/swarm.sh --results <run-id>
+```
+
+Results stored in: `~/.openclaw/swarm/<run-id>/`
+
+Verify skills are installed:
+
+```bash
+ls ~/.openclaw/workspace/skills/
+# Expected: agent-factory/ swarm/ (plus any others)
+```
+
+Full reference: `docs/SWARM.md`
 
 ## Known-good config (sanity checks)
 
 These should match (do not paste tokens publicly):
 
 ```bash
-openclaw --profile dev config get agents.defaults.model.primary
-openclaw --profile dev config get models.providers.ollama.baseUrl
-openclaw --profile dev config get models.providers.ollama.api
-openclaw --profile dev config get tools
-openclaw --profile dev config get messages.tts
+openclaw config get agents.list
+openclaw config get models.providers.ollama.baseUrl
+openclaw config get models.providers.ollama.api
+openclaw config get models.providers.ollama.apiKey
 ```
 
 Expected values (high level):
 - `models.providers.ollama.baseUrl`: `http://127.0.0.1:11434/v1`
-- `models.providers.ollama.api`: `openai-completions`
-- `tools.profile`: `minimal`
-- `tools.deny`: includes `tts`
-- `messages.tts.auto`: `off`
-- `messages.tts.edge.enabled`: `false`
-- `messages.tts.modelOverrides.enabled`: `false`
+- `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
+- `models.providers.ollama.apiKey`: set to a non-secret placeholder (e.g. `"local"`) to satisfy OpenClaw auth checks for local Ollama
 
 ## Standard way to run the agent (stable)
 
 Use embedded mode + disable thinking for “simple chat” reliability on small local models:
 
 ```bash
-openclaw --profile dev agent \
-  --agent dev \
+openclaw agent \
+  --agent main \
   --local \
   --thinking off \
   --session-id smoke_$(date +%s) \
   --message "What is 2+2?"
 ```
 
+## Cloud model: `kimi-k2.5:cloud` (256k context)
+
+This environment is configured with the Ollama cloud model:
+
+- Model id: `kimi-k2.5:cloud`
+- Expected context window: `262144` (256k)
+- Auth: via `ollama signin` (no API key required for local `http://127.0.0.1:11434` calls)
+
+Verify config:
+
+```bash
+openclaw config get agents.list
+openclaw config get models.providers.ollama.models
+```
+
+## Known behavior: Ollama Cloud “session usage limit” (HTTP 429)
+
+If you exceed your Ollama Cloud quota/limits, calls to a cloud model can fail with:
+
+```json
+{"StatusCode":429,"Status":"429 Too Many Requests","error":"you've reached your session usage limit, please wait or upgrade to continue"}
+```
+
+Reproduce / diagnose (direct to local Ollama):
+
+```bash
+curl -i -sS http://127.0.0.1:11434/api/chat \
+  -d '{"model":"kimi-k2.5:cloud","messages":[{"role":"user","content":"OK"}],"stream":false}'
+```
+
+Fix:
+- Wait for the limit to reset, or upgrade your Ollama plan.
+
 ## Health checks
 
 ```bash
 # Gateway should be reachable
-openclaw --profile dev health
+openclaw health
 
 # Ollama should list models
 curl -s http://127.0.0.1:11434/api/tags
@@ -65,22 +200,102 @@ curl -s http://127.0.0.1:11434/api/tags
 curl -s http://127.0.0.1:11434/api/ps
 ```
 
+## End-to-end smoke test (repo agent)
+
+This is the “we can ship” verification for `basedintern`:
+
+```bash
+openclaw agent --agent basedintern --local --thinking off --session-id bi_smoke_$(date +%s) --message "\
+In /home/manifest/basedintern/based-intern, use exec to run:\n\
+1) git pull --ff-only\n\
+2) npx tsc --noEmit\n\
+3) npm test\n\
+Paste raw stdout/stderr and exit codes."
+```
+
 ## If it hangs (fast recovery)
 
 ```bash
 # Clear stale session locks
-find ~/.openclaw-dev -name "*.lock" -type f -delete
+find ~/.openclaw -name "*.lock" -type f -delete
 
 # Stop anything stuck
 pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
 pkill -9 -f "node.*openclaw" 2>/dev/null || true
-fuser -k 19001/tcp 2>/dev/null || true
+fuser -k 18789/tcp 2>/dev/null || true
 
 # Re-apply the golden-path fix
 ./scripts/openclaw-fix.sh
 ```
 
+## Tool Calling (System Automation)
+
+With `tools.profile=coding` (or `full` for `basedintern`) and `api=openai-responses`, the agent can:
+- Execute shell commands via `exec` tool
+- Read/write files via `read`/`write` tools
+- Manage background processes via `process` tool
+- Browse the web via `browser` tool (full profile)
+- Fetch web pages via `web_fetch` / `web_search` tools (full profile)
+
+Test:
+```bash
+openclaw agent --agent main --local --thinking off \
+  --message "Call the exec tool with command: whoami"
+```
+
 Notes:
-- If you see loops calling tools (especially `tts`), keep `tools.profile=minimal` and deny `tts`.
+- If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
+- The `openai-responses` API mode is required for tool schemas to be passed to the model.
+
+## Browser Automation (OpenClaw-managed browser)
+
+This setup supports OpenClaw’s dedicated browser automation via the `openclaw browser ...` CLI (open tabs, snapshot, click/type).
+
+### Prereqs (WSL2/Linux)
+
+1) Install system dependencies (requires `sudo`):
+
+```bash
+sudo apt-get update && sudo apt-get install -y \
+  ca-certificates fonts-liberation wget xdg-utils \
+  libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+  libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 \
+  libgtk-3-0 libpango-1.0-0 libudev1 libvulkan1 \
+  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
+  libxkbcommon0 libasound2
+```
+
+2) Install a Chromium binary via Playwright (no sudo):
+
+```bash
+npx playwright install chromium
+```
+
+3) Point OpenClaw at that Chromium (example path shown; adjust if your version differs):
+
+```bash
+openclaw config set browser.enabled true
+openclaw config set browser.defaultProfile openclaw
+openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+```
+
+### Smoke test (CLI)
+
+```bash
+# Start gateway (if not already running)
+./scripts/start-gateway.sh
+
+openclaw browser start
+openclaw browser open https://example.com
+openclaw browser snapshot
+```
+
+### Known limitation (small local models)
+
+With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
+
+Workarounds:
+- Use the deterministic `openclaw browser ...` CLI for browser automation.
+- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
 

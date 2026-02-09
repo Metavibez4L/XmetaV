@@ -3,15 +3,14 @@
 # OpenClaw 2026.2.1 - WSL2 "Golden Path" Fix Script
 # -------------------------------------------------
 # Fixes: gateway connection (1006), agent hangs, stale locks, API mode
-# Profile: dev (state dir: ~/.openclaw-dev)
+# Config: default (~/.openclaw/)
 # Idempotent: safe to run multiple times
 #
 set -euo pipefail
 
-PROFILE="dev"
-STATE_DIR="$HOME/.openclaw-dev"
+STATE_DIR="$HOME/.openclaw"
 CONFIG_FILE="$STATE_DIR/openclaw.json"
-GATEWAY_PORT=19001
+GATEWAY_PORT=18789
 OLLAMA_URL="http://127.0.0.1:11434"
 
 echo "🦞 OpenClaw WSL2 Fix Script"
@@ -57,23 +56,14 @@ cp "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%s)"
 
 # Apply fixes using openclaw config set (validates keys)
 # Fix 1: gateway.mode = "local" (run gateway in-process or spawn it)
-openclaw --profile "$PROFILE" config set gateway.mode local
+openclaw config set gateway.mode local
 
 # Fix 2: Ollama uses OpenAI-compatible endpoints under /v1.
-# Use "openai-completions" - openai-responses hangs with local Ollama.
-openclaw --profile "$PROFILE" config set models.providers.ollama.api openai-completions
+# Use "openai-responses" for tool calling support.
+openclaw config set models.providers.ollama.api openai-responses
 
 # Fix 3: Base URL should include /v1 for the OpenAI-compatible API.
-openclaw --profile "$PROFILE" config set models.providers.ollama.baseUrl "http://127.0.0.1:11434/v1"
-
-# Fix 4: Reduce tool surface area to avoid tool-loop hangs on small local models.
-openclaw --profile "$PROFILE" config set tools.profile minimal
-openclaw --profile "$PROFILE" config set tools.deny '["tts"]'
-
-# Fix 5: Disable TTS (auto + Edge fallback + model-driven overrides).
-openclaw --profile "$PROFILE" config set messages.tts.auto off
-openclaw --profile "$PROFILE" config set messages.tts.edge.enabled false
-openclaw --profile "$PROFILE" config set messages.tts.modelOverrides.enabled false
+openclaw config set models.providers.ollama.baseUrl "http://127.0.0.1:11434/v1"
 
 echo "   ✓ Config patched"
 
@@ -83,7 +73,7 @@ echo "   ✓ Config patched"
 echo "▶ [5/6] Starting gateway on port $GATEWAY_PORT..."
 
 # Start gateway in background with --force to claim the port
-nohup openclaw --profile "$PROFILE" gateway --port "$GATEWAY_PORT" --force --verbose \
+nohup openclaw gateway --port "$GATEWAY_PORT" --force --verbose \
     > "$STATE_DIR/gateway.log" 2>&1 &
 GATEWAY_PID=$!
 echo "   Gateway PID: $GATEWAY_PID"
@@ -111,18 +101,18 @@ echo "▶ [6/6] Running verification..."
 echo ""
 
 echo "─── 6a. Gateway health ───"
-openclaw --profile "$PROFILE" health || echo "(health check returned non-zero)"
+openclaw health || echo "(health check returned non-zero)"
 
 echo ""
 echo "─── 6b. Models list ───"
-openclaw --profile "$PROFILE" models list 2>/dev/null | head -20 || echo "(models list failed)"
+openclaw models list 2>/dev/null | head -20 || echo "(models list failed)"
 
 echo ""
 echo "─── 6c. Agent test (local/embedded mode) ───"
 # Use --local to bypass gateway websocket and test model directly
 SESSION_ID="verify_$(date +%s)"
-AGENT_OUTPUT=$(timeout 60 openclaw --profile "$PROFILE" agent \
-    --agent dev \
+AGENT_OUTPUT=$(timeout 60 openclaw agent \
+    --agent main \
     --session-id "$SESSION_ID" \
     --local \
     --thinking off \
@@ -153,5 +143,5 @@ echo "Gateway running in background (PID $GATEWAY_PID)"
 echo "Logs: $STATE_DIR/gateway.log"
 echo ""
 echo "To stop gateway:  kill $GATEWAY_PID"
-echo "To restart:       openclaw --profile dev gateway --force"
+echo "To restart:       openclaw gateway --force"
 echo "========================================"

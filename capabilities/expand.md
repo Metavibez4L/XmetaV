@@ -14,48 +14,54 @@ ollama pull codellama:7b              # Code-focused
 ollama pull mistral:7b                # Fast, efficient
 ollama pull deepseek-coder:6.7b       # Coding specialist
 
+# Cloud models (require ollama signin)
+ollama pull kimi-k2.5:cloud           # 256k context, multimodal
+
 # Larger models (may need quantization)
 ollama pull qwen2.5:14b               # Better reasoning
 ollama pull codellama:13b             # Better code
 ```
 
-### Switch Models in Config
+### Register Models in Config
 
-Edit `~/.openclaw-dev/openclaw.json`:
+Edit `~/.openclaw/openclaw.json`:
 
-```json5
+```json
 {
-  models: {
-    ollama: {
-      api: "openai-completions",
-      baseUrl: "http://127.0.0.1:11434/v1",
-      models: {
-        "ollama/qwen2.5:7b-instruct": {},
-        "ollama/llama3:8b": {},
-        "ollama/codellama:7b": {}
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "apiKey": "local",
+        "api": "openai-responses",
+        "models": [
+          { "id": "qwen2.5:7b-instruct", "name": "qwen2.5:7b-instruct" },
+          { "id": "kimi-k2.5:cloud", "name": "kimi-k2.5:cloud" },
+          { "id": "llama3:8b", "name": "llama3:8b" }
+        ]
       }
     }
   },
-  agent: {
-    model: "ollama/qwen2.5:7b-instruct"  // Change this
+  "agents": {
+    "defaults": {
+      "model": { "primary": "ollama/qwen2.5:7b-instruct" }
+    }
   }
 }
 ```
 
 ### Cloud Models (API keys required)
 
-```json5
+```json
 {
-  models: {
-    anthropic: {
-      // Uses ANTHROPIC_API_KEY env var
-      models: {
+  "models": {
+    "anthropic": {
+      "models": {
         "anthropic/claude-opus-4-5": {}
       }
     },
-    openai: {
-      // Uses OPENAI_API_KEY env var
-      models: {
+    "openai": {
+      "models": {
         "openai/gpt-4o": {}
       }
     }
@@ -82,7 +88,7 @@ openclaw skills list
 
 ### Custom Skills
 
-Create `~/.openclaw-dev/workspace/skills/my-skill/SKILL.md`:
+Create `~/.openclaw/workspace/skills/my-skill/SKILL.md`:
 
 ```markdown
 # My Custom Skill
@@ -101,12 +107,11 @@ When the user asks about X, do Y.
 
 ### Telegram
 
-```json5
-// In openclaw.json
+```json
 {
-  channels: {
-    telegram: {
-      botToken: "YOUR_BOT_TOKEN"  // From @BotFather
+  "channels": {
+    "telegram": {
+      "botToken": "YOUR_BOT_TOKEN"
     }
   }
 }
@@ -114,11 +119,11 @@ When the user asks about X, do Y.
 
 ### Discord
 
-```json5
+```json
 {
-  channels: {
-    discord: {
-      token: "YOUR_BOT_TOKEN"
+  "channels": {
+    "discord": {
+      "token": "YOUR_BOT_TOKEN"
     }
   }
 }
@@ -126,12 +131,12 @@ When the user asks about X, do Y.
 
 ### Slack
 
-```json5
+```json
 {
-  channels: {
-    slack: {
-      botToken: "xoxb-...",
-      appToken: "xapp-..."
+  "channels": {
+    "slack": {
+      "botToken": "xoxb-...",
+      "appToken": "xapp-..."
     }
   }
 }
@@ -144,41 +149,99 @@ When the user asks about X, do Y.
 openclaw channels login whatsapp
 ```
 
-> ⚠️ **Note**: Channels require gateway mode (not `--local`). You may need to investigate the websocket hang issue for full channel support.
+> **Note**: Channels require gateway mode (not `--local`). You may need to investigate the websocket hang issue for full channel support.
 
 ## Creating Custom Agents
 
-Edit `~/.openclaw-dev/workspace/AGENTS.md`:
+### Automated (Agent Factory — recommended)
 
-```markdown
-# My Custom Agent
+Use the Agent Factory scripts to create fully configured agents:
 
-## Personality
-You are a helpful coding assistant specialized in Python.
+```bash
+# Create agent with identity files and config entry
+./scripts/create-agent.sh --id my-agent \
+  --template coding \
+  --description "My custom coding agent" \
+  --web  # also create my-agent_web companion
 
-## Rules
-- Always include docstrings
-- Prefer type hints
-- Follow PEP 8
+# Scaffold a project in the agent's workspace
+./scripts/build-app.sh --type node --workspace /home/manifest/my-agent
 
-## Knowledge
-- Expert in FastAPI, Django, Flask
-- Familiar with data science libraries
+# Check agent was created
+./scripts/manage-agents.sh list
+```
+
+Available templates: `coding`, `bot`, `research`, `devops`, `general`
+
+Available app types: `node`, `python`, `nextjs`, `hardhat`, `bot`, `fastapi`, `script`
+
+### Via the main agent (AI-driven)
+
+Ask the main agent directly — it has the Agent Factory skill:
+
+```bash
+openclaw agent --agent main --local --message "Create a Discord bot agent called social-bot"
+```
+
+### Manual
+
+Add an agent to `~/.openclaw/openclaw.json` under `agents.list`:
+
+```json
+{
+  "id": "my-agent",
+  "workspace": "/path/to/workspace",
+  "model": {
+    "primary": "ollama/kimi-k2.5:cloud"
+  }
+}
+```
+
+Optionally, create agent personality files in the workspace:
+- `AGENTS.md` — identity, capabilities, rules
+- `SOUL.md` — personality and operating principles
+- `TOOLS.md` — local setup notes
+
+### Managing Agents
+
+```bash
+# List all agents
+./scripts/manage-agents.sh list
+
+# Health check all agents
+./scripts/manage-agents.sh status
+
+# Remove an agent (preserves workspace)
+./scripts/manage-agents.sh remove my-agent
+
+# Update agent model
+./scripts/manage-agents.sh update my-agent --model ollama/qwen2.5:7b-instruct
 ```
 
 ## Adding Tools
 
-Tools are defined in skills or the agent workspace:
+Tools are controlled via the `tools` section in `openclaw.json`:
 
-```markdown
-## Tools
+```json
+{
+  "tools": {
+    "profile": "coding",
+    "allow": ["exec", "process", "read", "write"],
+    "deny": ["tts"]
+  }
+}
+```
 
-### web_search
-Search the web for information.
+For full tool access (like `basedintern`):
 
-### file_read
-Read contents of a file.
-
-### bash
-Execute shell commands.
+```json
+{
+  "tools": {
+    "profile": "full",
+    "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+    "elevated": {
+      "enabled": true
+    }
+  }
+}
 ```

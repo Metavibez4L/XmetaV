@@ -18,12 +18,14 @@ Quick reference for everything you can do with your OpenClaw setup.
 ┌─────────────────────────────────────────┐
 │              XmetaV Stack               │
 ├─────────────────────────────────────────┤
-│  Profile:  dev                          │
-│  Config:   ~/.openclaw-dev/openclaw.json│
-│  Gateway:  127.0.0.1:19001              │
+│  Config:   ~/.openclaw/openclaw.json    │
+│  Gateway:  127.0.0.1:18789             │
 │  Mode:     --local (recommended)        │
 ├─────────────────────────────────────────┤
-│  Model:    qwen2.5:7b-instruct          │
+│  Agents:                                │
+│    main         kimi-k2.5:cloud (256k)   │
+│    basedintern  kimi-k2.5:cloud (256k)  │
+├─────────────────────────────────────────┤
 │  Provider: Ollama (native + CUDA)       │
 │  GPU:      RTX 4070 (42-54 tok/s)       │
 └─────────────────────────────────────────┘
@@ -32,9 +34,12 @@ Quick reference for everything you can do with your OpenClaw setup.
 ## Quick Start
 
 ```bash
-# Talk to your AI
-openclaw --profile dev agent --agent dev --local --message "Hello!"
+# Talk to your AI (default agent: main)
+openclaw agent --agent main --local --message "Hello!"
+
+# Run the basedintern repo agent
+openclaw agent --agent basedintern --local --message "Summarize this repo."
 
 # Or start interactive session
-openclaw --profile dev agent --agent dev --local
+openclaw agent --agent main --local
 ```

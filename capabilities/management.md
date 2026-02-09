@@ -6,13 +6,13 @@ System administration and configuration.
 
 ```bash
 # View current config
-openclaw --profile dev config get
+openclaw config get
 
 # Edit config directly
-nano ~/.openclaw-dev/openclaw.json
+nano ~/.openclaw/openclaw.json
 
 # Validate config
-openclaw --profile dev doctor
+openclaw doctor
 ```
 
 ## Model Management
@@ -29,22 +29,39 @@ ollama rm model-name
 
 # Model info
 ollama show qwen2.5:7b-instruct
+
+# Sign in for cloud models
+ollama signin
+```
+
+## Agent Management
+
+```bash
+# List configured agents
+openclaw agents list
+
+# Run specific agent
+openclaw agent --agent main --local --message "Hello"
+openclaw agent --agent basedintern --local --message "Run tests"
+
+# View agent config
+openclaw config get agents.list
 ```
 
 ## Gateway Control
 
 ```bash
-# Start gateway (foreground, verbose)
-openclaw --profile dev gateway --verbose
-
 # Start gateway (background)
-openclaw --profile dev gateway &
+./scripts/start-gateway.sh
+
+# Start gateway (foreground, verbose)
+openclaw gateway --port 18789 --verbose
 
 # Check gateway health
-curl -s http://127.0.0.1:19001/health | jq
+openclaw health
 
 # View gateway logs
-tail -f ~/.openclaw-dev/logs/gateway.log
+tail -f ~/.openclaw/gateway.log
 ```
 
 ## Process Management
@@ -57,8 +74,8 @@ pgrep -af openclaw
 pkill -f "openclaw.*gateway"
 
 # Check port usage
-lsof -i :19001
-ss -tlnp | grep 19001
+lsof -i :18789
+ss -tlnp | grep 18789
 ```
 
 ## Ollama Management
@@ -81,35 +98,22 @@ nvidia-smi -l 1
 
 ```bash
 # Remove stale locks
-rm -f ~/.openclaw-dev/*.lock
+find ~/.openclaw -name "*.lock" -type f -delete
 
-# Clear session cache
-rm -rf ~/.openclaw-dev/sessions/*
+# Clear session cache (careful — removes history)
+rm -rf ~/.openclaw/agents/*/sessions/*
 
 # Reset to clean state
 ./scripts/stop-all.sh
-rm -f ~/.openclaw-dev/*.lock
+find ~/.openclaw -name "*.lock" -delete
 ./scripts/start-gateway.sh
-```
-
-## Profile Management
-
-```bash
-# Using dev profile (your setup)
-openclaw --profile dev <command>
-
-# Default profile (if configured)
-openclaw <command>
-
-# List profiles
-ls ~/.openclaw*/openclaw.json
 ```
 
 ## Diagnostics
 
 ```bash
 # Full system check
-openclaw --profile dev doctor
+openclaw doctor
 
 # Test Ollama connection
 curl http://127.0.0.1:11434/api/generate -d '{
