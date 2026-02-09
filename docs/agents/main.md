@@ -81,6 +81,7 @@ The main agent has the **Agent Factory** skill installed. It can:
 
 - Create new agents: `/spawn-agent <id> --template <type>`
 - Scaffold apps: `/build-app <type> <workspace>`
+- **Create GitHub repos**: `/spawn-agent <id> --github` or `/build-app <type> <workspace> --github`
 - List agents: `/list-agents`
 - Health check: `/agent-status`
 
@@ -91,11 +92,24 @@ openclaw agent --agent main --local --thinking off \
   --message "Create a research agent and scaffold a Node.js project for it"
 ```
 
+### Create an agent with a GitHub repo
+
+```bash
+openclaw agent --agent main --local --thinking off \
+  --message "Create an API agent with a private GitHub repo"
+```
+
 ### Create an agent via script
 
 ```bash
+# Without GitHub repo
 /home/manifest/XmetaV/scripts/create-agent.sh --id researcher --template research --web
-/home/manifest/XmetaV/scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# With GitHub repo (auto-creates Metavibez4L/researcher on GitHub + pushes)
+/home/manifest/XmetaV/scripts/create-agent.sh --id researcher --template research --web --github --private
+
+# Scaffold an app and push to GitHub
+/home/manifest/XmetaV/scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
 ```
 
 ### Manage the fleet

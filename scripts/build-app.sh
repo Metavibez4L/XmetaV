@@ -15,6 +15,9 @@
 #   --name <name>          Project name (default: derived from workspace dir name)
 #   --skip-install         Skip dependency installation
 #   --skip-skill           Skip repo-ops skill creation
+#   --github               Create a GitHub repo and push the initial scaffold
+#   --github-org <org>     GitHub org/user for the repo (default: Metavibez4L)
+#   --private              Make the GitHub repo private (default: public)
 #   --dry-run              Show what would be done without making changes
 #
 # Examples:
@@ -22,8 +25,19 @@
 #   ./scripts/build-app.sh --type bot --workspace /home/manifest/social-bot --name "social-bot"
 #   ./scripts/build-app.sh --type fastapi --workspace /home/manifest/api-server
 #   ./scripts/build-app.sh --type hardhat --workspace /home/manifest/contracts
+#   ./scripts/build-app.sh --type node --workspace /home/manifest/my-api --github --private
 #
 set -euo pipefail
+
+# Ensure modern Node.js (>= 16) is available — load nvm if system node is too old
+if [[ "$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)" -lt 16 ]] 2>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm use default --silent 2>/dev/null || nvm use node --silent 2>/dev/null || true
+  fi
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -33,6 +47,9 @@ WORKSPACE=""
 PROJECT_NAME=""
 SKIP_INSTALL=false
 SKIP_SKILL=false
+CREATE_GITHUB=false
+GITHUB_ORG="Metavibez4L"
+GITHUB_PRIVATE=false
 DRY_RUN=false
 
 # ─── Parse arguments ───
@@ -43,6 +60,9 @@ while [[ $# -gt 0 ]]; do
     --name)         PROJECT_NAME="$2"; shift 2 ;;
     --skip-install) SKIP_INSTALL=true; shift ;;
     --skip-skill)   SKIP_SKILL=true; shift ;;
+    --github)       CREATE_GITHUB=true; shift ;;
+    --github-org)   GITHUB_ORG="$2"; shift 2 ;;
+    --private)      GITHUB_PRIVATE=true; shift ;;
     --dry-run)      DRY_RUN=true; shift ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# *//'
@@ -93,6 +113,11 @@ echo "  Workspace:   $WORKSPACE"
 echo "  Name:        $PROJECT_NAME"
 echo "  Install:     $( [[ "$SKIP_INSTALL" == "true" ]] && echo "skip" || echo "yes" )"
 echo "  Skill:       $( [[ "$SKIP_SKILL" == "true" ]] && echo "skip" || echo "yes" )"
+echo "  GitHub repo: $CREATE_GITHUB"
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo "  GitHub org:  $GITHUB_ORG"
+  echo "  Visibility:  $( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" )"
+fi
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
@@ -762,6 +787,58 @@ if [[ ! -d "$WORKSPACE/.git" ]]; then
   git add -A
   git commit -q -m "Initial scaffold ($APP_TYPE) — created by Agent Factory" 2>/dev/null || true
   echo "  ✓ Git repo initialized with initial commit"
+fi
+
+# ─── GitHub repo creation ───
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo ""
+  echo "→ Creating GitHub repository"
+
+  if ! command -v gh &>/dev/null; then
+    echo "  ⚠ gh CLI not found — skipping GitHub repo creation"
+    echo "  Install: https://cli.github.com/"
+  elif ! gh auth status &>/dev/null 2>&1; then
+    echo "  ⚠ gh not authenticated — skipping GitHub repo creation"
+    echo "  Run: gh auth login"
+  else
+    REPO_NAME="$PROJECT_NAME"
+    REPO_FULL="$GITHUB_ORG/$REPO_NAME"
+    VISIBILITY="$( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "--private" || echo "--public" )"
+
+    # Check if repo already exists
+    if gh repo view "$REPO_FULL" &>/dev/null 2>&1; then
+      echo "  ⊘ Repository $REPO_FULL already exists"
+
+      # Make sure remote is set
+      cd "$WORKSPACE"
+      if ! git remote get-url origin &>/dev/null 2>&1; then
+        git remote add origin "https://github.com/$REPO_FULL.git" 2>/dev/null || true
+        echo "  ✓ Remote origin set"
+      fi
+    else
+      echo "  Creating: $REPO_FULL ($( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" ))"
+      cd "$WORKSPACE"
+      gh repo create "$REPO_FULL" $VISIBILITY \
+        --description "Agent workspace: $PROJECT_NAME ($APP_TYPE) — created by Agent Factory" \
+        --source . \
+        --remote origin \
+        2>&1 | sed 's/^/  /'
+
+      if [[ $? -eq 0 ]]; then
+        echo "  ✓ Repository created: https://github.com/$REPO_FULL"
+      else
+        echo "  ⚠ Repository creation may have failed — check gh output above"
+      fi
+    fi
+
+    # Push initial commit
+    cd "$WORKSPACE"
+    if git rev-parse HEAD &>/dev/null 2>&1; then
+      echo "  → Pushing initial commit..."
+      git push -u origin HEAD 2>&1 | sed 's/^/  /' || echo "  ⚠ Push failed"
+      echo "  ✓ Pushed to https://github.com/$REPO_FULL"
+    fi
+  fi
 fi
 
 echo ""

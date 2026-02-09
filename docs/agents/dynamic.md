@@ -11,7 +11,8 @@ The `main` agent can create new OpenClaw agents on the fly using the Agent Facto
 3. **Identity files** (`AGENTS.md` + `SOUL.md`) seeded from templates
 4. **Optional app scaffold** (Node.js, Python, bot, etc.)
 5. **Optional `_web` companion** agent with full tools (matching the basedintern/akua pattern)
-6. **Agent runbook** auto-generated at `docs/agents/<agent-id>.md`
+6. **Optional GitHub repo** — auto-created and pushed via `gh` CLI (`--github` flag)
+7. **Agent runbook** auto-generated at `docs/agents/<agent-id>.md`
 
 ## Creating Agents
 
@@ -38,8 +39,17 @@ The main agent will use its Agent Factory skill to:
   --description "Web research and data gathering" \
   --web
 
+# Create agent + GitHub repo (auto-creates Metavibez4L/researcher and pushes)
+./scripts/create-agent.sh --id researcher \
+  --template research \
+  --description "Web research and data gathering" \
+  --web --github --private
+
 # Scaffold an app
 ./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Scaffold an app + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
 ```
 
 ## Managing Dynamic Agents

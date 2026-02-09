@@ -18,7 +18,7 @@ All agents use **Kimi K2.5** (256k context) via Ollama.
 
 - [`dynamic`](./dynamic.md) — runbook for agents created at runtime by the Agent Factory
 
-Dynamic agents are created by the `main` agent using the Agent Factory skill. Each gets its own runbook auto-generated at `docs/agents/<agent-id>.md`.
+Dynamic agents are created by the `main` agent using the Agent Factory skill. Each gets its own runbook auto-generated at `docs/agents/<agent-id>.md`. Agents can also be created with a **GitHub repo** (`--github` flag) — the repo is auto-created under `Metavibez4L` and the initial scaffold is pushed.
 
 ## Swarm Orchestration
 

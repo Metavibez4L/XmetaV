@@ -73,8 +73,14 @@ openclaw doctor
 # Create a new agent
 ./scripts/create-agent.sh --id myagent --template coding --description "My agent" --web
 
+# Create agent with a GitHub repo (auto-creates + pushes)
+./scripts/create-agent.sh --id myagent --template coding --github --private --web
+
 # Scaffold an app in agent workspace
 ./scripts/build-app.sh --type node --workspace /home/manifest/myagent
+
+# Scaffold + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/myagent --github --private
 
 # List all agents
 ./scripts/manage-agents.sh list

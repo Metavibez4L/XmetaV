@@ -60,14 +60,20 @@ The `main` agent has two power skills installed:
 
 ### Agent Factory
 
-Create agents, scaffold apps, manage the fleet:
+Create agents, scaffold apps, manage the fleet, and create GitHub repos:
 
 ```bash
 # Create a new agent
 ./scripts/create-agent.sh --id researcher --template research --web
 
+# Create agent + GitHub repo (auto-creates + pushes)
+./scripts/create-agent.sh --id researcher --template research --web --github --private
+
 # Scaffold an app
 ./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Scaffold an app + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
 
 # Fleet status
 ./scripts/manage-agents.sh list

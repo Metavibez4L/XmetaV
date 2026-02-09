@@ -28,7 +28,7 @@
 
 ## Features
 
-- **Agent Factory** — main agent can create new agents, scaffold apps, and manage the fleet
+- **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution
 - Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
@@ -46,7 +46,7 @@
 
 **XmetaV** is your operational command center for managing [OpenClaw](https://openclaw.dev) -- an AI agent automation platform. This repository contains:
 
-- **Agent Factory** -- Create agents on the fly, scaffold apps, manage the fleet
+- **Agent Factory** -- Create agents on the fly, scaffold apps, create GitHub repos, manage the fleet
 - **Swarm Engine** -- Orchestrate multi-agent tasks (parallel, pipeline, collaborative)
 - **Setup & Fix Scripts** -- Automated solutions for common issues
 - **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
@@ -316,8 +316,16 @@ The `main` agent can create agents autonomously, or you can use the scripts dire
   --description "Web research and data gathering" \
   --web  # also create researcher_web companion
 
+# Create agent + auto-create a GitHub repo and push
+./scripts/create-agent.sh --id researcher \
+  --template research --web \
+  --github --private  # creates Metavibez4L/researcher on GitHub
+
 # Scaffold a project in the agent's workspace
 ./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Scaffold + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
 
 # Check the fleet
 ./scripts/manage-agents.sh list
@@ -561,6 +569,10 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 
 ## Changelog
 
+### 2026-02-06 (v4)
+- **GitHub Integration** — Agent Factory and Build App scripts can now auto-create GitHub repos and push initial scaffolds (`--github`, `--private`, `--github-org` flags)
+- Updated Agent Factory skill, docs, and quick commands with GitHub workflow
+
 ### 2026-02-06 (v3)
 - **Swarm Orchestration** — multi-agent task execution with parallel, pipeline, and collaborative modes
 - Added `scripts/swarm.sh` — swarm engine with manifest support, timeouts, synthesis
@@ -613,5 +625,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Agent Factory | Swarm Orchestration</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Agent Factory + GitHub | Swarm Orchestration</sub>
 </p>

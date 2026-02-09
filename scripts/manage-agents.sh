@@ -25,6 +25,16 @@
 #
 set -euo pipefail
 
+# Ensure modern Node.js (>= 16) is available — load nvm if system node is too old
+if [[ "$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)" -lt 16 ]] 2>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm use default --silent 2>/dev/null || nvm use node --silent 2>/dev/null || true
+  fi
+fi
+
 OPENCLAW_CONFIG="${OPENCLAW_CONFIG:-$HOME/.openclaw/openclaw.json}"
 MAX_AGENTS="${MAX_AGENTS:-10}"
 

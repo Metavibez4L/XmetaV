@@ -17,14 +17,28 @@
 #   --description <text>   Agent description (used in AGENTS.md)
 #   --template <type>      Identity template: coding | bot | research | devops | general (default: general)
 #   --web                  Also create a <id>_web companion agent with full tools
+#   --github               Create a GitHub repo and push initial scaffold
+#   --github-org <org>     GitHub org/user for the repo (default: Metavibez4L)
+#   --private              Make the GitHub repo private (default: public)
 #   --dry-run              Show what would be done without making changes
 #
 # Examples:
 #   ./scripts/create-agent.sh --id researcher --description "Web research agent"
 #   ./scripts/create-agent.sh --id trader --workspace /home/manifest/trader --tools coding --web
 #   ./scripts/create-agent.sh --id social-bot --template bot --description "Discord community bot"
+#   ./scripts/create-agent.sh --id my-api --template coding --github --private --web
 #
 set -euo pipefail
+
+# Ensure modern Node.js (>= 16) is available — load nvm if system node is too old
+if [[ "$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)" -lt 16 ]] 2>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm use default --silent 2>/dev/null || nvm use node --silent 2>/dev/null || true
+  fi
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -40,6 +54,9 @@ MODEL="ollama/kimi-k2.5:cloud"
 DESCRIPTION=""
 TEMPLATE="general"
 CREATE_WEB=false
+CREATE_GITHUB=false
+GITHUB_ORG="Metavibez4L"
+GITHUB_PRIVATE=false
 DRY_RUN=false
 
 # ─── Parse arguments ───
@@ -52,6 +69,9 @@ while [[ $# -gt 0 ]]; do
     --description) DESCRIPTION="$2"; shift 2 ;;
     --template)   TEMPLATE="$2"; shift 2 ;;
     --web)        CREATE_WEB=true; shift ;;
+    --github)     CREATE_GITHUB=true; shift ;;
+    --github-org) GITHUB_ORG="$2"; shift 2 ;;
+    --private)    GITHUB_PRIVATE=true; shift ;;
     --dry-run)    DRY_RUN=true; shift ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# *//'
@@ -142,6 +162,11 @@ echo "  Model:       $MODEL"
 echo "  Template:    $TEMPLATE"
 echo "  Description: $DESCRIPTION"
 echo "  Web agent:   $CREATE_WEB"
+echo "  GitHub repo: $CREATE_GITHUB"
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo "  GitHub org:  $GITHUB_ORG"
+  echo "  Visibility:  $( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" )"
+fi
 if [[ "$AGENT_EXISTS" == "yes" ]]; then
   echo "  Status:      UPDATE (agent already exists)"
 else
@@ -340,6 +365,60 @@ else
   echo "  ⊘ Runbook already exists (skipped)"
 fi
 
+# ─── GitHub repo creation ───
+if [[ "$CREATE_GITHUB" == "true" ]]; then
+  echo ""
+  echo "→ Creating GitHub repository"
+
+  if ! command -v gh &>/dev/null; then
+    echo "  ⚠ gh CLI not found — skipping GitHub repo creation"
+    echo "  Install: https://cli.github.com/"
+  elif ! gh auth status &>/dev/null 2>&1; then
+    echo "  ⚠ gh not authenticated — skipping GitHub repo creation"
+    echo "  Run: gh auth login"
+  else
+    REPO_NAME="$AGENT_ID"
+    REPO_FULL="$GITHUB_ORG/$REPO_NAME"
+    VISIBILITY="$( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "--private" || echo "--public" )"
+
+    # Check if repo already exists
+    if gh repo view "$REPO_FULL" &>/dev/null 2>&1; then
+      echo "  ⊘ Repository $REPO_FULL already exists"
+
+      # Make sure remote is set
+      cd "$WORKSPACE"
+      if ! git remote get-url origin &>/dev/null 2>&1; then
+        git remote add origin "https://github.com/$REPO_FULL.git" 2>/dev/null || true
+        echo "  ✓ Remote origin set to https://github.com/$REPO_FULL.git"
+      fi
+    else
+      # Create the repo
+      echo "  Creating: $REPO_FULL ($( [[ "$GITHUB_PRIVATE" == "true" ]] && echo "private" || echo "public" ))"
+      gh repo create "$REPO_FULL" $VISIBILITY \
+        --description "$DESCRIPTION" \
+        --source "$WORKSPACE" \
+        --remote origin \
+        2>&1 | sed 's/^/  /'
+
+      if [[ $? -eq 0 ]]; then
+        echo "  ✓ Repository created: https://github.com/$REPO_FULL"
+      else
+        echo "  ⚠ Repository creation may have failed — check gh output above"
+      fi
+    fi
+
+    # Push initial commit if there's one
+    cd "$WORKSPACE"
+    if git rev-parse HEAD &>/dev/null 2>&1; then
+      echo "  → Pushing initial commit..."
+      git push -u origin HEAD 2>&1 | sed 's/^/  /' || echo "  ⚠ Push failed (may need to pull first)"
+      echo "  ✓ Pushed to https://github.com/$REPO_FULL"
+    else
+      echo "  ⊘ No commits to push yet (run build-app.sh first)"
+    fi
+  fi
+fi
+
 # ─── Verify ───
 echo ""
 echo "═══ VERIFICATION ═══"
@@ -364,3 +443,6 @@ echo ""
 echo "Next steps:"
 echo "  1. Build an app:  ./scripts/build-app.sh --type node --workspace $WORKSPACE"
 echo "  2. Run the agent: ./scripts/agent-task.sh $AGENT_ID \"Hello, what can you do?\""
+if [[ "$CREATE_GITHUB" == "false" ]]; then
+  echo "  3. Create a repo: ./scripts/create-agent.sh --id $AGENT_ID --github"
+fi

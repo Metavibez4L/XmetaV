@@ -17,7 +17,9 @@ For per-agent runbooks, see `docs/agents/`:
 - Use a stable session id: `openclaw agent --session-id my_session --message "..."`
 - Browser automation (CLI): `openclaw browser open https://example.com`
 - **Create agent**: `./scripts/create-agent.sh --id myagent --template coding --web`
+- **Create agent + GitHub**: `./scripts/create-agent.sh --id myagent --template coding --github --private --web`
 - **Build app**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent`
+- **Build app + GitHub**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent --github`
 - **Fleet status**: `./scripts/manage-agents.sh status`
 - **Swarm parallel**: `./scripts/swarm.sh --parallel basedintern "task1" akua "task2"`
 - **Swarm pipeline**: `./scripts/swarm.sh --pipeline agent1 "step1" agent2 "step2"`
@@ -131,6 +133,7 @@ The `main` agent can create new agents at runtime via the Agent Factory skill. T
 - Config injection into `~/.openclaw/openclaw.json`
 - Optional `_web` companion agents
 - App scaffolding (Node.js, Python, bots, FastAPI, Hardhat, etc.)
+- **GitHub integration** — auto-create repos and push initial scaffolds (`--github` flag)
 
 For full details, see `docs/agents/dynamic.md`.
 
@@ -141,8 +144,15 @@ For full details, see `docs/agents/dynamic.md`.
 ./scripts/create-agent.sh --id researcher --template research --web \
   --description "Web research and data gathering"
 
+# Create with GitHub repo (auto-creates Metavibez4L/researcher on GitHub)
+./scripts/create-agent.sh --id researcher --template research --web --github --private \
+  --description "Web research and data gathering"
+
 # Scaffold a Node.js app in its workspace
 ./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Scaffold + push to GitHub
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
 
 # Check the fleet
 ./scripts/manage-agents.sh list
