@@ -19,6 +19,10 @@ For per-agent runbooks, see `docs/agents/`:
 - **Create agent**: `./scripts/create-agent.sh --id myagent --template coding --web`
 - **Build app**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent`
 - **Fleet status**: `./scripts/manage-agents.sh status`
+- **Swarm parallel**: `./scripts/swarm.sh --parallel basedintern "task1" akua "task2"`
+- **Swarm pipeline**: `./scripts/swarm.sh --pipeline agent1 "step1" agent2 "step2"`
+- **Swarm collab**: `./scripts/swarm.sh --collab "review task" basedintern akua`
+- **Swarm status**: `./scripts/swarm.sh --status`
 
 ## How agent routing works
 
@@ -153,3 +157,53 @@ For full details, see `docs/agents/dynamic.md`.
 | `research` | Web research, data gathering |
 | `devops` | Infrastructure, deployment |
 | `general` | Everything else |
+
+## Swarm Orchestration
+
+The `main` agent can coordinate multi-agent operations using the Swarm skill and `swarm.sh` engine.
+
+### Modes
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Parallel** | `./scripts/swarm.sh --parallel` | Run tasks simultaneously across agents |
+| **Pipeline** | `./scripts/swarm.sh --pipeline` | Chain agents — each gets prior output as context |
+| **Collaborative** | `./scripts/swarm.sh --collab` | Same task to multiple agents, then synthesize |
+
+### Examples
+
+```bash
+# Health check all repos in parallel
+./scripts/swarm.sh --parallel \
+  basedintern "Run /repo-health" \
+  akua "Run /repo-health"
+
+# Research then implement (pipeline)
+./scripts/swarm.sh --pipeline \
+  main "Research best practices for X" \
+  basedintern "Apply the findings to the codebase"
+
+# Multi-agent code review (collaborative)
+./scripts/swarm.sh --collab \
+  "Review the last commit for bugs and security issues" \
+  basedintern akua
+
+# Use a pre-built template
+./scripts/swarm.sh templates/swarms/health-all.json
+./scripts/swarm.sh templates/swarms/code-review.json
+```
+
+### Results
+
+All swarm output is stored in `~/.openclaw/swarm/<run-id>/`:
+- `manifest.json` — the manifest that was executed
+- `<task-id>.out` — per-task output
+- `synthesis.out` — synthesis (if requested)
+- `summary.md` — human-readable summary
+
+```bash
+./scripts/swarm.sh --status          # list past runs
+./scripts/swarm.sh --results <id>    # read a run's results
+```
+
+For the full swarm reference, see `docs/SWARM.md`.

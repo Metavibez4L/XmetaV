@@ -20,29 +20,31 @@ This file captures the **known-good** runtime settings for this machine/profile 
 
 ## Configured agents (this machine)
 
-This command center is set up for **multiple isolated agents**:
+This command center is set up for **multiple isolated agents**, all powered by **Kimi K2.5** (256k context):
 
-- **`main`**: general-purpose command-center agent
-  - Workspace: `~/.openclaw/workspace`
-  - Model: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
-- **`basedintern`**: repo agent for the local checkout at `/home/manifest/basedintern`
-  - Workspace: `/home/manifest/basedintern`
-  - Intended use: repo analysis + code/docs changes + running tests (`npm test`)
-  - Model: `ollama/kimi-k2.5:cloud` (cloud; 256k context)
-  - Tools: **coding** (exec + read + write + process) — lean tool schema for speed + 429 avoidance
-- **`basedintern_web`**: same workspace, full tools — use only when browser/web automation is needed
-  - Workspace: `/home/manifest/basedintern` (shared)
-  - Model: `ollama/kimi-k2.5:cloud`
-  - Tools: **full** (fs + runtime + web + browser + automation)
+| Agent | Model | Workspace | Tools | Role |
+|-------|-------|-----------|-------|------|
+| `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | default | **Orchestrator** — agent factory + swarm |
+| `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
+| `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
+| `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
+| `akua_web` | `kimi-k2.5:cloud` | `/home/manifest/akua` | full | Same repo — browser/web only |
+| _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
+
+\* = default agent
 
 Detailed agent runbooks:
 - `docs/agents/main.md`
 - `docs/agents/basedintern.md`
+- `docs/agents/akua.md`
+- `docs/agents/dynamic.md`
 
 List agents:
 
 ```bash
 openclaw agents list
+# or
+./scripts/manage-agents.sh list
 ```
 
 Run the repo agent:
@@ -51,6 +53,71 @@ Run the repo agent:
 openclaw agent --agent basedintern --local --thinking off \
   --message "Summarize this repo and run npm test."
 ```
+
+## Orchestrator capabilities (main agent)
+
+The `main` agent has two power skills installed:
+
+### Agent Factory
+
+Create agents, scaffold apps, manage the fleet:
+
+```bash
+# Create a new agent
+./scripts/create-agent.sh --id researcher --template research --web
+
+# Scaffold an app
+./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+
+# Fleet status
+./scripts/manage-agents.sh list
+./scripts/manage-agents.sh status
+```
+
+### Swarm (multi-agent orchestration)
+
+Dispatch tasks across multiple agents with three execution modes:
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| Parallel | `./scripts/swarm.sh --parallel` | Run tasks simultaneously across agents |
+| Pipeline | `./scripts/swarm.sh --pipeline` | Chain agents, output flows to next step |
+| Collaborative | `./scripts/swarm.sh --collab` | Same task to multiple agents, then synthesize |
+
+```bash
+# Parallel health check across all repos
+./scripts/swarm.sh --parallel \
+  basedintern "Run /repo-health" \
+  akua "Run /repo-health"
+
+# Pipeline: research then implement
+./scripts/swarm.sh --pipeline \
+  main "Research best practices for X" \
+  basedintern "Apply the findings"
+
+# Collaborative code review
+./scripts/swarm.sh --collab \
+  "Review the last commit for bugs" \
+  basedintern akua
+
+# Pre-built templates
+./scripts/swarm.sh templates/swarms/health-all.json
+
+# Check past runs and results
+./scripts/swarm.sh --status
+./scripts/swarm.sh --results <run-id>
+```
+
+Results stored in: `~/.openclaw/swarm/<run-id>/`
+
+Verify skills are installed:
+
+```bash
+ls ~/.openclaw/workspace/skills/
+# Expected: agent-factory/ swarm/ (plus any others)
+```
+
+Full reference: `docs/SWARM.md`
 
 ## Known-good config (sanity checks)
 

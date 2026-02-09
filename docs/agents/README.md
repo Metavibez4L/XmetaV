@@ -6,17 +6,42 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 
 ## Static Agents
 
-- [`main`](./main.md) — **orchestrator** + command-center agent (general ops, agent factory)
+- [`main`](./main.md) — **orchestrator** (agent factory + swarm + command center)
 - [`basedintern`](./basedintern.md) — repo agent (coding tools, lean) pinned to `/home/manifest/basedintern`
 - [`basedintern_web`](./basedintern.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
 - [`akua`](./akua.md) — repo agent (coding tools, lean) pinned to `/home/manifest/akua`
 - [`akua_web`](./akua.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
+
+All agents use **Kimi K2.5** (256k context) via Ollama.
 
 ## Dynamic Agents
 
 - [`dynamic`](./dynamic.md) — runbook for agents created at runtime by the Agent Factory
 
 Dynamic agents are created by the `main` agent using the Agent Factory skill. Each gets its own runbook auto-generated at `docs/agents/<agent-id>.md`.
+
+## Swarm Orchestration
+
+The `main` agent can coordinate multi-agent operations via the Swarm skill:
+
+| Mode | What it does |
+|------|-------------|
+| **Parallel** | Run tasks simultaneously across agents |
+| **Pipeline** | Chain agents — output from one feeds into the next |
+| **Collaborative** | Same task to multiple agents, then synthesize |
+
+```bash
+# Quick parallel
+./scripts/swarm.sh --parallel basedintern "Run tests" akua "Compile contracts"
+
+# Quick pipeline
+./scripts/swarm.sh --pipeline main "Research X" basedintern "Implement findings"
+
+# Quick collaborative
+./scripts/swarm.sh --collab "Review security" basedintern akua
+```
+
+See [`../SWARM.md`](../SWARM.md) for the full reference.
 
 ## Common commands (applies to all agents)
 

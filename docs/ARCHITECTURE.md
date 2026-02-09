@@ -118,12 +118,26 @@ Practical note for small local models (e.g. 7B):
 
 ## Data flow
 
+### Single agent turn
 1. You run a CLI command (`openclaw agent ...`).
 2. CLI reads `~/.openclaw/openclaw.json`.
 3. CLI connects to the Gateway at `ws://127.0.0.1:18789`.
 4. Gateway routes the turn to the agent runtime.
-5. Agent runtime calls the configured model provider (Ollama) using the configured OpenAI-compatible API mode.
+5. Agent runtime calls the configured model provider (Ollama/Kimi K2.5) using the `openai-responses` API mode.
 6. The response is written to the session JSONL and returned to CLI.
+
+### Swarm execution
+1. You run `swarm.sh` with a manifest or quick mode (`--parallel`, `--pipeline`, `--collab`).
+2. Swarm engine reads the manifest and creates a run directory (`~/.openclaw/swarm/<run-id>/`).
+3. For each task, swarm spawns an `openclaw agent` call (via `agent-task.sh` patterns: fresh session, `--local`, `--thinking off`).
+4. **Parallel**: all tasks run as background processes simultaneously (up to `SWARM_MAX_PARALLEL`).
+5. **Pipeline**: tasks run sequentially; each task's output is injected as context into the next.
+6. **Collaborative**: same task sent to all agents in parallel, then a synthesis agent merges responses.
+7. Per-task output captured to `<run-id>/<task-id>.out`.
+8. Optional synthesis step produces `synthesis.out`.
+9. `summary.md` generated with status of all tasks.
+
+All agents use **Kimi K2.5** (256k context) via Ollama as the model provider.
 
 ## Ports and endpoints
 

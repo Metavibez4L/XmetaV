@@ -16,10 +16,11 @@
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  main | basedintern | akua
- |   models:  kimi-k2.5:cloud (all agents)
- |   gateway: ws://127.0.0.1:18789
- |   engine:  Ollama + CUDA  |  RTX 4070
+ |   agents:  main | basedintern | akua          |
+ |   swarm:   parallel | pipeline | collab       |
+ |   models:  kimi-k2.5:cloud (256k, all agents) |
+ |   gateway: ws://127.0.0.1:18789              |
+ |   engine:  Ollama + CUDA  |  RTX 4070        |
  |_______________________________________________|
 ```
 
@@ -45,8 +46,10 @@
 
 **XmetaV** is your operational command center for managing [OpenClaw](https://openclaw.dev) -- an AI agent automation platform. This repository contains:
 
+- **Agent Factory** -- Create agents on the fly, scaffold apps, manage the fleet
+- **Swarm Engine** -- Orchestrate multi-agent tasks (parallel, pipeline, collaborative)
 - **Setup & Fix Scripts** -- Automated solutions for common issues
-- **Configuration Templates** -- Battle-tested configs for Ollama + local LLMs
+- **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
 - **Documentation** -- Runbooks, checklists, and troubleshooting guides
 - **Agent Definitions** -- Multi-agent profiles and workspaces
 - **Infrastructure as Code** -- Reproducible OpenClaw deployments
@@ -376,7 +379,7 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 ## System Architecture
 
 ```
-+-------------------------------------------------------------------------+
++=========================================================================+
 |                          XmetaV (This Repo)                             |
 |  +-----------+  +-----------+  +-----------+  +-----------+             |
 |  |  Scripts  |  |  Configs  |  |   Docs    |  | Templates |             |
@@ -384,7 +387,7 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 +---------+------------+-------------------------------------------------+
           |            |
           v            v
-+-------------------------------------------------------------------------+
++=========================================================================+
 |                       OpenClaw Runtime                                   |
 |  +-------------------------------------------------------------------+  |
 |  |                  Gateway (ws://127.0.0.1:18789)                    |  |
@@ -396,6 +399,7 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 |            |                                                             |
 |  +--------v----------------------------------------------------------+  |
 |  |             main agent (ORCHESTRATOR)                              |  |
+|  |                                                                    |  |
 |  |  +------------------+  +---------------+  +------------------+    |  |
 |  |  | Agent Factory    |  | Build App     |  | Manage Agents    |    |  |
 |  |  | (create-agent.sh)|  | (build-app.sh)|  | (manage-agents)  |    |  |
@@ -403,12 +407,31 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 |  |           |                    |                    |              |  |
 |  |           v                    v                    v              |  |
 |  |     openclaw.json        workspaces/          fleet health        |  |
-|  |     (agent entries)     (scaffolded apps)      (status)           |  |
+|  |                                                                    |  |
+|  |  +-------- SWARM ENGINE (swarm.sh) ----------------------------+  |  |
+|  |  |                                                              |  |  |
+|  |  |  PARALLEL         PIPELINE          COLLABORATIVE           |  |  |
+|  |  |  ┌──┬──┐         A -> B -> C       ┌──┬──┐                 |  |  |
+|  |  |  A  B  C                            A  B  |                 |  |  |
+|  |  |  └──┴──┘                            └──┴──> synthesize      |  |  |
+|  |  |         \             |             /                       |  |  |
+|  |  |          v            v            v                        |  |  |
+|  |  |       ~/.openclaw/swarm/<run-id>/                           |  |  |
+|  |  |         manifest.json | *.out | summary.md                  |  |  |
+|  |  +----------------------------------------------------------+  |  |
 |  +-------------------------------------------------------------------+  |
-+-----------|-------------------------------------------------------------+
-            |
-            v
-+-------------------------------------------------------------------------+
+|            |                                                             |
+|  +---------v---------------------------------------------------------+  |
+|  |                      Agent Fleet                                   |  |
+|  |  +----------+  +-----------+  +------+  +--------+  +--------+   |  |
+|  |  |   main   |  |basedintern|  | akua |  |  akua  |  |dynamic |   |  |
+|  |  | (orch.)  |  |  + _web   |  |+ _web|  |        |  | agents |   |  |
+|  |  +----------+  +-----------+  +------+  +--------+  +--------+   |  |
+|  +-------------------------------------------------------------------+  |
++---------|---------------------------------------------------------------+
+          |
+          v
++=========================================================================+
 |                       Model Providers                                    |
 |  +---------------------------+  +---------------------------+           |
 |  |    Ollama (Local Host)    |  |   Cloud Providers         |           |
@@ -417,7 +440,7 @@ See [docs/SWARM.md](docs/SWARM.md) for full documentation.
 |  |  +- kimi-k2.5:cloud      |  |                           |           |
 |  |     (Ollama Cloud, 256k) |  |                           |           |
 |  +---------------------------+  +---------------------------+           |
-+-------------------------------------------------------------------------+
++=========================================================================+
 ```
 
 ---
@@ -589,5 +612,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Ollama | Multi-agent | Multi-model</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Agent Factory | Swarm Orchestration</sub>
 </p>

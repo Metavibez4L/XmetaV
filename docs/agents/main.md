@@ -107,6 +107,59 @@ openclaw agent --agent main --local --thinking off \
 /home/manifest/XmetaV/scripts/manage-agents.sh status
 ```
 
+## Swarm Orchestration
+
+The main agent has the **Swarm** skill installed. It can orchestrate multi-agent operations across the fleet.
+
+### Three modes
+
+| Mode | How it works | Best for |
+|------|-------------|----------|
+| **Parallel** | All tasks run simultaneously | Independent tasks, health checks, audits |
+| **Pipeline** | Sequential chain, output flows forward | Research -> implement, analyze -> fix |
+| **Collaborative** | Same task to multiple agents, then synthesize | Code review, security audit |
+
+### Swarm via prompt
+
+```bash
+openclaw agent --agent main --local --thinking off \
+  --message "Run a parallel health check on basedintern and akua"
+```
+
+### Swarm via script
+
+```bash
+# Parallel
+/home/manifest/XmetaV/scripts/swarm.sh --parallel \
+  basedintern "Run /repo-health" \
+  akua "Run /repo-health"
+
+# Pipeline
+/home/manifest/XmetaV/scripts/swarm.sh --pipeline \
+  main "Research TypeScript error handling best practices" \
+  basedintern "Apply the findings to the codebase"
+
+# Collaborative
+/home/manifest/XmetaV/scripts/swarm.sh --collab \
+  "Review the last commit for bugs and security issues" \
+  basedintern akua
+
+# Pre-built templates
+/home/manifest/XmetaV/scripts/swarm.sh templates/swarms/health-all.json
+/home/manifest/XmetaV/scripts/swarm.sh templates/swarms/code-review.json
+```
+
+### Check results
+
+```bash
+/home/manifest/XmetaV/scripts/swarm.sh --status
+/home/manifest/XmetaV/scripts/swarm.sh --results <run-id>
+```
+
+Results are stored in `~/.openclaw/swarm/<run-id>/` with per-task outputs and a `summary.md`.
+
+See `docs/SWARM.md` for the full reference.
+
 ## Browser automation (optional)
 
 Browser automation is primarily operated via the deterministic CLI:
