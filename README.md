@@ -28,6 +28,7 @@
 ## Features
 
 - **Agent Factory** — main agent can create new agents, scaffold apps, and manage the fleet
+- **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution
 - Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -68,18 +69,24 @@ XmetaV/
 |   |-- agent-pipeline.sh     # Multi-step pipeline workflows
 |   |-- create-agent.sh       # [NEW] Agent Factory — create agents
 |   |-- build-app.sh          # [NEW] Agent Factory — scaffold apps
-|   +-- manage-agents.sh      # [NEW] Agent Factory — manage fleet
+|   |-- manage-agents.sh      # [NEW] Agent Factory — manage fleet
+|   +-- swarm.sh              # [NEW] Swarm — multi-agent orchestration
 |
 |-- configs/                  # Configuration files & templates
 |   +-- openclaw.json.fixed   # Known-good config for WSL2 + Ollama
 |
-|-- templates/                # [NEW] Agent identity templates
-|   +-- agents/               # Per-template identity files
-|       |-- general.md        # Generic agent template
-|       |-- coding.md         # Software development agent
-|       |-- bot.md            # Discord/Telegram bot agent
-|       |-- research.md       # Web research agent
-|       +-- devops.md         # Infrastructure/ops agent
+|-- templates/                # [NEW] Agent identity & swarm templates
+|   |-- agents/               # Per-template identity files
+|   |   |-- general.md        # Generic agent template
+|   |   |-- coding.md         # Software development agent
+|   |   |-- bot.md            # Discord/Telegram bot agent
+|   |   |-- research.md       # Web research agent
+|   |   +-- devops.md         # Infrastructure/ops agent
+|   +-- swarms/               # [NEW] Pre-built swarm manifests
+|       |-- health-all.json   # Parallel health check
+|       |-- ship-all.json     # Parallel build+test
+|       |-- research-implement.json  # Pipeline: research -> implement
+|       +-- code-review.json  # Collaborative code review
 |
 |-- capabilities/             # Quick-reference command guides
 |   |-- README.md             # Capabilities overview
@@ -97,6 +104,7 @@ XmetaV/
     |-- OLLAMA-SETUP.md       # Ollama integration guide
     |-- OPENCLAW-FIX-CHECKLIST.md  # Verification checklist
     |-- GITHUB-SKILL-STATUS.md     # GitHub skill status
+    |-- SWARM.md              # [NEW] Multi-agent swarm reference
     +-- agents/               # Per-agent runbooks
         |-- README.md
         |-- main.md           # main agent runbook
@@ -169,6 +177,7 @@ openclaw agent --agent main --local --thinking off \
 | **`create-agent.sh`** | **Agent Factory** -- create new agents | `./scripts/create-agent.sh --id myagent` |
 | **`build-app.sh`** | **Agent Factory** -- scaffold apps | `./scripts/build-app.sh --type node --workspace /path` |
 | **`manage-agents.sh`** | **Agent Factory** -- manage agent fleet | `./scripts/manage-agents.sh list` |
+| **`swarm.sh`** | **Swarm** -- multi-agent orchestration (parallel, pipeline, collab) | `./scripts/swarm.sh --parallel ...` |
 
 ---
 
@@ -326,6 +335,42 @@ openclaw agent --agent main --local \
 
 See [docs/agents/dynamic.md](docs/agents/dynamic.md) for full documentation.
 
+### Swarm Orchestration
+
+Dispatch tasks across multiple agents with three modes:
+
+```bash
+# Parallel: run independent tasks simultaneously
+./scripts/swarm.sh --parallel \
+  basedintern "Run npm test" \
+  akua "Run /repo-ops compile"
+
+# Pipeline: chain agents, output flows forward
+./scripts/swarm.sh --pipeline \
+  main "Research error handling best practices" \
+  basedintern "Apply the findings to the codebase"
+
+# Collaborative: multiple perspectives on the same problem
+./scripts/swarm.sh --collab "Review security of our auth flow" \
+  basedintern akua
+
+# Pre-built templates
+./scripts/swarm.sh templates/swarms/health-all.json
+
+# Check results
+./scripts/swarm.sh --status
+./scripts/swarm.sh --results <run-id>
+```
+
+Or let the main agent orchestrate swarms via its Swarm skill:
+
+```bash
+openclaw agent --agent main --local \
+  --message "Run a parallel health check across all repo agents"
+```
+
+See [docs/SWARM.md](docs/SWARM.md) for full documentation.
+
 ---
 
 ## System Architecture
@@ -459,6 +504,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
+| [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
 
 ---
 
@@ -490,6 +536,13 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-06 (v3)
+- **Swarm Orchestration** — multi-agent task execution with parallel, pipeline, and collaborative modes
+- Added `scripts/swarm.sh` — swarm engine with manifest support, timeouts, synthesis
+- Added `templates/swarms/` — pre-built manifests (health-all, ship-all, research-implement, code-review)
+- Added Swarm skill for main agent (`~/.openclaw/workspace/skills/swarm/`)
+- Added `docs/SWARM.md` — full swarm reference
 
 ### 2026-02-06 (v2)
 - **Agent Factory** — main agent can now create/manage agents and scaffold apps

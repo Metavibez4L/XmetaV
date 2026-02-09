@@ -1,0 +1,18 @@
+{
+  "mode": "parallel",
+  "tasks": [
+    {
+      "id": "basedintern-health",
+      "agent": "basedintern",
+      "message": "Run /repo-health and report results as structured JSON"
+    },
+    {
+      "id": "akua-health",
+      "agent": "akua",
+      "message": "Run /repo-health and report results as structured JSON"
+    }
+  ],
+  "on_failure": "continue",
+  "synthesize": true,
+  "synthesize_agent": "main"
+}

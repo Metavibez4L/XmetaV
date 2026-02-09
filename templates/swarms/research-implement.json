@@ -1,0 +1,25 @@
+{
+  "mode": "pipeline",
+  "tasks": [
+    {
+      "id": "research",
+      "agent": "main",
+      "message": "Research the topic provided and compile a concise summary of best practices, key findings, and actionable recommendations. Use web_fetch if needed.",
+      "timeout": 180
+    },
+    {
+      "id": "implement",
+      "agent": "basedintern",
+      "message": "Based on the research findings provided as context, implement the recommended changes in the codebase. Run typecheck after making changes.",
+      "depends_on": "research",
+      "timeout": 180
+    },
+    {
+      "id": "verify",
+      "agent": "basedintern",
+      "message": "Run /repo-health to verify the implementation didn't break anything. Report the results.",
+      "depends_on": "implement"
+    }
+  ],
+  "on_failure": "stop"
+}

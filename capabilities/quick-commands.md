@@ -95,6 +95,39 @@ openclaw doctor
 ocm "Create a Discord bot agent called social-bot"
 ```
 
+## Swarm Commands
+
+```bash
+# Parallel: run tasks on multiple agents simultaneously
+./scripts/swarm.sh --parallel \
+  basedintern "Run npm test" \
+  akua "Run /repo-ops compile"
+
+# Pipeline: sequential chain, output flows forward
+./scripts/swarm.sh --pipeline \
+  main "Research best practices for X" \
+  basedintern "Apply the findings"
+
+# Collaborative: same task, multiple agents, then synthesize
+./scripts/swarm.sh --collab "Review security" basedintern akua
+
+# Use a pre-built template
+./scripts/swarm.sh templates/swarms/health-all.json
+./scripts/swarm.sh templates/swarms/code-review.json
+
+# From a manifest file
+./scripts/swarm.sh /path/to/manifest.json
+
+# List past swarm runs
+./scripts/swarm.sh --status
+
+# Read results from a run
+./scripts/swarm.sh --results <run-id>
+
+# Or let main agent swarm via skill
+ocm "Run a parallel health check across all repo agents"
+```
+
 ## Quick Aliases
 
 Add to your `~/.bashrc`:
@@ -112,6 +145,12 @@ alias ocakuaweb='openclaw agent --agent akua_web --local --message'
 # Agent task wrappers (recommended for basedintern)
 alias agtask='./scripts/agent-task.sh'
 alias agpipe='./scripts/agent-pipeline.sh'
+
+# Swarm orchestration
+alias swarm='./scripts/swarm.sh'
+alias swarm-p='./scripts/swarm.sh --parallel'
+alias swarm-pipe='./scripts/swarm.sh --pipeline'
+alias swarm-c='./scripts/swarm.sh --collab'
 
 # Usage: ocm "What is the capital of France?"
 # Usage: ocbi "Run /repo-health"

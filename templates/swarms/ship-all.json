@@ -1,0 +1,18 @@
+{
+  "mode": "parallel",
+  "tasks": [
+    {
+      "id": "basedintern-ship",
+      "agent": "basedintern",
+      "message": "Run /repo-ops typecheck. If it passes, run /repo-ops test. Report results."
+    },
+    {
+      "id": "akua-ship",
+      "agent": "akua",
+      "message": "Run /repo-ops compile. If it passes, run /repo-ops test. Report results."
+    }
+  ],
+  "on_failure": "continue",
+  "synthesize": true,
+  "synthesize_agent": "main"
+}

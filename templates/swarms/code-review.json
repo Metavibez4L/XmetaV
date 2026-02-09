@@ -1,0 +1,6 @@
+{
+  "mode": "collaborative",
+  "task": "Review the recent code changes (run 'git diff HEAD~1' or 'git log --oneline -5' to see what changed). Focus on: 1) correctness and edge cases, 2) security concerns, 3) performance implications, 4) code style and maintainability. Provide specific, actionable feedback.",
+  "agents": ["basedintern", "akua"],
+  "synthesize_agent": "main"
+}

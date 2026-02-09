@@ -74,6 +74,34 @@ The `main` agent has an **Agent Factory** skill that enables it to:
 Scripts: `XmetaV/scripts/create-agent.sh`, `build-app.sh`, `manage-agents.sh`
 Templates: `XmetaV/templates/agents/` (coding, bot, research, devops, general)
 
+### Swarm (Multi-Agent Orchestration)
+
+The main agent has a **Swarm** skill that enables multi-agent task execution:
+
+1. **Parallel** — dispatch independent tasks to multiple agents simultaneously
+2. **Pipeline** — chain agents sequentially, passing output as context to the next
+3. **Collaborative** — send the same task to multiple agents, then synthesize responses
+
+```
+                        swarm.sh
+                           │
+              ┌────────────┼────────────┐
+              v            v            v
+          PARALLEL      PIPELINE    COLLABORATIVE
+         ┌──┬──┐       A → B → C    ┌──┬──┐
+         A  B  C                     A  B  │
+         │  │  │                     │  │  v
+         └──┴──┘                     └──┴── synthesize
+              │            │            │
+              v            v            v
+         ~/.openclaw/swarm/<run-id>/
+           manifest.json | *.out | summary.md
+```
+
+Script: `XmetaV/scripts/swarm.sh`
+Templates: `XmetaV/templates/swarms/` (health-all, ship-all, research-implement, code-review)
+Full docs: `docs/SWARM.md`
+
 ### Model provider: Ollama (local)
 OpenClaw talks to Ollama through its OpenAI-compatible API.
 
