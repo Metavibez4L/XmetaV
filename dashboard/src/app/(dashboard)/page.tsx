@@ -1,6 +1,7 @@
 "use client";
 
 import { SystemHealth } from "@/components/SystemHealth";
+import { BridgeControls } from "@/components/BridgeControls";
 import { CommandHistory } from "@/components/CommandHistory";
 import { QuickCommand } from "@/components/QuickCommand";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
@@ -50,8 +51,9 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <SystemHealth />
+        <BridgeControls />
 
         {/* Agent Fleet card */}
         <div className="cyber-card rounded-lg p-5">
