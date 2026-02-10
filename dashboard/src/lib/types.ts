@@ -5,6 +5,13 @@
 export type CommandStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type AgentStatus = "online" | "idle" | "busy" | "offline";
 
+export interface AgentControl {
+  agent_id: string;
+  enabled: boolean;
+  updated_by: string | null;
+  updated_at: string;
+}
+
 /** Row in the agent_commands table */
 export interface AgentCommand {
   id: string;
@@ -43,6 +50,73 @@ export interface AgentInfo {
   tools: string;
   model: string;
   status: AgentStatus;
+}
+
+// ============================================================
+// Swarm types
+// ============================================================
+
+export type SwarmMode = "parallel" | "pipeline" | "collaborative";
+export type SwarmRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type SwarmTaskStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+
+/** A single task definition within a swarm manifest */
+export interface SwarmManifestTask {
+  id: string;
+  agent: string;
+  message: string;
+  depends_on?: string;
+  timeout?: number;
+}
+
+/** The full manifest stored in swarm_runs.manifest */
+export interface SwarmManifest {
+  mode: SwarmMode;
+  /** For parallel/pipeline mode */
+  tasks?: SwarmManifestTask[];
+  /** For collaborative mode */
+  task?: string;
+  agents?: string[];
+  synthesize_agent?: string;
+  synthesize?: boolean;
+  on_failure?: "stop" | "continue";
+}
+
+/** Row in the swarm_runs table */
+export interface SwarmRun {
+  id: string;
+  name: string;
+  mode: SwarmMode;
+  status: SwarmRunStatus;
+  manifest: SwarmManifest;
+  synthesis: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Row in the swarm_tasks table */
+export interface SwarmTask {
+  id: string;
+  swarm_id: string;
+  task_id: string;
+  agent_id: string;
+  message: string;
+  status: SwarmTaskStatus;
+  output: string;
+  exit_code: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+/** Template descriptor (read from disk) */
+export interface SwarmTemplate {
+  filename: string;
+  name: string;
+  mode: SwarmMode;
+  description: string;
+  manifest: SwarmManifest;
 }
 
 /** Known agent fleet (matches OpenClaw config) */

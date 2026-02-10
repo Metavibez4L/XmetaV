@@ -2,9 +2,10 @@ import "dotenv/config";
 import { supabase } from "../lib/supabase.js";
 import { startHeartbeat, stopHeartbeat } from "./heartbeat.js";
 import { executeCommand } from "./executor.js";
+import { subscribeToSwarms } from "./swarm-executor.js";
 
 console.log("╔══════════════════════════════════════╗");
-console.log("║    XmetaV Bridge Daemon v1.0.0       ║");
+console.log("║    XmetaV Bridge Daemon v1.1.0       ║");
 console.log("╚══════════════════════════════════════╝");
 console.log("");
 
@@ -51,7 +52,10 @@ async function processPendingCommands() {
 
 processPendingCommands();
 
-console.log("[bridge] Listening for commands...");
+// Subscribe to swarm runs
+const swarmChannel = subscribeToSwarms();
+
+console.log("[bridge] Listening for commands & swarm runs...");
 console.log("[bridge] Press Ctrl+C to stop");
 
 // Graceful shutdown
@@ -59,6 +63,7 @@ process.on("SIGINT", async () => {
   console.log("\n[bridge] Shutting down...");
   stopHeartbeat();
   supabase.removeChannel(channel);
+  supabase.removeChannel(swarmChannel);
 
   // Mark bridge as offline
   await supabase

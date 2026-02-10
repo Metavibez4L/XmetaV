@@ -3,7 +3,8 @@
 import React, { useState, useCallback } from "react";
 import { KNOWN_AGENTS, type AgentStatus } from "@/lib/types";
 import { useAgentSessions } from "@/hooks/useAgentSessions";
-import { Send, Cpu, X } from "lucide-react";
+import { useAgentControls } from "@/hooks/useAgentControls";
+import { Send, Cpu, X, Power } from "lucide-react";
 
 const statusConfig: Record<AgentStatus, { color: string; bg: string; border: string; glow: string; label: string }> = {
   online: { color: '#39ff14', bg: '#39ff1410', border: '#39ff1425', glow: '0 0 6px #39ff14', label: 'ONLINE' },
@@ -14,9 +15,12 @@ const statusConfig: Record<AgentStatus, { color: string; bg: string; border: str
 
 export const FleetTable = React.memo(function FleetTable() {
   const { getStatus } = useAgentSessions();
+  const { isEnabled, setEnabled } = useAgentControls();
   const [taskAgent, setTaskAgent] = useState<string | null>(null);
   const [taskMessage, setTaskMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [toggling, setToggling] = useState<Record<string, boolean>>({});
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const sendTask = useCallback(async () => {
     if (!taskAgent || !taskMessage.trim()) return;
@@ -57,6 +61,9 @@ export const FleetTable = React.memo(function FleetTable() {
         const status = getStatus(agent.id);
         const cfg = statusConfig[status];
         const isOpen = taskAgent === agent.id;
+        const enabled = isEnabled(agent.id);
+
+        const canDispatch = enabled;
 
         return (
           <div key={agent.id} className="cyber-card rounded-lg p-5 transition-all duration-200">
@@ -88,6 +95,16 @@ export const FleetTable = React.memo(function FleetTable() {
                     >
                       {cfg.label}
                     </span>
+                    <span
+                      className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+                      style={{
+                        color: enabled ? "#39ff14" : "#ff2d5e",
+                        background: enabled ? "#39ff1410" : "#ff2d5e10",
+                        border: `1px solid ${enabled ? "#39ff1425" : "#ff2d5e25"}`,
+                      }}
+                    >
+                      {enabled ? "ENABLED" : "DISABLED"}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-4 flex-wrap">
@@ -118,14 +135,56 @@ export const FleetTable = React.memo(function FleetTable() {
                 </div>
               </div>
 
-              <button
-                onClick={() => toggleTask(agent.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider cyber-btn shrink-0"
-              >
-                <Send className="h-3 w-3" />
-                Task
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={async () => {
+                    setToggleError(null);
+                    setToggling((p) => ({ ...p, [agent.id]: true }));
+                    try {
+                      await setEnabled(agent.id, !enabled);
+                      if (agent.id === taskAgent && enabled) closeTask();
+                    } catch (e) {
+                      setToggleError(e instanceof Error ? e.message : "Toggle failed");
+                    } finally {
+                      setToggling((p) => ({ ...p, [agent.id]: false }));
+                    }
+                  }}
+                  disabled={!!toggling[agent.id]}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider cyber-btn disabled:opacity-30"
+                  style={{ borderColor: enabled ? "#39ff1440" : "#ff2d5e40" }}
+                  title={enabled ? "Disable agent" : "Enable agent"}
+                >
+                  <Power className="h-3 w-3" />
+                  {toggling[agent.id] ? "..." : enabled ? "On" : "Off"}
+                </button>
+
+                <button
+                  onClick={() => toggleTask(agent.id)}
+                  disabled={!canDispatch}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider cyber-btn shrink-0 disabled:opacity-30"
+                  title={!canDispatch ? "Agent disabled" : "Send task"}
+                >
+                  <Send className="h-3 w-3" />
+                  Task
+                </button>
+              </div>
             </div>
+
+            {toggleError && (
+              <div className="mt-3 rounded border px-3 py-2" style={{ borderColor: "#ff2d5e25", background: "#ff2d5e08" }}>
+                <p className="text-[10px] font-mono" style={{ color: "#ff2d5e" }}>
+                  [TOGGLE ERROR] {toggleError}
+                </p>
+              </div>
+            )}
+
+            {!enabled && (
+              <div className="mt-3 rounded border px-3 py-2" style={{ borderColor: "#f59e0b25", background: "#f59e0b08" }}>
+                <p className="text-[10px] font-mono" style={{ color: "#f59e0b" }}>
+                  [DISABLED] Commands to this agent will be blocked by the bridge until re-enabled.
+                </p>
+              </div>
+            )}
 
             {/* Inline task input */}
             {isOpen && (

@@ -6,6 +6,24 @@ import type { ChildProcess } from "child_process";
 /** Track running processes per agent (one at a time per agent) */
 const running = new Map<string, ChildProcess>();
 
+async function isAgentEnabled(agentId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("agent_controls")
+      .select("enabled")
+      .eq("agent_id", agentId)
+      .single();
+
+    // If table doesn't exist or row doesn't exist, default to enabled.
+    if (error) {
+      return true;
+    }
+    return data?.enabled !== false;
+  } catch {
+    return true;
+  }
+}
+
 export async function executeCommand(command: {
   id: string;
   agent_id: string;
@@ -17,6 +35,27 @@ export async function executeCommand(command: {
   if (running.has(agent_id)) {
     console.log(`[executor] Agent "${agent_id}" is busy, queueing command ${id}`);
     // Leave as pending -- will be picked up when current finishes
+    return;
+  }
+
+  // Check if agent is enabled
+  const enabled = await isAgentEnabled(agent_id);
+  if (!enabled) {
+    console.log(`[executor] Agent "${agent_id}" is disabled. Cancelling command ${id}`);
+
+    // Mark as cancelled
+    await supabase
+      .from("agent_commands")
+      .update({ status: "cancelled" })
+      .eq("id", id);
+
+    // Write a final response explaining why
+    await supabase.from("agent_responses").insert({
+      command_id: id,
+      content: `\n[Bridge] Agent \"${agent_id}\" is DISABLED by fleet control. Enable it on /fleet to run commands.\n`,
+      is_final: true,
+    });
+
     return;
   }
 
