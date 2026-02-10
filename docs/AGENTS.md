@@ -30,6 +30,23 @@ For per-agent runbooks, see `docs/agents/`:
 - **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
 - **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
 
+## Intent Layer (AI-Powered Agent Routing)
+
+The **Intent Layer** provides automated agent routing by analyzing natural language goals and producing structured command arrays. Instead of manually choosing which agent to use, describe your goal and the Intent Layer selects the appropriate agents, orders tasks by dependencies, and includes verification steps.
+
+```bash
+# Example: user says "health check all repos"
+# Intent Layer produces commands routed to basedintern + akua + main (synthesis)
+```
+
+The Intent Layer follows routing rules:
+- **main** — orchestration, research, documentation, system tasks
+- **basedintern** — TypeScript/Node.js repo work
+- **akua** — Solidity/Hardhat/Go repo work
+- **_web variants** — browser automation only (use sparingly)
+
+Full reference: `docs/INTENT-LAYER.md`
+
 ## How agent routing works
 
 OpenClaw's agent command sends a turn through the Gateway.

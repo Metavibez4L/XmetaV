@@ -94,6 +94,32 @@ flowchart TB
 
 ## Components
 
+### Intent Layer (AI-Powered Command Generation)
+
+The Intent Layer is the natural language interface that sits between user goals and the agent fleet. It analyzes high-level objectives and produces structured JSON command arrays for execution.
+
+- **Input**: Natural language goal (e.g., "update docs and status", "health check all repos")
+- **Output**: JSON array of `{agent, message, description}` command objects
+- **Routing**: Automatically selects the best agent for each sub-task
+- **Ordering**: Sequences commands with dependencies first, verification last
+- **Integration**: Output can be executed directly or fed into the swarm engine
+
+```mermaid
+flowchart LR
+    USER["User Goal"] --> IL["Intent Layer"]
+    IL --> CMD["JSON Commands"]
+    CMD --> SW["Swarm Engine"]
+    CMD --> DIRECT["Direct Execution"]
+    SW --> FLEET["Agent Fleet"]
+    DIRECT --> FLEET
+
+    style IL fill:#1a1a2e,stroke:#e94560,color:#fff
+    style CMD fill:#0f3460,stroke:#16c79a,color:#fff
+    style SW fill:#0f3460,stroke:#f7b731,color:#fff
+```
+
+Full documentation: `docs/INTENT-LAYER.md`
+
 ### Control Plane Dashboard (Next.js 16)
 
 A cyberpunk-themed web application providing a browser-based control interface for the entire XmetaV ecosystem.
