@@ -1,5 +1,5 @@
 # Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-10
+Last verified: 2026-02-10 (Intent Layer update)
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -322,6 +322,51 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## Intent Layer (AI-Powered Command Generation)
+
+The **Intent Layer** is an AI-powered command generation system that sits between natural language user goals and the agent fleet. It analyzes high-level objectives and produces structured JSON command arrays for multi-agent orchestration.
+
+### How it works
+
+1. User provides a high-level goal (e.g., "update docs and status", "health check all repos")
+2. The Intent Layer analyzes the goal, breaks it into atomic tasks
+3. Each task is routed to the most appropriate agent
+4. Output is a JSON array of `{agent, message, description}` command objects
+5. Commands can be executed sequentially or fed into the swarm engine
+
+### Available agents for routing
+
+| Agent | Best for |
+|-------|----------|
+| `main` | Orchestration, research, system tasks, doc updates, coordination |
+| `basedintern` | TypeScript/Node.js work (code, tests, commits) |
+| `akua` | Solidity/Hardhat/Go work (contracts, tests, deploys) |
+| `basedintern_web` | Browser automation for basedintern tasks (use sparingly) |
+| `akua_web` | Browser automation for akua tasks (use sparingly) |
+
+### Command format
+
+```json
+{
+  "agent": "main",
+  "message": "Specific, actionable task description",
+  "description": "Short human-readable summary"
+}
+```
+
+### Routing rules
+
+- Use `main` for coordination, research, documentation, and system tasks
+- Use `basedintern` for TypeScript/Node.js repo work
+- Use `akua` for Solidity/Hardhat/Go repo work
+- Use `_web` variants ONLY when browser automation is required
+- Order commands logically (dependencies first)
+- Include verification steps when appropriate
+
+Full reference: `docs/INTENT-LAYER.md`
 
 ---
 
