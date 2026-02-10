@@ -29,6 +29,7 @@
 
 ## Features
 
+- **Intent Layer** — AI-powered command generation from natural language goals, with automatic agent routing and task decomposition
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
@@ -129,6 +130,7 @@ XmetaV/
     |-- OPENCLAW-FIX-CHECKLIST.md  # Verification checklist
     |-- GITHUB-SKILL-STATUS.md     # GitHub skill status
     |-- SWARM.md              # Multi-agent swarm reference
+    |-- INTENT-LAYER.md       # Intent Layer — AI command generation
     +-- agents/               # Per-agent runbooks
         |-- README.md
         |-- main.md           # main agent runbook
@@ -592,6 +594,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
+| [INTENT-LAYER.md](docs/INTENT-LAYER.md) | Intent Layer — AI-powered command generation |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
@@ -627,6 +630,14 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-10 (v8) — Intent Layer & Documentation Update
+- **Intent Layer** — AI-powered command generation system that analyzes natural language goals and produces structured JSON command arrays for multi-agent orchestration
+- Added `docs/INTENT-LAYER.md` — full Intent Layer reference (routing rules, command format, examples, swarm integration)
+- Updated `docs/STATUS.md` — added Intent Layer section, refreshed verification dates
+- Updated `docs/ARCHITECTURE.md` — added Intent Layer as a system component with mermaid diagram
+- Updated `docs/AGENTS.md` — added Intent Layer routing reference
+- Updated `docs/GITHUB-SKILL-STATUS.md` — refreshed last verified date to 2026-02-10
 
 ### 2026-02-10 (v7) — Swarm Dashboard Optimization
 - **Swarm Feature Optimized** — memoized components, visibility-aware polling, lazy-loaded task history, cancellation-aware execution
