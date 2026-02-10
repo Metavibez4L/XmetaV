@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       },
       source: {
         repository: repo,
-        ref: "dev",
       },
       model: model || undefined,
     });

@@ -485,7 +485,6 @@ Goal: ${message}`;
       prompt: { text: intentPrompt },
       source: {
         repository: repo || "https://github.com/Metavibez4L/XmetaV",
-        ref: "dev",
       },
     });
 
