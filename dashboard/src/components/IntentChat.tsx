@@ -156,11 +156,14 @@ export const IntentChat = React.memo(function IntentChat({
                   color: "#fff",
                 }}
               >
-                <option value="https://github.com/Metavibez4L/XmetaV">
-                  Metavibez4L/XmetaV
-                </option>
+                {repos.length === 0 ? (
+                  <>
+                    <option value="https://github.com/Metavibez4L/XmetaV">Metavibez4L/XmetaV</option>
+                    <option value="https://github.com/Metavibez4L/basedintern">Metavibez4L/basedintern</option>
+                    <option value="https://github.com/Metavibez4L/akua">Metavibez4L/akua</option>
+                  </>
+                ) : null}
                 {repos
-                  .filter((r) => r.repository !== "https://github.com/Metavibez4L/XmetaV")
                   .map((r) => (
                     <option key={r.repository} value={r.repository}>
                       {r.owner}/{r.name}
