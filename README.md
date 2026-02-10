@@ -18,6 +18,7 @@
  |                                               |
  |   agents:  main | basedintern | akua          |
  |   swarm:   parallel | pipeline | collab       |
+ |   dashboard: Next.js + Supabase (cyberpunk)   |
  |   models:  kimi-k2.5:cloud (256k, all agents) |
  |   gateway: ws://127.0.0.1:18789              |
  |   engine:  Ollama + CUDA  |  RTX 4070        |
@@ -28,8 +29,11 @@
 
 ## Features
 
+- **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
+- **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
-- **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution
+- **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
+- **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
 - Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -46,8 +50,10 @@
 
 **XmetaV** is your operational command center for managing [OpenClaw](https://openclaw.dev) -- an AI agent automation platform. This repository contains:
 
+- **Control Plane Dashboard** -- Cyberpunk web UI (Next.js + Supabase) for agent chat, fleet management, swarm orchestration, and real-time monitoring
+- **Bridge Daemon** -- Local Node.js service that bridges the dashboard to OpenClaw CLI via Supabase Realtime
 - **Agent Factory** -- Create agents on the fly, scaffold apps, create GitHub repos, manage the fleet
-- **Swarm Engine** -- Orchestrate multi-agent tasks (parallel, pipeline, collaborative)
+- **Swarm Engine** -- Orchestrate multi-agent tasks (parallel, pipeline, collaborative) via CLI or dashboard
 - **Setup & Fix Scripts** -- Automated solutions for common issues
 - **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
 - **Documentation** -- Runbooks, checklists, and troubleshooting guides
@@ -63,6 +69,21 @@ XmetaV/
 |-- README.md                 # You are here
 |-- LICENSE                   # MIT License
 |
+|-- dashboard/                # Control Plane Dashboard (Next.js + Supabase)
+|   |-- src/
+|   |   |-- app/
+|   |   |   |-- (dashboard)/  # Protected routes (Command Center, Agent Chat, Swarms, Fleet)
+|   |   |   |-- auth/         # Login page
+|   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
+|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, etc.
+|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms)
+|   |   +-- lib/              # Supabase clients, types
+|   |-- bridge/               # Bridge Daemon (Node.js)
+|   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
+|   |   +-- lib/              # openclaw CLI wrapper, Supabase client
+|   |-- scripts/              # DB migrations (setup-db*.sql)
+|   +-- README.md             # Dashboard documentation
+|
 |-- scripts/                  # Executable automation scripts
 |   |-- openclaw-fix.sh       # Main fix script (gateway + ollama + locks)
 |   |-- start-gateway.sh      # Start gateway in background
@@ -70,22 +91,22 @@ XmetaV/
 |   |-- health-check.sh       # Quick system health verification
 |   |-- agent-task.sh         # Single atomic task wrapper
 |   |-- agent-pipeline.sh     # Multi-step pipeline workflows
-|   |-- create-agent.sh       # [NEW] Agent Factory — create agents
-|   |-- build-app.sh          # [NEW] Agent Factory — scaffold apps
-|   |-- manage-agents.sh      # [NEW] Agent Factory — manage fleet
-|   +-- swarm.sh              # [NEW] Swarm — multi-agent orchestration
+|   |-- create-agent.sh       # Agent Factory — create agents
+|   |-- build-app.sh          # Agent Factory — scaffold apps
+|   |-- manage-agents.sh      # Agent Factory — manage fleet
+|   +-- swarm.sh              # Swarm — multi-agent orchestration (CLI)
 |
 |-- configs/                  # Configuration files & templates
 |   +-- openclaw.json.fixed   # Known-good config for WSL2 + Ollama
 |
-|-- templates/                # [NEW] Agent identity & swarm templates
+|-- templates/                # Agent identity & swarm templates
 |   |-- agents/               # Per-template identity files
 |   |   |-- general.md        # Generic agent template
 |   |   |-- coding.md         # Software development agent
 |   |   |-- bot.md            # Discord/Telegram bot agent
 |   |   |-- research.md       # Web research agent
 |   |   +-- devops.md         # Infrastructure/ops agent
-|   +-- swarms/               # [NEW] Pre-built swarm manifests
+|   +-- swarms/               # Pre-built swarm manifests
 |       |-- health-all.json   # Parallel health check
 |       |-- ship-all.json     # Parallel build+test
 |       |-- research-implement.json  # Pipeline: research -> implement
@@ -107,13 +128,13 @@ XmetaV/
     |-- OLLAMA-SETUP.md       # Ollama integration guide
     |-- OPENCLAW-FIX-CHECKLIST.md  # Verification checklist
     |-- GITHUB-SKILL-STATUS.md     # GitHub skill status
-    |-- SWARM.md              # [NEW] Multi-agent swarm reference
+    |-- SWARM.md              # Multi-agent swarm reference
     +-- agents/               # Per-agent runbooks
         |-- README.md
         |-- main.md           # main agent runbook
         |-- basedintern.md    # basedintern agent runbook
         |-- akua.md           # akua agent runbook
-        +-- dynamic.md        # [NEW] Dynamic agent runbook
+        +-- dynamic.md        # Dynamic agent runbook
 ```
 
 ---
@@ -347,9 +368,42 @@ openclaw agent --agent main --local \
 
 See [docs/agents/dynamic.md](docs/agents/dynamic.md) for full documentation.
 
+### Control Plane Dashboard
+
+A cyberpunk-themed web dashboard for managing the entire XmetaV ecosystem from a browser.
+
+```bash
+# Run locally
+cd dashboard && npm install && npm run dev
+# Open http://localhost:3000
+
+# Start the bridge daemon (connects dashboard to OpenClaw CLI)
+cd dashboard/bridge && npm install && npm start
+```
+
+**Dashboard Pages:**
+
+| Page | Description |
+|------|-------------|
+| `/` | **Command Center** -- bridge health, fleet summary, command history, quick command |
+| `/agent` | **Agent Chat** -- full-screen streaming chat with agent selector |
+| `/swarms` | **Swarms** -- create, monitor, and review multi-agent swarm runs |
+| `/fleet` | **Fleet** -- agent status table with enable/disable toggles and task dispatch |
+
+**Key Features:**
+- **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
+- **Agent Controls** -- Enable/disable agents from the Fleet page; disabled agents have commands blocked by the bridge
+- **Bridge Controls** -- Start/stop the local bridge daemon from the dashboard
+- **Real-time** -- All data updates live via Supabase Realtime (no polling)
+- **Cyberpunk UI** -- Neon blue/dark hacker aesthetic with glitch effects, scanlines, and animated elements
+
+**Architecture:** `Browser (Vercel) <-> Supabase (command bus) <-> Bridge Daemon (WSL) <-> OpenClaw CLI <-> Agents`
+
+See [dashboard/README.md](dashboard/README.md) for full documentation.
+
 ### Swarm Orchestration
 
-Dispatch tasks across multiple agents with three modes:
+Dispatch tasks across multiple agents with three modes (CLI or dashboard):
 
 ```bash
 # Parallel: run independent tasks simultaneously
@@ -532,15 +586,16 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive |
+| [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** -- setup, architecture, pages, bridge |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive (includes dashboard) |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
-| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua) |
+| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
+| [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
-| [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
 
 ---
 
@@ -573,6 +628,34 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 
 ## Changelog
 
+### 2026-02-10 (v7) — Swarm Dashboard Optimization
+- **Swarm Feature Optimized** — memoized components, visibility-aware polling, lazy-loaded task history, cancellation-aware execution
+- Hydration error fix (nested `<button>` in SwarmActiveRuns)
+- Supabase RLS UPDATE/INSERT policies added for `swarm_runs` and `swarm_tasks`
+- `useSwarmRuns` hook: inline updates, task deduplication, visibility-aware Realtime
+- Bridge `swarm-executor`: cancel-aware child process killing, agent-enabled checks, output buffer dedup
+
+### 2026-02-10 (v6) — Swarm Dashboard
+- **Swarm Dashboard** — full-featured tab for creating, monitoring, and reviewing swarm runs from the browser
+- `SwarmCreate` component with template picker, custom builder, and "Let Main Agent Decide"
+- `SwarmActiveRuns` component with live progress, per-task streaming output, cancel button
+- `SwarmHistory` component with filterable history, expandable detail views
+- `useSwarmRuns` hook with Supabase Realtime subscriptions
+- Bridge `swarm-executor` for orchestrating parallel/pipeline/collaborative runs
+- Supabase `swarm_runs` + `swarm_tasks` tables with RLS and Realtime
+- API routes: `/api/swarms`, `/api/swarms/[id]`, `/api/swarms/[id]/cancel`, `/api/swarms/templates`
+
+### 2026-02-10 (v5) — Control Plane Dashboard
+- **Control Plane Dashboard** — cyberpunk-themed Next.js 16 web UI deployed to Vercel
+- Agent Chat with streaming responses and agent selector
+- Fleet management with agent enable/disable toggles (Supabase `agent_controls` table)
+- Bridge daemon controls (start/stop from dashboard)
+- Command Center overview with bridge health, fleet summary, and command history
+- Supabase as message bus (Postgres + Realtime) between dashboard and local bridge daemon
+- Bridge daemon (Node.js) for executing OpenClaw CLI commands from the remote dashboard
+- Cyberpunk UI/UX: neon blue/dark hacker theme, glitch effects, scanlines, animated elements
+- Frontend optimizations: React.memo, keyboard shortcuts, auto-resize, responsive design, error boundaries
+
 ### 2026-02-06 (v4)
 - **GitHub Integration** — Agent Factory and Build App scripts can now auto-create GitHub repos and push initial scaffolds (`--github`, `--private`, `--github-org` flags)
 - Updated Agent Factory skill, docs, and quick commands with GitHub workflow
@@ -590,7 +673,7 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 - Added `scripts/build-app.sh` — app scaffolding (node, python, nextjs, hardhat, bot, fastapi, script)
 - Added `scripts/manage-agents.sh` — fleet management (list, status, remove, update)
 - Added `templates/agents/` — identity templates (coding, bot, research, devops, general)
-- Added Agent Factory skill for the main agent (`~/.openclaw/workspace/skills/agent-factory/`)
+- Added Agent Factory skill for the main agent (`~/.openclaw/workspace/skills/swarm/`)
 - Updated main agent identity with orchestrator role
 - Added `docs/agents/dynamic.md` — runbook for dynamically created agents
 - Updated architecture diagram with orchestrator layer
@@ -629,5 +712,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Agent Factory + GitHub | Swarm Orchestration</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | Agent Factory + GitHub | Swarm Orchestration</sub>
 </p>

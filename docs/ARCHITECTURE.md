@@ -1,85 +1,127 @@
 # Architecture — XmetaV OpenClaw Command Center
 
-This repo is a thin operational layer around OpenClaw. It does **not** replace OpenClaw; it makes OpenClaw easier to run, debug, and keep stable on this machine (WSL2/Linux).
+This repo is the operational layer around OpenClaw. It provides a **Control Plane Dashboard** (Next.js + Supabase), a **Bridge Daemon** (Node.js), automation scripts, and documentation to manage OpenClaw agents, swarms, and infrastructure on WSL2/Linux.
 
 ## System Overview
 
 ```mermaid
 flowchart TB
-    subgraph XMETAV["XmetaV (This Repo)"]
+    subgraph DASHBOARD["Control Plane Dashboard (Vercel / localhost:3000)"]
         direction LR
-        SCRIPTS["Scripts"]
-        CONFIGS["Configs"]
-        DOCS["Docs"]
-        TEMPLATES["Templates"]
+        UI_CC["Command Center"]
+        UI_CHAT["Agent Chat"]
+        UI_SWARM["Swarms"]
+        UI_FLEET["Fleet"]
     end
 
-    subgraph RUNTIME["OpenClaw Runtime"]
-        GW["Gateway\nws://127.0.0.1:18789"]
+    subgraph SUPABASE["Supabase (Cloud Postgres + Realtime)"]
+        direction LR
+        TBL_CMD["agent_commands"]
+        TBL_RESP["agent_responses"]
+        TBL_CTRL["agent_controls"]
+        TBL_SRUN["swarm_runs"]
+        TBL_STASK["swarm_tasks"]
+    end
 
-        subgraph GWSVC["Gateway Services"]
+    subgraph LOCAL["Local Machine (WSL2)"]
+        subgraph BRIDGE["Bridge Daemon (Node.js)"]
             direction LR
-            AR["Agent Runtime"]
-            SM["Session Manager"]
-            CR["Channel Router"]
-            SE["Skill Executor"]
+            EXEC["Command\nExecutor"]
+            SWEXEC["Swarm\nExecutor"]
+            HB["Heartbeat"]
         end
 
-        subgraph MAIN_AGENT["main agent (ORCHESTRATOR)"]
-            direction TB
-            subgraph FACTORY["Agent Factory"]
-                direction LR
-                CREATE["create-agent.sh"]
-                BUILD["build-app.sh"]
-                MANAGE["manage-agents.sh"]
-            end
-            subgraph SWARM["Swarm Engine"]
-                direction LR
-                S_PAR["Parallel"]
-                S_PIPE["Pipeline"]
-                S_COLLAB["Collaborative"]
-            end
+        subgraph XMETAV["XmetaV (This Repo)"]
+            direction LR
+            SCRIPTS["Scripts"]
+            CONFIGS["Configs"]
+            DOCS["Docs"]
+            TEMPLATES["Templates"]
         end
 
-        subgraph FLEET["Agent Fleet"]
-            direction LR
-            A_MAIN["main\n(orchestrator)"]
-            A_BI["basedintern\n+ _web"]
-            A_AKUA["akua\n+ _web"]
-            A_DYN["dynamic\nagents"]
+        subgraph RUNTIME["OpenClaw Runtime"]
+            GW["Gateway\nws://127.0.0.1:18789"]
+
+            subgraph MAIN_AGENT["main agent (ORCHESTRATOR)"]
+                direction TB
+                FACTORY["Agent Factory"]
+                SWARM_SK["Swarm Skill"]
+            end
+
+            subgraph FLEET["Agent Fleet"]
+                direction LR
+                A_MAIN["main"]
+                A_BI["basedintern"]
+                A_AKUA["akua"]
+                A_DYN["dynamic"]
+            end
         end
     end
 
     subgraph PROVIDERS["Model Providers"]
         direction LR
-        OLLAMA["Ollama (Local)\nhttp://127.0.0.1:11434\n• qwen2.5:7b-instruct\n• kimi-k2.5:cloud (256k)"]
-        CLOUD["Cloud Providers\n(Anthropic, OpenAI)"]
+        OLLAMA["Ollama (Local)\n• kimi-k2.5:cloud (256k)\n• qwen2.5:7b-instruct"]
     end
 
     subgraph EXTERNAL["External Services"]
         direction LR
-        GITHUB["GitHub\n(gh CLI → Metavibez4L)"]
+        GITHUB["GitHub\n(Metavibez4L)"]
+        VERCEL["Vercel\n(Dashboard Host)"]
     end
 
-    XMETAV --> RUNTIME
-    GW --> GWSVC
-    GWSVC --> MAIN_AGENT
+    DASHBOARD <-->|Realtime WS| SUPABASE
+    BRIDGE <-->|Realtime WS| SUPABASE
+    BRIDGE --> RUNTIME
+    EXEC -->|openclaw agent| GW
+    SWEXEC -->|orchestrate| GW
+    GW --> MAIN_AGENT
     MAIN_AGENT --> FLEET
-    FACTORY -->|--github| GITHUB
     FLEET --> PROVIDERS
+    FACTORY -->|--github| GITHUB
+    DASHBOARD -.->|deployed to| VERCEL
 
+    style DASHBOARD fill:#0a0e1a,stroke:#00f0ff,color:#00f0ff
+    style SUPABASE fill:#1a1a2e,stroke:#3ecf8e,color:#fff
+    style LOCAL fill:#0d1117,stroke:#e94560,color:#fff
+    style BRIDGE fill:#16213e,stroke:#00f0ff,color:#fff
     style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
     style RUNTIME fill:#16213e,stroke:#e94560,color:#fff
     style MAIN_AGENT fill:#0f3460,stroke:#e94560,color:#fff
-    style FACTORY fill:#1a1a4e,stroke:#16c79a,color:#fff
-    style SWARM fill:#1a1a4e,stroke:#f7b731,color:#fff
     style FLEET fill:#1a1a3e,stroke:#a29bfe,color:#fff
     style PROVIDERS fill:#222,stroke:#888,color:#fff
     style EXTERNAL fill:#161b22,stroke:#58a6ff,color:#fff
-    style GITHUB fill:#161b22,stroke:#58a6ff,color:#fff
 ```
 
 ## Components
+
+### Control Plane Dashboard (Next.js 16)
+
+A cyberpunk-themed web application providing a browser-based control interface for the entire XmetaV ecosystem.
+
+- **Framework**: Next.js 16 (App Router) with TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
+- **Auth**: Supabase Auth (email/password)
+- **Hosting**: Vercel (production) or localhost:3000 (development)
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet
+
+### Supabase (Message Bus + Database)
+
+Supabase acts as the communication layer between the remote dashboard and the local bridge daemon.
+
+- **Database**: Postgres with RLS policies for all tables
+- **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `swarm_runs`, `swarm_tasks`
+- **Project**: `ptlneqcjsnrxxruutsxm`
+
+### Bridge Daemon (Node.js)
+
+A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
+
+- **Command Executor**: Subscribes to `agent_commands` via Realtime, spawns `openclaw agent` processes, streams output to `agent_responses`
+- **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
+- **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
+- **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
+- **Location**: `dashboard/bridge/`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`
@@ -311,10 +353,73 @@ sequenceDiagram
 
 All agents use **Kimi K2.5** (256k context) via Ollama as the model provider.
 
+### Dashboard command flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant DASH as Dashboard (Browser)
+    participant SUPA as Supabase
+    participant BRIDGE as Bridge Daemon (WSL)
+    participant OC as OpenClaw CLI
+    participant LLM as Kimi K2.5
+
+    User->>DASH: Type command in Agent Chat
+    DASH->>SUPA: INSERT into agent_commands
+    SUPA-->>BRIDGE: Realtime: new command
+    BRIDGE->>BRIDGE: Check agent_controls (enabled?)
+    BRIDGE->>OC: spawn openclaw agent --message "..."
+    OC->>LLM: API call
+    LLM-->>OC: Response
+    OC-->>BRIDGE: stdout stream
+    BRIDGE->>SUPA: INSERT/UPDATE agent_responses (streaming chunks)
+    SUPA-->>DASH: Realtime: response chunks
+    DASH-->>User: Display streaming response
+```
+
+### Dashboard swarm flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant DASH as Dashboard (Browser)
+    participant SUPA as Supabase
+    participant BRIDGE as Bridge Daemon (WSL)
+    participant OC as OpenClaw CLI
+
+    User->>DASH: Create swarm (template or custom)
+    DASH->>SUPA: INSERT into swarm_runs (status=pending)
+    SUPA-->>BRIDGE: Realtime: new swarm run
+    BRIDGE->>BRIDGE: Parse manifest, determine mode
+
+    alt Parallel mode
+        BRIDGE->>SUPA: INSERT swarm_tasks (one per agent)
+        BRIDGE->>OC: Spawn agents in parallel
+        OC-->>BRIDGE: stdout streams
+        BRIDGE->>SUPA: UPDATE swarm_tasks (output chunks)
+    else Pipeline mode
+        BRIDGE->>OC: Run agent A
+        OC-->>BRIDGE: Output A
+        BRIDGE->>OC: Run agent B (with A's output as context)
+        OC-->>BRIDGE: Output B
+    else Collaborative mode
+        BRIDGE->>OC: Same task to all agents (parallel)
+        OC-->>BRIDGE: All outputs
+        BRIDGE->>OC: Synthesis agent merges
+        OC-->>BRIDGE: Synthesis result
+    end
+
+    BRIDGE->>SUPA: UPDATE swarm_runs (status=completed, synthesis)
+    SUPA-->>DASH: Realtime updates throughout
+    DASH-->>User: Live progress, streaming output, final results
+```
+
 ## Ports and endpoints
 
+- Dashboard: `http://localhost:3000` (dev) or Vercel URL (prod)
 - Gateway WS: `ws://127.0.0.1:18789`
 - Ollama HTTP: `http://127.0.0.1:11434`
+- Supabase: `https://ptlneqcjsnrxxruutsxm.supabase.co`
 
 ## Failure modes (what this repo is designed to prevent)
 

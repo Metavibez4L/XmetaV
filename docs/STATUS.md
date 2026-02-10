@@ -1,5 +1,5 @@
 # Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-06
+Last verified: 2026-02-10
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -247,6 +247,83 @@ Notes:
 - If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
 - The `openai-responses` API mode is required for tool schemas to be passed to the model.
+
+## Control Plane Dashboard
+
+The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web application providing remote agent management, swarm orchestration, and fleet controls via a browser.
+
+### Dashboard status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Dashboard (Next.js) | Active | `cd dashboard && npm run dev` (localhost:3000) |
+| Bridge Daemon | Active when running | `cd dashboard/bridge && npm start` |
+| Supabase | Active | Project: `ptlneqcjsnrxxruutsxm` |
+
+### Supabase tables
+
+| Table | Purpose | RLS |
+|-------|---------|-----|
+| `agent_commands` | Command bus (dashboard -> bridge) | Authenticated: SELECT, INSERT |
+| `agent_responses` | Response bus (bridge -> dashboard) | Authenticated: SELECT, INSERT |
+| `agent_sessions` | Agent session tracking | Authenticated: SELECT, INSERT |
+| `agent_controls` | Agent enable/disable state | Authenticated: SELECT, INSERT, UPDATE |
+| `swarm_runs` | Swarm run metadata and status | Authenticated: SELECT, INSERT, UPDATE |
+| `swarm_tasks` | Per-task status and output | Authenticated: SELECT, INSERT, UPDATE |
+
+All tables have Realtime enabled for live updates.
+
+### Dashboard pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Command Center | Bridge health, fleet summary, recent commands, quick command |
+| `/agent` | Agent Chat | Streaming chat with agent selector |
+| `/swarms` | Swarms | Create (templates/custom), active runs (live), history (filterable) |
+| `/fleet` | Fleet | Agent table with enable/disable toggles |
+
+### Dashboard health checks
+
+```bash
+# Verify dashboard is running
+curl -s http://localhost:3000 | head -1
+
+# Verify bridge daemon is running
+curl -s http://localhost:3000/api/bridge/status
+
+# Verify Supabase connection
+cd dashboard && npx tsx -e "
+  const { createClient } = require('@supabase/supabase-js');
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  sb.from('agent_commands').select('count').then(r => console.log('OK:', r));
+"
+```
+
+### Dashboard environment
+
+Required environment variables (in `dashboard/.env.local`):
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+
+### Swarm runs (dashboard)
+
+The dashboard can create, monitor, and cancel swarm runs:
+
+```bash
+# Swarm runs are stored in Supabase swarm_runs table
+# The bridge daemon picks up pending runs and orchestrates execution
+# Live output is streamed via Supabase Realtime to the browser
+```
+
+Swarm modes: **parallel**, **pipeline**, **collaborative**
+
+Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
 
 ## Browser Automation (OpenClaw-managed browser)
 

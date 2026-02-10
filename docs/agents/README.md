@@ -20,9 +20,35 @@ All agents use **Kimi K2.5** (256k context) via Ollama.
 
 Dynamic agents are created by the `main` agent using the Agent Factory skill. Each gets its own runbook auto-generated at `docs/agents/<agent-id>.md`. Agents can also be created with a **GitHub repo** (`--github` flag) — the repo is auto-created under `Metavibez4L` and the initial scaffold is pushed.
 
-## Swarm Orchestration
+## Dashboard Fleet Management
 
-The `main` agent can coordinate multi-agent operations via the Swarm skill:
+All agents can be managed from the **Control Plane Dashboard** at http://localhost:3000.
+
+### Fleet Page (`/fleet`)
+
+- View all agents with their status, workspace, model, and tools profile
+- **Enable/Disable toggle** — flip agents on/off; the bridge daemon enforces this by blocking commands to disabled agents
+- **Send Task** — dispatch a one-off task to any agent directly from the browser
+
+### Agent Chat (`/agent`)
+
+- Full-screen streaming chat with an agent selector dropdown
+- Commands are routed through Supabase to the bridge daemon and back
+- Real-time response streaming
+
+### Swarms Page (`/swarms`)
+
+- Create swarm runs from templates or a custom builder
+- "Let Main Agent Decide" — the main agent autonomously creates a swarm
+- Live monitoring of active runs with per-task streaming output
+- Cancel running swarms with one click
+- Filterable history of past runs
+
+See the [dashboard README](../../dashboard/README.md) for setup and full documentation.
+
+## Swarm Orchestration (CLI)
+
+The `main` agent can also coordinate multi-agent operations via the CLI Swarm skill:
 
 | Mode | What it does |
 |------|-------------|
@@ -41,7 +67,7 @@ The `main` agent can coordinate multi-agent operations via the Swarm skill:
 ./scripts/swarm.sh --collab "Review security" basedintern akua
 ```
 
-See [`../SWARM.md`](../SWARM.md) for the full reference.
+See [`../SWARM.md`](../SWARM.md) for the full CLI reference.
 
 ## Common commands (applies to all agents)
 
@@ -56,6 +82,12 @@ openclaw agent --agent main --local --thinking off \
 
 # Clear stale session locks (safe)
 find ~/.openclaw -name "*.lock" -type f -delete
+
+# Start the dashboard (browser-based management)
+cd dashboard && npm run dev
+
+# Start the bridge daemon (dashboard <-> OpenClaw)
+cd dashboard/bridge && npm start
 ```
 
 ## Tooling baseline
@@ -66,6 +98,8 @@ This command center uses:
 - **API mode**: `openai-responses` (required for tool calling)
 - **API key**: `"local"` (required placeholder for OpenClaw auth checks)
 - **Tools profile**: `full` for `main`, `coding` for repo agents, `full` for `_web` companions
+- **Dashboard**: Next.js 16 + Supabase (Realtime + Postgres)
+- **Bridge Daemon**: Node.js process bridging dashboard to OpenClaw CLI
 
 Quick sanity checks:
 
