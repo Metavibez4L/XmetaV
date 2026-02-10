@@ -4,7 +4,7 @@ import { createStreamer } from "./streamer.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
-const running = new Map<string, ChildProcess>();
+export const running = new Map<string, ChildProcess>();
 
 async function isAgentEnabled(agentId: string): Promise<boolean> {
   try {

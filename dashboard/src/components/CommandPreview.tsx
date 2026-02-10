@@ -13,6 +13,8 @@ import {
   CheckCircle,
   AlertCircle,
   Terminal,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 import type { IntentCommand, IntentSession } from "@/lib/types";
 
@@ -114,6 +116,20 @@ export const CommandPreview = React.memo(function CommandPreview({
           )}
         </div>
       </div>
+
+      {/* Retry indicator */}
+      {session && session.retry_count > 0 && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3"
+          style={{ background: "#f7b73112", border: "1px solid #f7b73130" }}
+        >
+          <RefreshCw className="h-3.5 w-3.5" style={{ color: "#f7b731" }} />
+          <span className="text-[10px] font-mono" style={{ color: "#f7b731" }}>
+            Retry {session.retry_count}/{session.max_retries} — previous commands timed out after {session.timeout_seconds}s
+          </span>
+          <Clock className="h-3 w-3 ml-auto opacity-50" style={{ color: "#f7b731" }} />
+        </div>
+      )}
 
       {/* Command list */}
       <div className="flex-1 overflow-y-auto space-y-2 mb-4" style={{ maxHeight: "calc(100vh - 380px)" }}>

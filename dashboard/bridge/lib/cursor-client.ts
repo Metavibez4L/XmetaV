@@ -74,6 +74,10 @@ export class CursorClient {
     return this.request("GET", `/v0/agents/${id}/conversation`);
   }
 
+  async addFollowup(id: string, prompt: CursorAgentPrompt): Promise<{ id: string }> {
+    return this.request("POST", `/v0/agents/${id}/followup`, { prompt });
+  }
+
   async stopAgent(id: string): Promise<{ id: string }> {
     return this.request("POST", `/v0/agents/${id}/stop`);
   }

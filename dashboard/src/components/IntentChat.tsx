@@ -9,6 +9,7 @@ import {
   MessageSquare,
   StopCircle,
   GitBranch,
+  RefreshCw,
 } from "lucide-react";
 import type { IntentSession, IntentConversationMessage } from "@/lib/types";
 
@@ -200,6 +201,19 @@ export const IntentChat = React.memo(function IntentChat({
             <ConversationBubble key={msg.id || i} msg={msg} sc={sc} />
           ))}
 
+          {/* Timeout retry indicator */}
+          {session.retry_count > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2">
+              <RefreshCw className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "#f7b731" }} />
+              <div>
+                <p className="text-[10px] font-mono" style={{ color: "#f7b731" }}>
+                  Previous commands timed out — Cursor is generating alternatives
+                  (retry {session.retry_count}/{session.max_retries})
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Thinking indicator */}
           {isThinking && (
             <div className="flex items-center gap-2 px-3 py-2">
@@ -208,7 +222,9 @@ export const IntentChat = React.memo(function IntentChat({
                 style={{ color: sc.neon }}
               />
               <span className="text-[10px] font-mono" style={{ color: sc.dimText }}>
-                Cursor is thinking...
+                {session.retry_count > 0
+                  ? "Cursor is rethinking with alternative approaches..."
+                  : "Cursor is thinking..."}
               </span>
             </div>
           )}

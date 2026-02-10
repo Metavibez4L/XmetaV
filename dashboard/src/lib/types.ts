@@ -2,7 +2,7 @@
 // Shared TypeScript types for the XmetaV Control Plane
 // ============================================================
 
-export type CommandStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type CommandStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "timeout";
 export type AgentStatus = "online" | "idle" | "busy" | "offline";
 
 export interface AgentControl {
@@ -149,6 +149,9 @@ export interface IntentSession {
   commands: IntentCommand[];
   executed_command_ids: string[] | null;
   conversation: IntentConversationMessage[] | null;
+  retry_count: number;
+  max_retries: number;
+  timeout_seconds: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
