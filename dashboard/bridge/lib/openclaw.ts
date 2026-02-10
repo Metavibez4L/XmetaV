@@ -31,7 +31,7 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
     "--agent", agentId,
     "--local",
     "--thinking", "off",
-    message,
+    "-m", message,
   ];
 
   console.log(`[openclaw] Spawning: ${openclawPath} ${args.join(" ")}`);
