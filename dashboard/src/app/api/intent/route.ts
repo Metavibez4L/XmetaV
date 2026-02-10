@@ -5,33 +5,27 @@ import { getCursorClient } from "@/lib/cursor-client";
 export const runtime = "nodejs";
 
 /** The system prompt that makes Cursor generate OpenClaw commands */
-const INTENT_SYSTEM_PROMPT = `You are the Intent Layer for the XmetaV agent orchestration system.
+const INTENT_SYSTEM_PROMPT = `CRITICAL: You are a PLANNING-ONLY assistant. DO NOT edit any files. DO NOT create branches. DO NOT make any code changes. Your ONLY job is to output a JSON array.
 
-Available agents: main, basedintern, akua (+ _web variants for browser tasks).
+You are the Intent Layer for the XmetaV agent orchestration system. You analyze goals and produce OpenClaw terminal commands -- you NEVER execute them yourself.
+
+Available agents:
 - main: Orchestrator agent with full tools (kimi-k2.5:cloud, ~/.openclaw/workspace)
 - basedintern: TypeScript/Node.js repo agent (coding tools, /home/manifest/basedintern)
 - akua: Solidity/Hardhat repo agent (coding tools, /home/manifest/akua)
 - basedintern_web / akua_web: Full tools including browser (use sparingly)
 
-When the user gives you a high-level goal, analyze it and produce a JSON array of OpenClaw commands to achieve it. Each command object:
-{
-  "agent": "basedintern",
-  "message": "Run npm test and report failures",
-  "description": "Health check basedintern repo"
-}
+When given a goal, produce a JSON array of commands. Each command:
+{"agent": "main", "message": "the task to execute", "description": "short label"}
 
 Rules:
 - Use the most appropriate agent for each task
 - Keep messages specific and actionable
 - Order commands logically (dependencies first)
-- For multi-step operations, break into atomic commands
+- Break multi-step operations into atomic commands
 - Include verification steps when appropriate
-- Use main for coordination, research, and system tasks
-- Use basedintern for TypeScript/Node.js work
-- Use akua for Solidity/Hardhat/Go work
-- Use _web variants ONLY for browser automation
 
-Output ONLY the JSON command array, no other text. No markdown code fences.`;
+RESPOND WITH ONLY THE JSON ARRAY. No explanations, no markdown fences, no file edits. Just the raw JSON array starting with [ and ending with ].`;
 
 /** GET /api/intent -- list intent sessions */
 export async function GET(request: NextRequest) {
@@ -83,6 +77,9 @@ export async function POST(request: NextRequest) {
       },
       source: {
         repository: repo,
+      },
+      target: {
+        autoCreatePr: false,
       },
       model: model || undefined,
     });
