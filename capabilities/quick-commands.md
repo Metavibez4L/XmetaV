@@ -134,6 +134,39 @@ ocm "Create a Discord bot agent called social-bot"
 ocm "Run a parallel health check across all repo agents"
 ```
 
+## Dashboard Commands
+
+```bash
+# Start the dashboard (dev server)
+cd dashboard && npm run dev
+# Open http://localhost:3000
+
+# Start the bridge daemon (connects dashboard to OpenClaw CLI)
+cd dashboard/bridge && npm start
+
+# Check bridge status from CLI
+curl -s http://localhost:3000/api/bridge/status | jq
+
+# Kill stale dashboard processes
+pkill -f "next dev"
+rm -f dashboard/.next/dev/lock
+```
+
+### Dashboard Pages
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Command Center | http://localhost:3000 | Bridge health, fleet overview, quick command |
+| Agent Chat | http://localhost:3000/agent | Streaming agent chat with selector |
+| Swarms | http://localhost:3000/swarms | Create, monitor, cancel swarm runs |
+| Fleet | http://localhost:3000/fleet | Agent table with enable/disable toggles |
+
+### Dashboard Swarm Shortcuts
+
+- Use keyboard `1` / `2` / `3` on the Swarms page to switch between Create / Active / History tabs
+- Click a template card to instantly launch a swarm
+- "Let Main Agent Decide" delegates swarm creation to the main agent
+
 ## Quick Aliases
 
 Add to your `~/.bashrc`:

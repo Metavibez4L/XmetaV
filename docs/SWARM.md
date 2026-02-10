@@ -2,6 +2,8 @@
 
 The swarm system enables the main agent (or you directly) to decompose complex tasks and dispatch them across the agent fleet using three execution modes.
 
+> **Dashboard**: Swarms can also be created, monitored, and cancelled from the **Control Plane Dashboard** at http://localhost:3000/swarms. The dashboard provides a visual interface with template picker, custom builder, live progress tracking, and run history. See [dashboard/README.md](../dashboard/README.md) for setup.
+
 ## Quick Start
 
 ```bash
@@ -258,3 +260,37 @@ EOF
 
 ./scripts/swarm.sh /tmp/swarm-audit.json
 ```
+
+## Dashboard Swarm Management
+
+In addition to the CLI, swarms can be managed from the **Control Plane Dashboard** (http://localhost:3000/swarms):
+
+### Create Tab
+- **Templates**: Click a pre-built template card to instantly launch a swarm
+- **Custom Builder**: Pick mode (parallel/pipeline/collaborative), define tasks and agents, toggle synthesis
+- **Main Agent Decide**: Let the main agent autonomously create an appropriate swarm
+
+### Active Tab
+- Live progress bars per run
+- Per-task streaming output (auto-scrolls, pauses on user scroll)
+- Cancel button to abort running swarms (kills child processes)
+- Auto-expands newly created runs
+
+### History Tab
+- Filter by mode (parallel/pipeline/collaborative) and status (completed/failed/cancelled)
+- Expandable detail views with synthesis results and per-task output
+- Lazy-loaded task data (fetched on expand)
+
+### Dashboard vs CLI
+
+| Feature | CLI (`swarm.sh`) | Dashboard |
+|---------|------------------|-----------|
+| Create swarm | Manual command or manifest file | Visual builder or templates |
+| Monitor progress | `--status` (one-time check) | Live streaming in browser |
+| Cancel running | `kill` + cleanup | One-click cancel button |
+| View results | `--results <id>` | Expandable inline views |
+| History | File-based (`~/.openclaw/swarm/`) | Supabase-stored, filterable |
+| Templates | JSON files on disk | Visual template picker |
+| Main agent swarms | Via skill/command | "Let Main Agent Decide" button |
+
+Dashboard swarm runs are stored in Supabase (`swarm_runs` + `swarm_tasks` tables) and executed by the bridge daemon's swarm executor. CLI swarm runs are stored locally in `~/.openclaw/swarm/`.

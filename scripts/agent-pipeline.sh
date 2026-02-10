@@ -12,6 +12,16 @@
 #
 set -euo pipefail
 
+# Ensure Node.js 22+ is available (openclaw is installed under nvm node 22)
+if ! command -v openclaw &>/dev/null || [[ "$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)" -lt 16 ]] 2>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh" --no-use
+    nvm use 22 --silent 2>/dev/null || nvm use default --silent 2>/dev/null || true
+  fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT="${AGENT:-basedintern}"
 

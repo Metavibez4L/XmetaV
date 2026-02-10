@@ -25,6 +25,10 @@ For per-agent runbooks, see `docs/agents/`:
 - **Swarm pipeline**: `./scripts/swarm.sh --pipeline agent1 "step1" agent2 "step2"`
 - **Swarm collab**: `./scripts/swarm.sh --collab "review task" basedintern akua`
 - **Swarm status**: `./scripts/swarm.sh --status`
+- **Dashboard**: `cd dashboard && npm run dev` → http://localhost:3000
+- **Bridge daemon**: `cd dashboard/bridge && npm start`
+- **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
+- **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
 
 ## How agent routing works
 
@@ -168,9 +172,41 @@ For full details, see `docs/agents/dynamic.md`.
 | `devops` | Infrastructure, deployment |
 | `general` | Everything else |
 
-## Swarm Orchestration
+## Dashboard Fleet Controls
 
-The `main` agent can coordinate multi-agent operations using the Swarm skill and `swarm.sh` engine.
+The Control Plane Dashboard provides a browser-based interface for managing agents:
+
+### Agent Enable/Disable
+
+Agents can be toggled on/off from the **Fleet** page (`/fleet`):
+
+- **UI**: Toggle switch on each agent row in the Fleet table
+- **Storage**: `agent_controls` table in Supabase (keyed by agent ID)
+- **Enforcement**: The bridge daemon checks `agent_controls` before executing any command. Disabled agents have their commands rejected with a "disabled" response.
+- **Main agent**: The `main` agent is notified when agents are toggled, so it can adjust its orchestration accordingly.
+
+### Dashboard Agent Chat
+
+The **Agent Chat** page (`/agent`) provides a full-screen streaming chat interface:
+
+- Agent selector dropdown (main, basedintern, akua, etc.)
+- Commands are sent via Supabase and executed by the bridge daemon
+- Responses stream in real-time via Supabase Realtime
+- Full message history per session
+
+### Dashboard Swarm Management
+
+The **Swarms** page (`/swarms`) provides a complete interface for swarm orchestration:
+
+- **Create tab**: Pick from pre-built templates, build custom swarms, or "Let Main Agent Decide"
+- **Active tab**: Live progress bars, per-task streaming output, cancel button
+- **History tab**: Filterable past runs with expandable detail views
+
+Swarm runs created from the dashboard are stored in Supabase (`swarm_runs` + `swarm_tasks`) and executed by the bridge daemon's swarm executor.
+
+## Swarm Orchestration (CLI + Dashboard)
+
+The `main` agent can coordinate multi-agent operations using the Swarm skill, `swarm.sh` engine, or the dashboard.
 
 ### Modes
 
