@@ -51,8 +51,14 @@ create policy "Authenticated users can read swarm runs"
   on swarm_runs for select to authenticated using (true);
 create policy "Authenticated users can insert swarm runs"
   on swarm_runs for insert to authenticated with check (true);
+create policy "Authenticated users can update swarm runs"
+  on swarm_runs for update to authenticated using (true) with check (true);
 create policy "Authenticated users can read swarm tasks"
   on swarm_tasks for select to authenticated using (true);
+create policy "Authenticated users can insert swarm tasks"
+  on swarm_tasks for insert to authenticated with check (true);
+create policy "Authenticated users can update swarm tasks"
+  on swarm_tasks for update to authenticated using (true) with check (true);
 
 -- Realtime
 alter publication supabase_realtime add table swarm_runs;

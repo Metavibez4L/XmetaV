@@ -12,6 +12,7 @@ import {
   XCircle,
   Ban,
   Filter,
+  Loader2,
 } from "lucide-react";
 import type { SwarmRun, SwarmTask, SwarmMode, SwarmRunStatus } from "@/lib/types";
 
@@ -70,6 +71,7 @@ export const SwarmHistory = React.memo(function SwarmHistory({
           next.delete(id);
         } else {
           next.add(id);
+          // Lazy-load tasks only when expanding
           if (!taskMap[id]) fetchTasks(id);
         }
         return next;
@@ -77,20 +79,6 @@ export const SwarmHistory = React.memo(function SwarmHistory({
     },
     [taskMap, fetchTasks]
   );
-
-  const formatDuration = useCallback((start: string, end: string) => {
-    const ms = new Date(end).getTime() - new Date(start).getTime();
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${(ms / 60000).toFixed(1)}m`;
-  }, []);
-
-  const formatTime = useCallback((ts: string) => {
-    const d = new Date(ts);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-      " " +
-      d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-  }, []);
 
   return (
     <div className="space-y-4">
@@ -126,7 +114,7 @@ export const SwarmHistory = React.memo(function SwarmHistory({
         </select>
 
         <span className="text-[9px] font-mono" style={{ color: "#4a6a8a" }}>
-          {filteredRuns.length} runs
+          {filteredRuns.length} run{filteredRuns.length !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -140,110 +128,152 @@ export const SwarmHistory = React.memo(function SwarmHistory({
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredRuns.map((run) => {
-            const isExpanded = expanded.has(run.id);
-            const mc = modeColors[run.mode as SwarmMode] ?? "#00f0ff";
-            const sc = statusColors[run.status] ?? "#4a6a8a";
-            const si = statusIcons[run.status];
-            const mi = modeIcons[run.mode as SwarmMode];
-            const tasks = taskMap[run.id] ?? [];
-
-            return (
-              <div key={run.id} className="cyber-card rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggle(run.id)}
-                  className="w-full px-4 py-3 flex items-center gap-3 text-left"
-                >
-                  {/* Status icon */}
-                  <span style={{ color: sc }}>{si}</span>
-
-                  {/* Name */}
-                  <span className="text-[11px] font-mono font-bold truncate" style={{ color: "#c8d6e5" }}>
-                    {run.name}
-                  </span>
-
-                  {/* Mode badge */}
-                  <span
-                    className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1"
-                    style={{ background: `${mc}10`, border: `1px solid ${mc}25`, color: mc }}
-                  >
-                    {mi}
-                    {run.mode}
-                  </span>
-
-                  {/* Status */}
-                  <span
-                    className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
-                    style={{ background: `${sc}10`, border: `1px solid ${sc}25`, color: sc }}
-                  >
-                    {run.status}
-                  </span>
-
-                  <div className="flex-1" />
-
-                  {/* Duration */}
-                  <span className="text-[9px] font-mono shrink-0" style={{ color: "#4a6a8a" }}>
-                    <Clock className="h-2.5 w-2.5 inline mr-1" />
-                    {formatDuration(run.created_at, run.updated_at)}
-                  </span>
-
-                  {/* Timestamp */}
-                  <span className="text-[9px] font-mono shrink-0 hidden sm:inline" style={{ color: "#4a6a8a" }}>
-                    {formatTime(run.created_at)}
-                  </span>
-
-                  {isExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: "#4a6a8a" }} />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: "#4a6a8a" }} />
-                  )}
-                </button>
-
-                {/* Expanded Detail */}
-                {isExpanded && (
-                  <div className="px-4 pb-4 space-y-3" style={{ borderTop: "1px solid #00f0ff08" }}>
-                    {/* Synthesis */}
-                    {run.synthesis && (
-                      <div className="mt-3 rounded-lg p-3" style={{ background: "#060b14", border: "1px solid #a855f720" }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#a855f7" }}>
-                            Synthesis
-                          </span>
-                        </div>
-                        <pre
-                          className="text-[10px] font-mono leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto"
-                          style={{ color: "#c8d6e5" }}
-                        >
-                          {run.synthesis}
-                        </pre>
-                      </div>
-                    )}
-
-                    {/* Task list */}
-                    {tasks.length > 0 ? (
-                      <div className="mt-3 space-y-1.5">
-                        {tasks.map((task) => {
-                          const tsc = statusColors[task.status] ?? "#4a6a8a";
-                          return (
-                            <HistoryTaskRow key={task.id} task={task} color={tsc} />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="mt-3 text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-                        Loading tasks...
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {filteredRuns.map((run) => (
+            <HistoryRunRow
+              key={run.id}
+              run={run}
+              tasks={taskMap[run.id]}
+              isExpanded={expanded.has(run.id)}
+              onToggle={toggle}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 });
+
+// ============================================================
+// Memoized run row
+// ============================================================
+
+const HistoryRunRow = React.memo(function HistoryRunRow({
+  run,
+  tasks,
+  isExpanded,
+  onToggle,
+}: {
+  run: SwarmRun;
+  tasks?: SwarmTask[];
+  isExpanded: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const mc = modeColors[run.mode as SwarmMode] ?? "#00f0ff";
+  const sc = statusColors[run.status] ?? "#4a6a8a";
+  const si = statusIcons[run.status];
+  const mi = modeIcons[run.mode as SwarmMode];
+
+  const duration = useMemo(() => {
+    const ms = new Date(run.updated_at).getTime() - new Date(run.created_at).getTime();
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
+  }, [run.created_at, run.updated_at]);
+
+  const timestamp = useMemo(() => {
+    const d = new Date(run.created_at);
+    return (
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+      " " +
+      d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+    );
+  }, [run.created_at]);
+
+  return (
+    <div className="cyber-card rounded-lg overflow-hidden">
+      <button
+        onClick={() => onToggle(run.id)}
+        className="w-full px-4 py-3 flex items-center gap-3 text-left"
+      >
+        <span style={{ color: sc }}>{si}</span>
+
+        <span className="text-[11px] font-mono font-bold truncate" style={{ color: "#c8d6e5" }}>
+          {run.name}
+        </span>
+
+        <span
+          className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1"
+          style={{ background: `${mc}10`, border: `1px solid ${mc}25`, color: mc }}
+        >
+          {mi}
+          {run.mode}
+        </span>
+
+        <span
+          className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: `${sc}10`, border: `1px solid ${sc}25`, color: sc }}
+        >
+          {run.status}
+        </span>
+
+        <div className="flex-1" />
+
+        <span className="text-[9px] font-mono shrink-0" style={{ color: "#4a6a8a" }}>
+          <Clock className="h-2.5 w-2.5 inline mr-1" />
+          {duration}
+        </span>
+
+        <span className="text-[9px] font-mono shrink-0 hidden sm:inline" style={{ color: "#4a6a8a" }}>
+          {timestamp}
+        </span>
+
+        {isExpanded ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: "#4a6a8a" }} />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: "#4a6a8a" }} />
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 space-y-3" style={{ borderTop: "1px solid #00f0ff08" }}>
+          {/* Synthesis */}
+          {run.synthesis && (
+            <div className="mt-3 rounded-lg p-3" style={{ background: "#060b14", border: "1px solid #a855f720" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#a855f7" }}>
+                  Synthesis
+                </span>
+              </div>
+              <pre
+                className="text-[10px] font-mono leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto"
+                style={{ color: "#c8d6e5" }}
+              >
+                {run.synthesis}
+              </pre>
+            </div>
+          )}
+
+          {/* Task list -- lazy loaded */}
+          {tasks ? (
+            tasks.length > 0 ? (
+              <div className="mt-3 space-y-1.5">
+                {tasks.map((task) => {
+                  const tsc = statusColors[task.status] ?? "#4a6a8a";
+                  return <HistoryTaskRow key={task.id} task={task} color={tsc} />;
+                })}
+              </div>
+            ) : (
+              <div className="mt-3 text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+                No tasks recorded
+              </div>
+            )
+          ) : (
+            <div className="mt-3 flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#00f0ff44" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+                Loading tasks...
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ============================================================
+// Memoized task row
+// ============================================================
 
 const HistoryTaskRow = React.memo(function HistoryTaskRow({
   task,
@@ -260,7 +290,7 @@ const HistoryTaskRow = React.memo(function HistoryTaskRow({
         onClick={() => setShowOutput((p) => !p)}
         className="w-full px-3 py-2 flex items-center gap-2 text-left"
       >
-        <div className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+        <div className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
         <span className="text-[10px] font-mono" style={{ color: "#c8d6e5" }}>
           {task.task_id}
         </span>
@@ -277,18 +307,18 @@ const HistoryTaskRow = React.memo(function HistoryTaskRow({
           </span>
         )}
         {showOutput ? (
-          <ChevronDown className="h-2.5 w-2.5" style={{ color: "#4a6a8a" }} />
+          <ChevronDown className="h-2.5 w-2.5 shrink-0" style={{ color: "#4a6a8a" }} />
         ) : (
-          <ChevronRight className="h-2.5 w-2.5" style={{ color: "#4a6a8a" }} />
+          <ChevronRight className="h-2.5 w-2.5 shrink-0" style={{ color: "#4a6a8a" }} />
         )}
       </button>
-      {showOutput && task.output && (
+      {showOutput && (
         <div className="px-3 pb-2">
           <pre
             className="p-2 rounded text-[9px] font-mono leading-relaxed overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap"
             style={{ background: "#05080f", color: "#4a6a8a" }}
           >
-            {task.output}
+            {task.output || "(no output)"}
           </pre>
         </div>
       )}

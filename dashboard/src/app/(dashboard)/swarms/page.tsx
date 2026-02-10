@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Network, Plus, Activity, Clock } from "lucide-react";
+import React, { useState, useCallback, useEffect } from "react";
+import { Network, Plus, Activity, Clock, Loader2 } from "lucide-react";
 import { SwarmCreate } from "@/components/SwarmCreate";
 import { SwarmActiveRuns } from "@/components/SwarmActiveRuns";
 import { SwarmHistory } from "@/components/SwarmHistory";
@@ -9,20 +9,44 @@ import { useSwarmRuns } from "@/hooks/useSwarmRuns";
 
 type Tab = "create" | "active" | "history";
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "create", label: "Create", icon: <Plus className="h-3.5 w-3.5" /> },
-  { id: "active", label: "Active", icon: <Activity className="h-3.5 w-3.5" /> },
-  { id: "history", label: "History", icon: <Clock className="h-3.5 w-3.5" /> },
+const tabs: { id: Tab; label: string; icon: React.ReactNode; shortcut: string }[] = [
+  { id: "create", label: "Create", icon: <Plus className="h-3.5 w-3.5" />, shortcut: "1" },
+  { id: "active", label: "Active", icon: <Activity className="h-3.5 w-3.5" />, shortcut: "2" },
+  { id: "history", label: "History", icon: <Clock className="h-3.5 w-3.5" />, shortcut: "3" },
 ];
 
 export default function SwarmsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("create");
-  const { activeRuns, historyRuns, taskMap, fetchTasks, refetch } = useSwarmRuns();
+  const { activeRuns, historyRuns, taskMap, fetchTasks, refetch, loading } = useSwarmRuns();
 
   const handleCreated = useCallback(() => {
     setActiveTab("active");
     refetch();
   }, [refetch]);
+
+  // Auto-switch to Active tab when new runs appear
+  useEffect(() => {
+    if (activeRuns.length > 0 && activeTab === "create") {
+      setActiveTab("active");
+    }
+  }, [activeRuns.length, activeTab]);
+
+  // Keyboard shortcuts: 1/2/3 to switch tabs (when not in an input)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input/textarea/select
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const tab = tabs.find((t) => t.shortcut === e.key);
+      if (tab) {
+        e.preventDefault();
+        setActiveTab(tab.id);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -49,7 +73,8 @@ export default function SwarmsPage() {
         {/* Active badge */}
         {activeRuns.length > 0 && (
           <div
-            className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg"
+            className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer"
+            onClick={() => setActiveTab("active")}
             style={{ background: "#00f0ff08", border: "1px solid #00f0ff20" }}
           >
             <div
@@ -110,6 +135,9 @@ export default function SwarmsPage() {
                   {badge}
                 </span>
               )}
+              <span className="text-[8px] opacity-30 hidden sm:inline">
+                {tab.shortcut}
+              </span>
             </button>
           );
         })}
@@ -117,12 +145,23 @@ export default function SwarmsPage() {
 
       {/* Tab Content */}
       <div>
-        {activeTab === "create" && <SwarmCreate onCreated={handleCreated} />}
-        {activeTab === "active" && (
-          <SwarmActiveRuns runs={activeRuns} taskMap={taskMap} fetchTasks={fetchTasks} />
-        )}
-        {activeTab === "history" && (
-          <SwarmHistory runs={historyRuns} taskMap={taskMap} fetchTasks={fetchTasks} />
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00f0ff44" }} />
+            <p className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+              Loading swarm data...
+            </p>
+          </div>
+        ) : (
+          <>
+            {activeTab === "create" && <SwarmCreate onCreated={handleCreated} />}
+            {activeTab === "active" && (
+              <SwarmActiveRuns runs={activeRuns} taskMap={taskMap} fetchTasks={fetchTasks} />
+            )}
+            {activeTab === "history" && (
+              <SwarmHistory runs={historyRuns} taskMap={taskMap} fetchTasks={fetchTasks} />
+            )}
+          </>
         )}
       </div>
     </div>

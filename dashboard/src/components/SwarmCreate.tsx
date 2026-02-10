@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   Zap,
   ArrowRight,
@@ -11,6 +11,7 @@ import {
   Brain,
   FileJson,
   Play,
+  CheckCircle,
 } from "lucide-react";
 import { KNOWN_AGENTS, type SwarmMode, type SwarmTemplate, type SwarmManifestTask } from "@/lib/types";
 
@@ -35,6 +36,8 @@ const modeConfig: Record<SwarmMode, { icon: React.ReactNode; label: string; desc
   },
 };
 
+const INITIAL_TASK: SwarmManifestTask = { id: "task-1", agent: "main", message: "" };
+
 interface Props {
   onCreated?: () => void;
 }
@@ -46,33 +49,63 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
   const [creating, setCreating] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Custom builder state
   const [mode, setMode] = useState<SwarmMode>("parallel");
   const [name, setName] = useState("");
-  const [tasks, setTasks] = useState<SwarmManifestTask[]>([
-    { id: "task-1", agent: "main", message: "" },
-  ]);
+  const [tasks, setTasks] = useState<SwarmManifestTask[]>([{ ...INITIAL_TASK }]);
   const [collabTask, setCollabTask] = useState("");
   const [collabAgents, setCollabAgents] = useState<string[]>(["main"]);
   const [synthesizeAgent, setSynthesizeAgent] = useState("main");
   const [synthesize, setSynthesize] = useState(true);
 
-  // Fetch templates
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const templatesCacheRef = useRef<SwarmTemplate[] | null>(null);
+
+  // Fetch templates (cached)
   useEffect(() => {
+    if (templatesCacheRef.current) {
+      setTemplates(templatesCacheRef.current);
+      setLoadingTemplates(false);
+      return;
+    }
     fetch("/api/swarms/templates")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setTemplates(data);
+        if (Array.isArray(data)) {
+          templatesCacheRef.current = data;
+          setTemplates(data);
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingTemplates(false));
+  }, []);
+
+  // Clear success after timeout
+  const showSuccess = useCallback((msg: string) => {
+    setSuccess(msg);
+    setError(null);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setSuccess(null), 4000);
+  }, []);
+
+  // Reset form to initial state
+  const resetForm = useCallback(() => {
+    setName("");
+    setTasks([{ ...INITIAL_TASK }]);
+    setCollabTask("");
+    setCollabAgents(["main"]);
+    setSynthesizeAgent("main");
+    setSynthesize(true);
+    setMode("parallel");
   }, []);
 
   const createSwarm = useCallback(
     async (swarmName: string, swarmMode: SwarmMode, manifest: Record<string, unknown>) => {
       setCreating(true);
       setError(null);
+      setSuccess(null);
       try {
         const res = await fetch("/api/swarms", {
           method: "POST",
@@ -83,6 +116,8 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
           const data = await res.json();
           throw new Error(data.error || "Failed to create swarm");
         }
+        showSuccess(`Swarm "${swarmName}" launched`);
+        resetForm();
         onCreated?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Unknown error");
@@ -90,7 +125,7 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
         setCreating(false);
       }
     },
-    [onCreated]
+    [onCreated, showSuccess, resetForm]
   );
 
   const handleTemplateClick = useCallback(
@@ -131,6 +166,7 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
   const handleLetMainDecide = useCallback(async () => {
     setDeciding(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch("/api/commands", {
         method: "POST",
@@ -138,16 +174,17 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
         body: JSON.stringify({
           agent_id: "main",
           message:
-            "Analyze the current system state and create a swarm if useful. Respond with a JSON block in your output: {\"__swarm__\": {manifest}} where manifest follows the swarm.sh format.",
+            'Analyze the current system state and create a swarm if useful. Respond with a JSON block in your output: {"__swarm__": {manifest}} where manifest follows the swarm.sh format.',
         }),
       });
       if (!res.ok) throw new Error("Failed to send command to main agent");
+      showSuccess("Command sent to main agent -- check Active tab for results");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setDeciding(false);
     }
-  }, []);
+  }, [showSuccess]);
 
   const addTask = useCallback(() => {
     setTasks((prev) => [
@@ -171,11 +208,15 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
 
   const toggleCollabAgent = useCallback((agentId: string) => {
     setCollabAgents((prev) =>
-      prev.includes(agentId)
-        ? prev.filter((a) => a !== agentId)
-        : [...prev, agentId]
+      prev.includes(agentId) ? prev.filter((a) => a !== agentId) : [...prev, agentId]
     );
   }, []);
+
+  // Memoize agent options to avoid re-render on every keystroke
+  const agentOptions = useMemo(
+    () => KNOWN_AGENTS.map((a) => <option key={a.id} value={a.id}>{a.id}</option>),
+    []
+  );
 
   return (
     <div className="space-y-6">
@@ -207,7 +248,7 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
       <button
         onClick={handleLetMainDecide}
         disabled={deciding}
-        className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-lg text-[11px] font-mono uppercase tracking-wider transition-all"
+        className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-lg text-[11px] font-mono uppercase tracking-wider transition-all disabled:opacity-50"
         style={{
           background: "linear-gradient(135deg, #a855f715, #a855f708)",
           border: "1px solid #a855f740",
@@ -221,6 +262,16 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
         )}
         {deciding ? "Main Agent is analyzing..." : "Let Main Agent Decide"}
       </button>
+
+      {/* Success */}
+      {success && (
+        <div className="rounded border px-3 py-2 flex items-center gap-2" style={{ borderColor: "#39ff1425", background: "#39ff1408" }}>
+          <CheckCircle className="h-3.5 w-3.5 shrink-0" style={{ color: "#39ff14" }} />
+          <p className="text-[10px] font-mono" style={{ color: "#39ff14" }}>
+            {success}
+          </p>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -241,42 +292,20 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
           ) : templates.length === 0 ? (
             <div className="col-span-full text-center py-8">
               <p className="text-[11px] font-mono" style={{ color: "#4a6a8a" }}>
-                No templates found
+                No templates found in templates/swarms/
               </p>
             </div>
           ) : (
             templates.map((template) => {
               const mc = modeConfig[template.mode];
               return (
-                <button
+                <TemplateCard
                   key={template.filename}
-                  onClick={() => handleTemplateClick(template)}
+                  template={template}
+                  mc={mc}
                   disabled={creating}
-                  className="cyber-card rounded-lg p-5 text-left transition-all duration-200 hover:scale-[1.02] disabled:opacity-50"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className="p-2 rounded"
-                      style={{ background: `${mc.color}12`, border: `1px solid ${mc.color}30` }}
-                    >
-                      <span style={{ color: mc.color }}>{mc.icon}</span>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-mono font-bold" style={{ color: "#c8d6e5" }}>
-                        {template.name}
-                      </h3>
-                      <span
-                        className="text-[9px] font-mono uppercase tracking-wider"
-                        style={{ color: mc.color }}
-                      >
-                        {mc.label}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-mono leading-relaxed" style={{ color: "#4a6a8a" }}>
-                    {template.description}
-                  </p>
-                </button>
+                  onClick={handleTemplateClick}
+                />
               );
             })
           )}
@@ -380,11 +409,7 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
                   onChange={(e) => setSynthesizeAgent(e.target.value)}
                   className="w-full px-3 py-2.5 rounded text-sm font-mono cyber-input"
                 >
-                  {KNOWN_AGENTS.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.id}
-                    </option>
-                  ))}
+                  {agentOptions}
                 </select>
               </div>
             </div>
@@ -408,61 +433,16 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
 
               <div className="space-y-3">
                 {tasks.map((task, i) => (
-                  <div
+                  <TaskEditor
                     key={i}
-                    className="cyber-card rounded-lg p-4 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded"
-                          style={{ background: "#00f0ff10", border: "1px solid #00f0ff20", color: "#00f0ff" }}
-                        >
-                          {mode === "pipeline" ? `Step ${i + 1}` : `Task ${i + 1}`}
-                        </span>
-                        <input
-                          type="text"
-                          value={task.id}
-                          onChange={(e) => updateTask(i, "id", e.target.value)}
-                          className="px-2 py-1 rounded text-[10px] font-mono cyber-input w-28"
-                          placeholder="task-id"
-                        />
-                      </div>
-                      {tasks.length > 1 && (
-                        <button
-                          onClick={() => removeTask(i)}
-                          className="p-1 rounded hover:bg-red-900/20"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" style={{ color: "#ff2d5e" }} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <label className="text-[9px] font-mono shrink-0" style={{ color: "#4a6a8a" }}>
-                        AGENT:
-                      </label>
-                      <select
-                        value={task.agent}
-                        onChange={(e) => updateTask(i, "agent", e.target.value)}
-                        className="flex-1 px-2 py-1.5 rounded text-[10px] font-mono cyber-input"
-                      >
-                        {KNOWN_AGENTS.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.id}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <textarea
-                      value={task.message}
-                      onChange={(e) => updateTask(i, "message", e.target.value)}
-                      placeholder={`// ${mode === "pipeline" ? `step ${i + 1}` : "task"} instructions...`}
-                      rows={2}
-                      className="w-full rounded p-2.5 font-mono text-[11px] resize-none cyber-input"
-                    />
-                  </div>
+                    index={i}
+                    task={task}
+                    mode={mode}
+                    canRemove={tasks.length > 1}
+                    agentOptions={agentOptions}
+                    onUpdate={updateTask}
+                    onRemove={removeTask}
+                  />
                 ))}
               </div>
 
@@ -494,11 +474,7 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
                     onChange={(e) => setSynthesizeAgent(e.target.value)}
                     className="px-2 py-1 rounded text-[10px] font-mono cyber-input"
                   >
-                    {KNOWN_AGENTS.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.id}
-                      </option>
-                    ))}
+                    {agentOptions}
                   </select>
                 )}
               </div>
@@ -520,6 +496,114 @@ export const SwarmCreate = React.memo(function SwarmCreate({ onCreated }: Props)
           </button>
         </div>
       )}
+    </div>
+  );
+});
+
+// ============================================================
+// Extracted memoized sub-components
+// ============================================================
+
+const TemplateCard = React.memo(function TemplateCard({
+  template,
+  mc,
+  disabled,
+  onClick,
+}: {
+  template: SwarmTemplate;
+  mc: { icon: React.ReactNode; label: string; color: string };
+  disabled: boolean;
+  onClick: (t: SwarmTemplate) => void;
+}) {
+  return (
+    <button
+      onClick={() => onClick(template)}
+      disabled={disabled}
+      className="cyber-card rounded-lg p-5 text-left transition-all duration-200 hover:scale-[1.02] disabled:opacity-50"
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="p-2 rounded"
+          style={{ background: `${mc.color}12`, border: `1px solid ${mc.color}30` }}
+        >
+          <span style={{ color: mc.color }}>{mc.icon}</span>
+        </div>
+        <div>
+          <h3 className="text-sm font-mono font-bold" style={{ color: "#c8d6e5" }}>
+            {template.name}
+          </h3>
+          <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: mc.color }}>
+            {mc.label}
+          </span>
+        </div>
+      </div>
+      <p className="text-[10px] font-mono leading-relaxed" style={{ color: "#4a6a8a" }}>
+        {template.description}
+      </p>
+    </button>
+  );
+});
+
+const TaskEditor = React.memo(function TaskEditor({
+  index,
+  task,
+  mode,
+  canRemove,
+  agentOptions,
+  onUpdate,
+  onRemove,
+}: {
+  index: number;
+  task: SwarmManifestTask;
+  mode: SwarmMode;
+  canRemove: boolean;
+  agentOptions: React.ReactNode;
+  onUpdate: (i: number, field: keyof SwarmManifestTask, value: string) => void;
+  onRemove: (i: number) => void;
+}) {
+  return (
+    <div className="cyber-card rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span
+            className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded"
+            style={{ background: "#00f0ff10", border: "1px solid #00f0ff20", color: "#00f0ff" }}
+          >
+            {mode === "pipeline" ? `Step ${index + 1}` : `Task ${index + 1}`}
+          </span>
+          <input
+            type="text"
+            value={task.id}
+            onChange={(e) => onUpdate(index, "id", e.target.value)}
+            className="px-2 py-1 rounded text-[10px] font-mono cyber-input w-28"
+            placeholder="task-id"
+          />
+        </div>
+        {canRemove && (
+          <button onClick={() => onRemove(index)} className="p-1 rounded hover:bg-red-900/20">
+            <Trash2 className="h-3.5 w-3.5" style={{ color: "#ff2d5e" }} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-[9px] font-mono shrink-0" style={{ color: "#4a6a8a" }}>AGENT:</label>
+        <select
+          value={task.agent}
+          onChange={(e) => onUpdate(index, "agent", e.target.value)}
+          className="flex-1 px-2 py-1.5 rounded text-[10px] font-mono cyber-input"
+        >
+          {agentOptions}
+        </select>
+      </div>
+
+      <textarea
+        value={task.message}
+        onChange={(e) => onUpdate(index, "message", e.target.value)}
+        placeholder={`// ${mode === "pipeline" ? `step ${index + 1}` : "task"} instructions...`}
+        rows={2}
+        className="w-full rounded p-2.5 font-mono text-[11px] resize-none cyber-input"
+      />
     </div>
   );
 });
