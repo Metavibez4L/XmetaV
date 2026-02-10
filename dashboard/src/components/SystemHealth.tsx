@@ -1,9 +1,10 @@
 "use client";
 
+import React from "react";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { Server } from "lucide-react";
 
-export function SystemHealth() {
+export const SystemHealth = React.memo(function SystemHealth() {
   const { session, isOnline } = useBridgeStatus();
 
   const lastSeen = session
@@ -65,4 +66,4 @@ export function SystemHealth() {
       </div>
     </div>
   );
-}
+});

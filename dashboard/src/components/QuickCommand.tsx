@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Send, ChevronRight } from "lucide-react";
 
-export function QuickCommand() {
+export const QuickCommand = React.memo(function QuickCommand() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || sending) return;
 
@@ -28,7 +28,7 @@ export function QuickCommand() {
     } finally {
       setSending(false);
     }
-  }
+  }, [input, sending, router]);
 
   return (
     <form onSubmit={handleSubmit} className="flex gap-2 items-center">
@@ -54,4 +54,4 @@ export function QuickCommand() {
       </button>
     </form>
   );
-}
+});

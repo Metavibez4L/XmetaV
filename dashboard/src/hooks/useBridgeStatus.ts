@@ -1,46 +1,78 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { AgentSession } from "@/lib/types";
+
+const HEARTBEAT_TIMEOUT_MS = 60_000;
+const POLL_INTERVAL_MS = 15_000;
 
 /**
  * Monitor the bridge daemon's heartbeat. Returns the latest session
  * and whether the bridge is considered "online" (heartbeat within 60s).
+ *
+ * Optimizations:
+ * - Singleton supabase client
+ * - Stable fetchLatest callback
+ * - Visibility-aware polling (pauses when tab is hidden)
+ * - Proper cleanup
  */
 export function useBridgeStatus() {
   const [session, setSession] = useState<AgentSession | null>(null);
   const [isOnline, setIsOnline] = useState(false);
-  const supabaseRef = useRef(createClient());
+  const supabase = useMemo(() => createClient(), []);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const processSession = useCallback((data: AgentSession | null) => {
+    if (data) {
+      setSession(data);
+      const lastBeat = new Date(data.last_heartbeat).getTime();
+      setIsOnline(Date.now() - lastBeat < HEARTBEAT_TIMEOUT_MS);
+    } else {
+      setSession(null);
+      setIsOnline(false);
+    }
+  }, []);
+
+  const fetchLatest = useCallback(async () => {
+    const { data } = await supabase
+      .from("agent_sessions")
+      .select("*")
+      .eq("agent_id", "bridge")
+      .order("last_heartbeat", { ascending: false })
+      .limit(1)
+      .single();
+
+    processSession(data);
+  }, [supabase, processSession]);
 
   useEffect(() => {
-    const supabase = supabaseRef.current;
+    fetchLatest();
 
-    const fetchLatest = async () => {
-      const { data } = await supabase
-        .from("agent_sessions")
-        .select("*")
-        .eq("agent_id", "bridge")
-        .order("last_heartbeat", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (data) {
-        setSession(data);
-        const lastBeat = new Date(data.last_heartbeat).getTime();
-        setIsOnline(Date.now() - lastBeat < 60_000);
+    // Visibility-aware polling: stop when tab is hidden
+    const startPolling = () => {
+      if (intervalRef.current) return;
+      intervalRef.current = setInterval(fetchLatest, POLL_INTERVAL_MS);
+    };
+    const stopPolling = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
       } else {
-        setSession(null);
-        setIsOnline(false);
+        fetchLatest(); // immediate refresh on tab focus
+        startPolling();
       }
     };
 
-    fetchLatest();
+    startPolling();
+    document.addEventListener("visibilitychange", handleVisibility);
 
-    // Poll every 15s
-    const interval = setInterval(fetchLatest, 15_000);
-
-    // Also subscribe to realtime changes
+    // Realtime subscription
     const channel = supabase
       .channel("bridge-heartbeat")
       .on(
@@ -52,19 +84,17 @@ export function useBridgeStatus() {
           filter: "agent_id=eq.bridge",
         },
         (payload) => {
-          const row = payload.new as AgentSession;
-          setSession(row);
-          const lastBeat = new Date(row.last_heartbeat).getTime();
-          setIsOnline(Date.now() - lastBeat < 60_000);
+          processSession(payload.new as AgentSession);
         }
       )
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibility);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchLatest, supabase, processSession]);
 
   return { session, isOnline };
 }
