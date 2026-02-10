@@ -119,6 +119,48 @@ export interface SwarmTemplate {
   manifest: SwarmManifest;
 }
 
+// ============================================================
+// Intent Layer types (Cursor Cloud Agents as reasoning layer)
+// ============================================================
+
+export type IntentSessionStatus =
+  | "THINKING"
+  | "READY"
+  | "EXECUTING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
+
+/** A single generated command from the intent layer */
+export interface IntentCommand {
+  agent: string;
+  message: string;
+  description: string;
+}
+
+/** Row in the intent_sessions table */
+export interface IntentSession {
+  id: string;
+  cursor_agent_id: string;
+  goal: string;
+  repository: string;
+  model: string | null;
+  status: IntentSessionStatus;
+  commands: IntentCommand[];
+  executed_command_ids: string[] | null;
+  conversation: IntentConversationMessage[] | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A message in the intent conversation */
+export interface IntentConversationMessage {
+  id: string;
+  type: "user_message" | "assistant_message";
+  text: string;
+}
+
 /** Known agent fleet (matches OpenClaw config) */
 export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
   {

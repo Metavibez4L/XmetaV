@@ -3,9 +3,11 @@ import { supabase } from "../lib/supabase.js";
 import { startHeartbeat, stopHeartbeat } from "./heartbeat.js";
 import { executeCommand } from "./executor.js";
 import { subscribeToSwarms } from "./swarm-executor.js";
+import { startIntentTracker } from "./intent-tracker.js";
 
 console.log("╔══════════════════════════════════════╗");
-console.log("║    XmetaV Bridge Daemon v1.1.0       ║");
+console.log("║    XmetaV Bridge Daemon v1.2.0       ║");
+console.log("║    + Intent Layer (Cursor API)       ║");
 console.log("╚══════════════════════════════════════╝");
 console.log("");
 
@@ -55,7 +57,10 @@ processPendingCommands();
 // Subscribe to swarm runs
 const swarmChannel = subscribeToSwarms();
 
-console.log("[bridge] Listening for commands & swarm runs...");
+// Start intent session tracker
+const intentChannel = startIntentTracker();
+
+console.log("[bridge] Listening for commands, swarm runs & intent sessions...");
 console.log("[bridge] Press Ctrl+C to stop");
 
 // Graceful shutdown
@@ -64,6 +69,7 @@ process.on("SIGINT", async () => {
   stopHeartbeat();
   supabase.removeChannel(channel);
   supabase.removeChannel(swarmChannel);
+  supabase.removeChannel(intentChannel);
 
   // Mark bridge as offline
   await supabase

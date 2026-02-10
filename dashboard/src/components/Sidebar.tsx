@@ -4,14 +4,15 @@ import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: LayoutDashboard, shortcut: "01", key: "1" },
-  { href: "/agent", label: "Agent Chat", icon: MessageSquare, shortcut: "02", key: "2" },
-  { href: "/swarms", label: "Swarms", icon: Network, shortcut: "03", key: "3" },
-  { href: "/fleet", label: "Fleet", icon: Users, shortcut: "04", key: "4" },
+  { href: "/intent", label: "Intent", icon: Zap, shortcut: "02", key: "2" },
+  { href: "/agent", label: "Agent Chat", icon: MessageSquare, shortcut: "03", key: "3" },
+  { href: "/swarms", label: "Swarms", icon: Network, shortcut: "04", key: "4" },
+  { href: "/fleet", label: "Fleet", icon: Users, shortcut: "05", key: "5" },
 ];
 
 interface SidebarProps {

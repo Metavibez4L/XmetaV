@@ -17,6 +17,12 @@ interface SwarmManifestTask {
   message: string;
   depends_on?: string;
   timeout?: number;
+  /** Task type: "openclaw" (default) or "intent" (uses Cursor API to generate commands first) */
+  type?: "openclaw" | "intent";
+  /** For intent tasks: target GitHub repo */
+  repo?: string;
+  /** For intent tasks: auto-execute generated commands */
+  auto_execute?: boolean;
 }
 
 interface SwarmManifest {
@@ -170,7 +176,9 @@ async function executeParallel(runId: string, manifest: SwarmManifest) {
     await Promise.all(
       chunk.map(async (taskRow) => {
         const taskDef = tasks.find((t) => t.id === taskRow.task_id);
-        const result = await executeTask(runId, taskRow, taskDef?.message ?? taskRow.message, taskDef?.timeout);
+        const result = taskDef?.type === "intent"
+          ? await executeIntentTask(runId, taskRow, taskDef?.message ?? taskRow.message, taskDef?.repo, taskDef?.auto_execute)
+          : await executeTask(runId, taskRow, taskDef?.message ?? taskRow.message, taskDef?.timeout);
         results.set(taskRow.task_id, result);
       })
     );
@@ -220,7 +228,9 @@ async function executePipeline(runId: string, manifest: SwarmManifest) {
       message = `[Context from previous step "${tasks[i - 1].id}"]:\n${previousOutput}\n\n[Your task]:\n${message}`;
     }
 
-    const result = await executeTask(runId, taskRow, message, taskDef.timeout);
+    const result = taskDef.type === "intent"
+      ? await executeIntentTask(runId, taskRow, message, taskDef.repo, taskDef.auto_execute)
+      : await executeTask(runId, taskRow, message, taskDef.timeout);
     previousOutput = result.output;
 
     if (manifest.on_failure === "stop" && result.exitCode !== 0 && result.exitCode !== null) {
@@ -428,6 +438,156 @@ async function executeTask(
       finish(1);
     }
   });
+}
+
+/**
+ * Execute an intent task: use Cursor Cloud Agent to generate commands,
+ * then optionally auto-execute them via OpenClaw.
+ */
+async function executeIntentTask(
+  runId: string,
+  taskRow: SwarmTaskRow,
+  message: string,
+  repo?: string,
+  autoExecute?: boolean
+): Promise<{ output: string; exitCode: number | null }> {
+  const apiKey = process.env.CURSOR_API_KEY;
+  if (!apiKey) {
+    const err = "[Bridge] CURSOR_API_KEY not configured. Cannot run intent task.";
+    console.error(`[swarm] ${err}`);
+    await supabase.from("swarm_tasks").update({
+      status: "failed",
+      output: err,
+      completed_at: new Date().toISOString(),
+    }).eq("id", taskRow.id);
+    return { output: err, exitCode: 1 };
+  }
+
+  await supabase.from("swarm_tasks").update({
+    status: "running",
+    started_at: new Date().toISOString(),
+  }).eq("id", taskRow.id);
+
+  try {
+    // Dynamic import of the Cursor client
+    const mod = await import("../lib/cursor-client.js");
+    const CursorClient = mod.CursorClient;
+    const cursor = new CursorClient(apiKey);
+
+    const intentPrompt = `You are the Intent Layer for the XmetaV agent orchestration system.
+Available agents: main, basedintern, akua.
+Output ONLY a JSON array of command objects: [{"agent": "...", "message": "...", "description": "..."}]
+
+Goal: ${message}`;
+
+    // Launch Cursor agent
+    const agent = await cursor.launchAgent({
+      prompt: { text: intentPrompt },
+      source: {
+        repository: repo || "https://github.com/Metavibez4L/XmetaV",
+        ref: "dev",
+      },
+    });
+
+    let output = `[Intent] Launched Cursor agent ${agent.id}\n`;
+    await supabase.from("swarm_tasks").update({ output }).eq("id", taskRow.id);
+
+    // Poll until finished
+    const maxWait = 120_000; // 2 min
+    const pollInterval = 5_000;
+    const start = Date.now();
+
+    while (Date.now() - start < maxWait) {
+      if (await isCancelled(runId)) {
+        try { await cursor.stopAgent(agent.id); } catch { /* */ }
+        output += "[Intent] Cancelled\n";
+        await supabase.from("swarm_tasks").update({ status: "skipped", output }).eq("id", taskRow.id);
+        return { output, exitCode: null };
+      }
+
+      const status = await cursor.getStatus(agent.id);
+      if (status.status === "FINISHED") {
+        const convo = await cursor.getConversation(agent.id);
+        // Find the last assistant message with JSON
+        let commands: { agent: string; message: string; description: string }[] = [];
+        for (let i = convo.messages.length - 1; i >= 0; i--) {
+          if (convo.messages[i].type === "assistant_message") {
+            try {
+              const text = convo.messages[i].text.trim();
+              const match = text.match(/\[[\s\S]*\]/);
+              if (match) commands = JSON.parse(match[0]);
+              else commands = JSON.parse(text);
+              break;
+            } catch { /* try previous message */ }
+          }
+        }
+
+        output += `[Intent] Generated ${commands.length} commands:\n`;
+        commands.forEach((c, i) => {
+          output += `  ${i + 1}. [${c.agent}] ${c.description || c.message}\n`;
+        });
+
+        if (autoExecute && commands.length > 0) {
+          output += "\n[Intent] Auto-executing commands...\n";
+          for (const cmd of commands) {
+            output += `\n--- Executing: [${cmd.agent}] ${cmd.message} ---\n`;
+            await supabase.from("swarm_tasks").update({ output }).eq("id", taskRow.id);
+
+            // Execute via OpenClaw
+            const result = await executeTask(runId, {
+              ...taskRow,
+              agent_id: cmd.agent,
+              task_id: `intent-${cmd.agent}`,
+            }, cmd.message, 120);
+            output += result.output + "\n";
+          }
+        }
+
+        await supabase.from("swarm_tasks").update({
+          status: "completed",
+          output,
+          exit_code: 0,
+          completed_at: new Date().toISOString(),
+        }).eq("id", taskRow.id);
+
+        return { output, exitCode: 0 };
+      }
+
+      if (status.status === "STOPPED" || status.status === "FAILED") {
+        output += `[Intent] Cursor agent ${status.status}\n`;
+        await supabase.from("swarm_tasks").update({
+          status: "failed",
+          output,
+          exit_code: 1,
+          completed_at: new Date().toISOString(),
+        }).eq("id", taskRow.id);
+        return { output, exitCode: 1 };
+      }
+
+      await new Promise((r) => setTimeout(r, pollInterval));
+    }
+
+    // Timeout
+    output += "[Intent] Timed out waiting for Cursor agent\n";
+    try { await cursor.stopAgent(agent.id); } catch { /* */ }
+    await supabase.from("swarm_tasks").update({
+      status: "failed",
+      output,
+      exit_code: 124,
+      completed_at: new Date().toISOString(),
+    }).eq("id", taskRow.id);
+    return { output, exitCode: 124 };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const output = `[Intent Error] ${errMsg}\n`;
+    await supabase.from("swarm_tasks").update({
+      status: "failed",
+      output,
+      exit_code: 1,
+      completed_at: new Date().toISOString(),
+    }).eq("id", taskRow.id);
+    return { output, exitCode: 1 };
+  }
 }
 
 function killRunChildren(runId: string) {

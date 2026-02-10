@@ -1,0 +1,343 @@
+"use client";
+
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import {
+  Zap,
+  Send,
+  Loader2,
+  ChevronDown,
+  MessageSquare,
+  StopCircle,
+  GitBranch,
+} from "lucide-react";
+import type { IntentSession, IntentConversationMessage } from "@/lib/types";
+
+interface Props {
+  session: IntentSession | null;
+  loading: boolean;
+  error: string | null;
+  onSubmitGoal: (goal: string, repository?: string, model?: string) => void;
+  onFollowup: (message: string) => void;
+  onStop: () => void;
+}
+
+export const IntentChat = React.memo(function IntentChat({
+  session,
+  loading,
+  error,
+  onSubmitGoal,
+  onFollowup,
+  onStop,
+}: Props) {
+  const [goal, setGoal] = useState("");
+  const [followup, setFollowup] = useState("");
+  const [selectedModel, setSelectedModel] = useState("auto");
+  const [selectedRepo, setSelectedRepo] = useState("https://github.com/Metavibez4L/XmetaV");
+  const [models, setModels] = useState<string[]>([]);
+  const [repos, setRepos] = useState<{ owner: string; name: string; repository: string }[]>([]);
+  const [showConfig, setShowConfig] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch models and repos on mount
+  useEffect(() => {
+    fetch("/api/cursor/models")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.models) setModels(d.models);
+      })
+      .catch(() => {});
+    fetch("/api/cursor/repos")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.repositories) setRepos(d.repositories);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Auto-scroll conversation
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [session?.conversation]);
+
+  const handleSubmitGoal = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!goal.trim() || loading) return;
+      onSubmitGoal(
+        goal.trim(),
+        selectedRepo || undefined,
+        selectedModel === "auto" ? undefined : selectedModel
+      );
+      setShowConfig(false);
+    },
+    [goal, loading, onSubmitGoal, selectedRepo, selectedModel]
+  );
+
+  const handleFollowup = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!followup.trim() || loading) return;
+      onFollowup(followup.trim());
+      setFollowup("");
+    },
+    [followup, loading, onFollowup]
+  );
+
+  const conversation = useMemo(
+    () => session?.conversation ?? [],
+    [session?.conversation]
+  );
+
+  const isThinking = session?.status === "THINKING";
+  const hasSession = !!session;
+  const sc = {
+    neon: "#00f0ff",
+    dimText: "#4a6a8a",
+    bg: "#0a0e1a",
+    cardBg: "#0d1117",
+    border: "#00f0ff15",
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Config panel (visible before session starts) */}
+      {showConfig && !hasSession && (
+        <div className="space-y-3 mb-4">
+          {/* Model selector */}
+          <div>
+            <label
+              className="block text-[9px] font-mono uppercase tracking-wider mb-1.5"
+              style={{ color: sc.dimText }}
+            >
+              Model
+            </label>
+            <div className="relative">
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full px-3 py-2 rounded text-[11px] font-mono appearance-none cursor-pointer"
+                style={{
+                  background: sc.cardBg,
+                  border: `1px solid ${sc.border}`,
+                  color: sc.neon,
+                }}
+              >
+                <option value="auto">Auto (recommended)</option>
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
+                style={{ color: sc.dimText }}
+              />
+            </div>
+          </div>
+
+          {/* Repo selector */}
+          <div>
+            <label
+              className="block text-[9px] font-mono uppercase tracking-wider mb-1.5"
+              style={{ color: sc.dimText }}
+            >
+              <GitBranch className="inline h-3 w-3 mr-1" />
+              Repository Context
+            </label>
+            <div className="relative">
+              <select
+                value={selectedRepo}
+                onChange={(e) => setSelectedRepo(e.target.value)}
+                className="w-full px-3 py-2 rounded text-[11px] font-mono appearance-none cursor-pointer"
+                style={{
+                  background: sc.cardBg,
+                  border: `1px solid ${sc.border}`,
+                  color: "#fff",
+                }}
+              >
+                <option value="https://github.com/Metavibez4L/XmetaV">
+                  Metavibez4L/XmetaV
+                </option>
+                {repos
+                  .filter((r) => r.repository !== "https://github.com/Metavibez4L/XmetaV")
+                  .map((r) => (
+                    <option key={r.repository} value={r.repository}>
+                      {r.owner}/{r.name}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
+                style={{ color: sc.dimText }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conversation */}
+      {hasSession && (
+        <div
+          className="flex-1 overflow-y-auto space-y-3 mb-4 pr-1"
+          style={{ maxHeight: "calc(100vh - 420px)" }}
+        >
+          {/* Goal message */}
+          <div className="flex justify-end">
+            <div
+              className="max-w-[85%] px-3 py-2 rounded-lg text-[11px] font-mono"
+              style={{ background: "#00f0ff12", border: `1px solid ${sc.border}`, color: "#fff" }}
+            >
+              {session.goal}
+            </div>
+          </div>
+
+          {/* Conversation messages */}
+          {conversation.map((msg: IntentConversationMessage, i: number) => (
+            <ConversationBubble key={msg.id || i} msg={msg} sc={sc} />
+          ))}
+
+          {/* Thinking indicator */}
+          {isThinking && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Loader2
+                className="h-3.5 w-3.5 animate-spin"
+                style={{ color: sc.neon }}
+              />
+              <span className="text-[10px] font-mono" style={{ color: sc.dimText }}>
+                Cursor is thinking...
+              </span>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div
+          className="px-3 py-2 rounded text-[10px] font-mono mb-3"
+          style={{ background: "#ff000015", border: "1px solid #ff000030", color: "#ff6b6b" }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Input area */}
+      {!hasSession ? (
+        <form onSubmit={handleSubmitGoal} className="mt-auto">
+          <div className="relative">
+            <textarea
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmitGoal(e);
+                }
+              }}
+              placeholder="Describe your high-level goal..."
+              rows={3}
+              className="w-full px-4 py-3 pr-12 rounded-lg text-[12px] font-mono resize-none placeholder:opacity-30"
+              style={{
+                background: sc.cardBg,
+                border: `1px solid ${sc.border}`,
+                color: "#fff",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!goal.trim() || loading}
+              className="absolute right-3 bottom-3 p-1.5 rounded disabled:opacity-30 transition-all"
+              style={{
+                background: goal.trim() ? `${sc.neon}20` : "transparent",
+                border: `1px solid ${goal.trim() ? sc.neon + "40" : "transparent"}`,
+              }}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" style={{ color: sc.neon }} />
+              ) : (
+                <Zap className="h-4 w-4" style={{ color: sc.neon }} />
+              )}
+            </button>
+          </div>
+          <p className="text-[8px] font-mono mt-1.5 opacity-30 text-center">
+            Cursor will analyze the repo and generate OpenClaw commands
+          </p>
+        </form>
+      ) : (
+        <div className="mt-auto space-y-2">
+          {/* Follow-up or stop */}
+          {isThinking ? (
+            <button
+              onClick={onStop}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all"
+              style={{
+                background: "#ff000012",
+                border: "1px solid #ff000030",
+                color: "#ff6b6b",
+              }}
+            >
+              <StopCircle className="h-3.5 w-3.5" />
+              Stop Thinking
+            </button>
+          ) : session.status === "READY" ? (
+            <form onSubmit={handleFollowup} className="relative">
+              <input
+                value={followup}
+                onChange={(e) => setFollowup(e.target.value)}
+                placeholder="Refine: 'also add a deploy step...'"
+                className="w-full px-4 py-2.5 pr-10 rounded text-[11px] font-mono placeholder:opacity-30"
+                style={{
+                  background: sc.cardBg,
+                  border: `1px solid ${sc.border}`,
+                  color: "#fff",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!followup.trim()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded disabled:opacity-20"
+              >
+                <Send className="h-3.5 w-3.5" style={{ color: sc.neon }} />
+              </button>
+            </form>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+});
+
+const ConversationBubble = React.memo(function ConversationBubble({
+  msg,
+  sc,
+}: {
+  msg: IntentConversationMessage;
+  sc: Record<string, string>;
+}) {
+  const isUser = msg.type === "user_message";
+  return (
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div
+        className="max-w-[85%] px-3 py-2 rounded-lg text-[10px] font-mono whitespace-pre-wrap"
+        style={{
+          background: isUser ? "#00f0ff12" : sc.cardBg,
+          border: `1px solid ${isUser ? sc.border : "#ffffff08"}`,
+          color: isUser ? "#fff" : sc.dimText,
+        }}
+      >
+        {!isUser && (
+          <div className="flex items-center gap-1.5 mb-1">
+            <MessageSquare className="h-2.5 w-2.5" style={{ color: sc.neon }} />
+            <span style={{ color: sc.neon }} className="text-[8px] uppercase tracking-wider">
+              Cursor
+            </span>
+          </div>
+        )}
+        {msg.text.length > 500 ? msg.text.slice(0, 500) + "..." : msg.text}
+      </div>
+    </div>
+  );
+});
