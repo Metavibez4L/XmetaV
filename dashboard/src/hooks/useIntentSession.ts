@@ -62,17 +62,6 @@ export function useIntentSession(sessionId: string | null) {
     }
   }, []);
 
-  const startPolling = useCallback(
-    (interval = 3000) => {
-      stopPolling();
-      pollRef.current = setInterval(() => {
-        fetchSessionInner();
-      }, interval);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
   const fetchSessionInner = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -93,6 +82,14 @@ export function useIntentSession(sessionId: string | null) {
     }
   }, [sessionId, isTerminal, stopPolling]);
 
+  const startPolling = useCallback(
+    (interval = 3000) => {
+      stopPolling();
+      pollRef.current = setInterval(fetchSessionInner, interval);
+    },
+    [stopPolling, fetchSessionInner]
+  );
+
   const fetchSession = useCallback(async () => {
     if (!sessionId) return;
     setLoading(true);
@@ -105,8 +102,11 @@ export function useIntentSession(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
 
-    // If session is already in a terminal state, just fetch once (no polling)
+    // If session is already in a terminal state, fetch once and stop polling
     if (session && isTerminal(session.status)) {
+      stopPolling();
+      // still refresh once to ensure UI has final state
+      fetchSession();
       return;
     }
 
@@ -114,11 +114,10 @@ export function useIntentSession(sessionId: string | null) {
 
     // Poll every 3s for THINKING, every 5s for EXECUTING
     const interval = session?.status === "EXECUTING" ? 5000 : 3000;
-    pollRef.current = setInterval(fetchSessionInner, interval);
+    startPolling(interval);
 
     return () => stopPolling();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, session?.status, session, isTerminal, fetchSession, startPolling, stopPolling]);
 
   const createSession = useCallback(
     async (goal: string, repository?: string, model?: string) => {

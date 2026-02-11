@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase.js";
-import { runAgent } from "../lib/openclaw.js";
+import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
 import type { ChildProcess } from "child_process";
 
@@ -79,7 +79,7 @@ export async function executeCommand(command: {
   streamer.start();
 
   try {
-    const child = runAgent({
+    const child = runAgentWithFallback({
       agentId: agent_id,
       message,
       onChunk: (text) => streamer.write(text),
