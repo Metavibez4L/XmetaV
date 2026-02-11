@@ -73,9 +73,13 @@ export function useIntentSession(sessionId: string | null) {
     setLoading(false);
   }, [sessionId]);
 
-  // Poll while THINKING
+  // Poll while THINKING -- skip if session is already in a terminal/ready state
   useEffect(() => {
     if (!sessionId) return;
+
+    // If session is already loaded and not THINKING, no need to start polling
+    if (session && session.status !== "THINKING") return;
+
     fetchSession();
 
     // Poll every 3s while THINKING
@@ -87,7 +91,8 @@ export function useIntentSession(sessionId: string | null) {
         pollRef.current = null;
       }
     };
-  }, [sessionId, fetchSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const createSession = useCallback(
     async (goal: string, repository?: string, model?: string) => {
@@ -100,9 +105,21 @@ export function useIntentSession(sessionId: string | null) {
           body: JSON.stringify({ goal, repository, model }),
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = await res.json() as IntentSession;
           setSession(data);
-          return data as IntentSession;
+
+          // If session is already READY (local Ollama), skip polling entirely
+          if (data.status === "READY") {
+            // No polling needed -- commands are already present
+            return data;
+          }
+
+          // Cursor cloud path: start polling for THINKING sessions
+          if (data.status === "THINKING" && !pollRef.current) {
+            pollRef.current = setInterval(fetchSession, 3000);
+          }
+
+          return data;
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
           setError(err.error || "Failed to create");
@@ -115,7 +132,7 @@ export function useIntentSession(sessionId: string | null) {
         setLoading(false);
       }
     },
-    []
+    [fetchSession]
   );
 
   const sendFollowup = useCallback(
