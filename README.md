@@ -34,6 +34,7 @@
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
+- **x402 Payments** — Autonomous USDC micro-payments on Base via Coinbase x402 protocol (auto-pay, gateway monetization, swarm budgets)
 - Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -596,6 +597,19 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
+| [X402-INTEGRATION.md](docs/X402-INTEGRATION.md) | **x402 Payment Protocol** — autonomous USDC micro-payments integration plan |
+
+---
+
+## x402 Payment Protocol (Coinbase)
+
+The x402 integration plan enables autonomous USDC micro-payments for the main agent on the Base network. Three integration patterns are documented:
+
+- **Pattern A: Client (Auto-Pay)** — Main agent auto-pays for 402-gated premium APIs (recommended first)
+- **Pattern B: Gateway (Monetize)** — Dashboard endpoints gated by x402 for external callers
+- **Pattern C: Budget Manager** — Orchestrator allocates USDC budgets across swarm tasks
+
+See [docs/X402-INTEGRATION.md](docs/X402-INTEGRATION.md) for the full integration plan, architecture diagrams, and implementation roadmap.
 
 ---
 
@@ -627,6 +641,14 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-11 (v8) — x402 Payment Protocol Integration Plan
+- **x402 Integration Plan** — comprehensive design document for autonomous USDC micro-payments on Base network
+- Three integration patterns: Client (Auto-Pay), Gateway (Monetize Endpoints), Budget Manager (Swarm Spend Control)
+- Updated Intent Layer system prompt with x402 awareness (agent routing for payment tasks)
+- Updated agent descriptions with x402 roles (akua=server, basedintern=client)
+- Added `docs/X402-INTEGRATION.md` with architecture diagrams, implementation roadmap, and security considerations
+- Documentation index updated with x402 reference
 
 ### 2026-02-10 (v7) — Swarm Dashboard Optimization
 - **Swarm Feature Optimized** — memoized components, visibility-aware polling, lazy-loaded task history, cancellation-aware execution

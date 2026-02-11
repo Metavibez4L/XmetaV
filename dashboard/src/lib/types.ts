@@ -172,14 +172,14 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
   },
   {
     id: "akua",
-    name: "Akua (CRE/DTA/Solidity)",
+    name: "Akua (CRE/DTA/Solidity/x402-server)",
     workspace: "/home/manifest/akua",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
   },
   {
     id: "basedintern",
-    name: "BasedIntern (Repo)",
+    name: "BasedIntern (Repo/x402-client)",
     workspace: "/home/manifest/basedintern",
     tools: "coding",
     model: "ollama/qwen2.5:7b-instruct",
