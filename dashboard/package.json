@@ -9,8 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@coinbase/x402": "^2.1.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "@x402/next": "^2.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",

@@ -4,12 +4,18 @@ import { startHeartbeat, stopHeartbeat } from "./heartbeat.js";
 import { executeCommand } from "./executor.js";
 import { subscribeToSwarms } from "./swarm-executor.js";
 import { startIntentTracker } from "./intent-tracker.js";
+import { initializeX402Client, isX402Active } from "../lib/x402-client.js";
 
 console.log("╔══════════════════════════════════════╗");
-console.log("║    XmetaV Bridge Daemon v1.2.0       ║");
+console.log("║    XmetaV Bridge Daemon v1.3.0       ║");
 console.log("║    + Intent Layer (Cursor API)       ║");
+console.log("║    + x402 Payment Protocol           ║");
 console.log("╚══════════════════════════════════════╝");
 console.log("");
+
+// Initialize x402 payment client (non-blocking — works without wallet configured)
+initializeX402Client();
+console.log(`[bridge] x402 auto-pay: ${isX402Active() ? "ACTIVE" : "DISABLED (no wallet configured)"}`);
 
 // Start heartbeat
 startHeartbeat();

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
+import { isX402Active } from "./x402-client.js";
 
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set(["main", "akua", "akua_web", "basedintern", "basedintern_web"]);
@@ -9,6 +10,42 @@ export interface OpenClawOptions {
   message: string;
   onChunk: (text: string) => void;
   onExit: (code: number | null) => void;
+}
+
+/**
+ * Build x402 env vars to pass to agent child processes.
+ * Agents inherit the bridge's x402 config so they can reference payment status.
+ */
+function getX402ChildEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+
+  // Forward x402 config to child processes
+  if (process.env.AGENT_WALLET_PRIVATE_KEY) {
+    env.AGENT_WALLET_PRIVATE_KEY = process.env.AGENT_WALLET_PRIVATE_KEY;
+  }
+  if (process.env.X402_NETWORK) {
+    env.X402_NETWORK = process.env.X402_NETWORK;
+  }
+  if (process.env.X402_MAX_PER_REQUEST) {
+    env.X402_MAX_PER_REQUEST = process.env.X402_MAX_PER_REQUEST;
+  }
+  if (process.env.X402_MAX_DAILY) {
+    env.X402_MAX_DAILY = process.env.X402_MAX_DAILY;
+  }
+  if (process.env.X402_MAX_PER_HOUR) {
+    env.X402_MAX_PER_HOUR = process.env.X402_MAX_PER_HOUR;
+  }
+  if (process.env.X402_ALLOWED_DOMAINS) {
+    env.X402_ALLOWED_DOMAINS = process.env.X402_ALLOWED_DOMAINS;
+  }
+  if (process.env.X402_BLOCKED_DOMAINS) {
+    env.X402_BLOCKED_DOMAINS = process.env.X402_BLOCKED_DOMAINS;
+  }
+
+  // Signal to child that x402 is active at the bridge level
+  env.X402_BRIDGE_ACTIVE = isX402Active() ? "true" : "false";
+
+  return env;
 }
 
 /**
@@ -40,6 +77,7 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
     cwd: resolve(process.env.HOME || "/home/manifest"),
     env: {
       ...process.env,
+      ...getX402ChildEnv(),
       PATH: `${resolve(nodePath, "..")}:${process.env.PATH}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
