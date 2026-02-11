@@ -49,19 +49,40 @@ export function useIntentSession(sessionId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSession = useCallback(async () => {
+  // Terminal states that don't need polling
+  const isTerminal = useCallback(
+    (status: string) => ["READY", "COMPLETED", "FAILED", "CANCELLED"].includes(status),
+    []
+  );
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(
+    (interval = 3000) => {
+      stopPolling();
+      pollRef.current = setInterval(() => {
+        fetchSessionInner();
+      }, interval);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const fetchSessionInner = useCallback(async () => {
     if (!sessionId) return;
-    setLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/intent/${sessionId}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as IntentSession;
         setSession(data);
-        // Stop polling if no longer THINKING
-        if (data.status !== "THINKING" && pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
+        // Stop polling when we reach a terminal state
+        if (isTerminal(data.status)) {
+          stopPolling();
         }
       } else {
         const err = await res.json().catch(() => ({ error: "Unknown" }));
@@ -70,27 +91,32 @@ export function useIntentSession(sessionId: string | null) {
     } catch {
       setError("Network error");
     }
-    setLoading(false);
-  }, [sessionId]);
+  }, [sessionId, isTerminal, stopPolling]);
 
-  // Poll while THINKING -- skip if session is already in a terminal/ready state
+  const fetchSession = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    await fetchSessionInner();
+    setLoading(false);
+  }, [sessionId, fetchSessionInner]);
+
+  // Poll while in an active state (THINKING or EXECUTING)
   useEffect(() => {
     if (!sessionId) return;
 
-    // If session is already loaded and not THINKING, no need to start polling
-    if (session && session.status !== "THINKING") return;
+    // If session is already in a terminal state, just fetch once (no polling)
+    if (session && isTerminal(session.status)) {
+      return;
+    }
 
     fetchSession();
 
-    // Poll every 3s while THINKING
-    pollRef.current = setInterval(fetchSession, 3000);
+    // Poll every 3s for THINKING, every 5s for EXECUTING
+    const interval = session?.status === "EXECUTING" ? 5000 : 3000;
+    pollRef.current = setInterval(fetchSessionInner, interval);
 
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
+    return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
@@ -108,15 +134,9 @@ export function useIntentSession(sessionId: string | null) {
           const data = await res.json() as IntentSession;
           setSession(data);
 
-          // If session is already READY (local Ollama), skip polling entirely
-          if (data.status === "READY") {
-            // No polling needed -- commands are already present
-            return data;
-          }
-
-          // Cursor cloud path: start polling for THINKING sessions
-          if (data.status === "THINKING" && !pollRef.current) {
-            pollRef.current = setInterval(fetchSession, 3000);
+          // If session is already in a terminal state (local Ollama → READY), no polling
+          if (!isTerminal(data.status)) {
+            startPolling(3000);
           }
 
           return data;
@@ -132,7 +152,7 @@ export function useIntentSession(sessionId: string | null) {
         setLoading(false);
       }
     },
-    [fetchSession]
+    [isTerminal, startPolling]
   );
 
   const sendFollowup = useCallback(
@@ -146,13 +166,10 @@ export function useIntentSession(sessionId: string | null) {
           body: JSON.stringify({ message }),
         });
         if (res.ok) {
-          // Restart polling
           setSession((prev) =>
             prev ? { ...prev, status: "THINKING" } : prev
           );
-          if (!pollRef.current) {
-            pollRef.current = setInterval(fetchSession, 3000);
-          }
+          startPolling(3000);
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
           setError(err.error || "Failed to send follow-up");
@@ -161,7 +178,7 @@ export function useIntentSession(sessionId: string | null) {
         setError("Network error");
       }
     },
-    [sessionId, fetchSession]
+    [sessionId, startPolling]
   );
 
   const executeCommands = useCallback(
@@ -179,6 +196,8 @@ export function useIntentSession(sessionId: string | null) {
           setSession((prev) =>
             prev ? { ...prev, status: "EXECUTING" } : prev
           );
+          // Start polling to detect EXECUTING → COMPLETED/FAILED
+          startPolling(5000);
           return data;
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
@@ -190,7 +209,7 @@ export function useIntentSession(sessionId: string | null) {
         return null;
       }
     },
-    [sessionId]
+    [sessionId, startPolling]
   );
 
   const stopSession = useCallback(async () => {
@@ -200,14 +219,11 @@ export function useIntentSession(sessionId: string | null) {
       setSession((prev) =>
         prev ? { ...prev, status: "CANCELLED" } : prev
       );
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
+      stopPolling();
     } catch {
       setError("Failed to stop");
     }
-  }, [sessionId]);
+  }, [sessionId, stopPolling]);
 
   return {
     session,

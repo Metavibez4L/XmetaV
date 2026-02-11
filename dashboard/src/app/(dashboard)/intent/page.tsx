@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Zap, RotateCcw } from "lucide-react";
 import { IntentChat } from "@/components/IntentChat";
 import { CommandPreview } from "@/components/CommandPreview";
@@ -23,6 +23,15 @@ export default function IntentPage() {
   } = useIntentSession(activeSessionId);
 
   const { sessions, refetch: refetchSessions } = useIntentSessions();
+
+  // Refetch history whenever the active session's status changes
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (session && session.status !== prevStatusRef.current) {
+      prevStatusRef.current = session.status;
+      refetchSessions();
+    }
+  }, [session, session?.status, refetchSessions]);
 
   const handleSubmitGoal = useCallback(
     async (goal: string, repository?: string, model?: string) => {

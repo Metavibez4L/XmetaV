@@ -48,9 +48,12 @@ export const CommandPreview = React.memo(function CommandPreview({
     border: "#00f0ff15",
   };
 
+  const isThinking = session?.status === "THINKING";
   const isReady = session?.status === "READY";
   const isExecuting = session?.status === "EXECUTING";
   const isCompleted = session?.status === "COMPLETED";
+  const isFailed = session?.status === "FAILED";
+  const isCancelled = session?.status === "CANCELLED";
   const isEmpty = commands.length === 0;
 
   const handleRemove = useCallback((idx: number) => {
@@ -117,6 +120,31 @@ export const CommandPreview = React.memo(function CommandPreview({
         </div>
       </div>
 
+      {/* Status banner */}
+      {isReady && commands.length > 0 && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 animate-in fade-in duration-300"
+          style={{ background: "#00ff8812", border: "1px solid #00ff8830" }}
+        >
+          <CheckCircle className="h-3.5 w-3.5" style={{ color: sc.green }} />
+          <span className="text-[10px] font-mono font-medium" style={{ color: sc.green }}>
+            {commands.length} command{commands.length !== 1 ? "s" : ""} generated — review and execute
+          </span>
+        </div>
+      )}
+
+      {isExecuting && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3"
+          style={{ background: "#00ff8808", border: "1px solid #00ff8820" }}
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: sc.green }} />
+          <span className="text-[10px] font-mono" style={{ color: sc.green }}>
+            Executing commands via bridge...
+          </span>
+        </div>
+      )}
+
       {/* Retry indicator */}
       {session && session.retry_count > 0 && (
         <div
@@ -140,14 +168,23 @@ export const CommandPreview = React.memo(function CommandPreview({
               Submit a goal to generate commands
             </p>
           </div>
-        ) : isEmpty && session?.status === "THINKING" ? (
+        ) : isEmpty && isThinking ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2
               className="h-6 w-6 animate-spin mb-3"
               style={{ color: `${sc.neon}44` }}
             />
             <p className="text-[10px] font-mono" style={{ color: sc.dimText }}>
-              Cursor is generating commands...
+              {session?.model?.startsWith("local:")
+                ? "Ollama is generating commands..."
+                : "Cursor is generating commands..."}
+            </p>
+          </div>
+        ) : isEmpty && (isFailed || isCancelled) ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <AlertCircle className="h-6 w-6 mb-3 opacity-20" style={{ color: sc.red }} />
+            <p className="text-[10px] font-mono" style={{ color: sc.dimText }}>
+              {isFailed ? "Command generation failed" : "Session cancelled"}
             </p>
           </div>
         ) : (

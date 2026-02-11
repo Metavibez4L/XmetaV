@@ -258,6 +258,43 @@ export const IntentChat = React.memo(function IntentChat({
             </div>
           )}
 
+          {/* Status indicators for terminal/active states */}
+          {session.status === "READY" && (session.commands?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Zap className="h-3.5 w-3.5" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#00ff88" }}>
+                {session.commands!.length} command{session.commands!.length !== 1 ? "s" : ""} ready — review on the right panel
+              </span>
+            </div>
+          )}
+
+          {session.status === "EXECUTING" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#00ff88" }}>
+                Executing commands via bridge...
+              </span>
+            </div>
+          )}
+
+          {session.status === "COMPLETED" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Zap className="h-3.5 w-3.5" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono font-medium" style={{ color: "#00ff88" }}>
+                All commands executed successfully
+              </span>
+            </div>
+          )}
+
+          {session.status === "FAILED" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <StopCircle className="h-3.5 w-3.5" style={{ color: "#ff6b6b" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#ff6b6b" }}>
+                Session failed
+              </span>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       )}
