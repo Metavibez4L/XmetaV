@@ -194,6 +194,53 @@ Results are stored in `~/.openclaw/swarm/<run-id>/` with per-task outputs and a 
 
 See `docs/SWARM.md` for the full reference.
 
+## x402 Autonomous Payments (Base network)
+
+The main agent can orchestrate **x402 payment protocol** deployments across the fleet. x402 (by Coinbase) enables agents to autonomously pay for services via USDC on Base — no API keys or subscriptions needed.
+
+### What main does with x402
+
+- **Delegates** x402 server-side work to `akua` (Solidity/Hardhat, payment middleware)
+- **Delegates** x402 client-side work to `basedintern` (XMTP chat agents, TypeScript SDK)
+- **Coordinates** multi-agent deployments via swarm pipelines
+- **Manages** payment budgets and safety thresholds
+
+### Swarm patterns for x402
+
+```bash
+# Pipeline: deploy payment-gated API, then build the paying client
+./scripts/swarm.sh --pipeline \
+  akua "Deploy x402 payment middleware on the NFT floor price endpoint" \
+  basedintern "Build an XMTP agent that pays for NFT data via x402"
+
+# Collaborative: both agents review an x402 integration
+./scripts/swarm.sh --collab \
+  "Audit the x402 payment flow for security issues" \
+  akua basedintern
+```
+
+### Key concepts
+
+| Concept | Description |
+|---------|-------------|
+| HTTP 402 | Server returns payment requirements (amount, recipient, reference) |
+| `X-PAYMENT` header | Client sends signed payment proof on retry |
+| USDC on Base | Settlement currency and network |
+| `@coinbase/x402-sdk` | Client SDK for executing payments |
+| `@coinbase/x402-middleware` | Server middleware for gating endpoints |
+| `@xmtp/agent-sdk` | Chat agent framework (XMTP v4) |
+
+### Environment variables (agent wallet)
+
+```bash
+XMTP_WALLET_KEY=         # Agent wallet private key
+XMTP_DB_ENCRYPTION_KEY=  # XMTP local DB encryption
+XMTP_ENV=production      # XMTP network
+NETWORK=base             # Payment network
+```
+
+Full protocol reference: `capabilities/x402-payments.md`
+
 ## Browser automation (optional)
 
 Browser automation is primarily operated via the deterministic CLI:

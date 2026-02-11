@@ -11,6 +11,7 @@ Quick reference for everything you can do with your OpenClaw setup.
 | [management.md](management.md) | System administration commands |
 | [expand.md](expand.md) | How to add models, skills, channels |
 | [cheatsheet.md](cheatsheet.md) | One-page reference card |
+| [x402-payments.md](x402-payments.md) | x402 autonomous payment protocol (Coinbase/Base) |
 
 ## Your Setup at a Glance
 
