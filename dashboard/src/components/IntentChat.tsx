@@ -39,6 +39,7 @@ export const IntentChat = React.memo(function IntentChat({
   const [repos, setRepos] = useState<{ owner: string; name: string; repository: string }[]>([]);
   const [showConfig, setShowConfig] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conversationContainerRef = useRef<HTMLDivElement>(null);
 
   const isLocalModel = selectedModel.startsWith("local:");
 
@@ -64,9 +65,15 @@ export const IntentChat = React.memo(function IntentChat({
       .catch(() => {});
   }, []);
 
-  // Auto-scroll conversation
+  // Auto-scroll conversation (only scroll the chat container, not the page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = conversationContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [session?.conversation]);
 
   const handleSubmitGoal = useCallback(
@@ -210,6 +217,7 @@ export const IntentChat = React.memo(function IntentChat({
       {/* Conversation */}
       {hasSession && (
         <div
+          ref={conversationContainerRef}
           className="flex-1 overflow-y-auto space-y-3 mb-4 pr-1"
           style={{ maxHeight: "calc(100vh - 420px)" }}
         >
