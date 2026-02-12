@@ -364,7 +364,7 @@ export const IntentChat = React.memo(function IntentChat({
       ) : (
         <div className="mt-auto space-y-2">
           {/* Follow-up or stop */}
-          {isThinking ? (
+          {isThinking || session.status === "EXECUTING" ? (
             <button
               onClick={onStop}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all"
@@ -375,7 +375,7 @@ export const IntentChat = React.memo(function IntentChat({
               }}
             >
               <StopCircle className="h-3.5 w-3.5" />
-              Stop Thinking
+              {session.status === "EXECUTING" ? "Cancel Execution" : "Stop Thinking"}
             </button>
           ) : session.status === "READY" ? (
             <form onSubmit={handleFollowup} className="relative">

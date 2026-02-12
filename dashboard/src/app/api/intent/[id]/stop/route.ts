@@ -27,10 +27,10 @@ export async function POST(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  // Stop Cursor agent if still active
+  // Stop Cursor agent if still active (THINKING state)
   if (
     session.cursor_agent_id &&
-    (session.status === "THINKING")
+    session.status === "THINKING"
   ) {
     try {
       const cursor = getCursorClient();
@@ -38,6 +38,15 @@ export async function POST(
     } catch {
       // Agent might already be stopped/finished -- ignore
     }
+  }
+
+  // Cancel any pending/running agent_commands tied to this session (EXECUTING state)
+  if (session.status === "EXECUTING" && session.executed_command_ids?.length) {
+    await supabase
+      .from("agent_commands")
+      .update({ status: "cancelled" })
+      .in("id", session.executed_command_ids)
+      .in("status", ["pending", "running"]);
   }
 
   // Update session status
