@@ -250,9 +250,11 @@ export function AgentChat() {
     scrollToBottom();
   }, [fullText, isComplete, activeCommandId, scrollToBottom]);
 
-  // ── Command complete ──
+  // ── Command complete — track which command just finished ──
+  const [lastCompletedCmdId, setLastCompletedCmdId] = useState<string | null>(null);
   useEffect(() => {
     if (isComplete && activeCommandId) {
+      setLastCompletedCmdId(activeCommandId);
       setActiveCommandId(null);
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -331,20 +333,25 @@ export function AgentChat() {
   );
 
   // ── Auto-speak response when voice mode + autoSpeak is on ──
-  const lastSpokenRef = useRef<string | null>(null);
+  // Track by command ID (unique per command) to prevent re-speaking stale responses.
+  // Use a ref for `speak` so callback identity changes don't re-trigger the effect.
+  const lastSpokenCmdRef = useRef<string | null>(null);
+  const speakRef = useRef(speak);
+  speakRef.current = speak;
+
   useEffect(() => {
     if (
       voiceEnabled &&
       settings.autoSpeak &&
-      isComplete &&
+      lastCompletedCmdId &&
+      lastCompletedCmdId !== lastSpokenCmdRef.current &&
       fullText &&
-      fullText !== lastSpokenRef.current &&
       !isSpeaking
     ) {
-      lastSpokenRef.current = fullText;
-      speak(fullText);
+      lastSpokenCmdRef.current = lastCompletedCmdId;
+      speakRef.current(fullText);
     }
-  }, [voiceEnabled, settings.autoSpeak, isComplete, fullText, isSpeaking, speak]);
+  }, [voiceEnabled, settings.autoSpeak, lastCompletedCmdId, fullText, isSpeaking]);
 
   // ── Continuous conversation: auto-listen after TTS finishes ──
   const wasSpeakingRef = useRef(false);
