@@ -2,9 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-2026.2.1-red?style=flat-square)](https://openclaw.dev)
-[![Platform](https://img.shields.io/badge/Platform-WSL2%20%7C%20Linux-blue?style=flat-square)](https://docs.microsoft.com/en-us/windows/wsl/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
 
 ```
  ___   ___                    __           ___   ___
@@ -38,16 +36,21 @@
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
-- **Voice Commands** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS, with x402 payment-gated API
-- Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
-- Multi-model support (local qwen2.5 + cloud kimi-k2.5)
+- **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
+- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating)
+- **ERC-8004 Identity** — On-chain agent identity (NFT #16905) and reputation tracking on Base mainnet
+- **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration
+- **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs with live streaming output
+- **Agent Factory** — Main agent creates agents, scaffolds apps, manages GitHub repos, and orchestrates fleet
+- **Swarm Orchestration** — Parallel, pipeline, and collaborative multi-agent task execution
+- **Fleet Controls** — Enable/disable agents from dashboard with bridge-side enforcement
+- Multi-agent management (`main`, `basedintern`, `akua`, `basedintern_web`, `akua_web`, `dynamic`)
+- Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
-- One-command setup and troubleshooting scripts
-- Ollama integration for local LLMs with GPU acceleration
-- Full tool calling (exec, read, write, process, browser, web)
+- GitHub integration for automated repo creation and pushing
+- Full tool calling (exec, read, write, process, browser, web, cron, gateway, sessions)
 - OpenClaw-managed browser automation
-- GitHub skill integration for repo operations
-- WSL2/Linux optimized workflows
+- Ollama integration with GPU acceleration (RTX 4070 + CUDA)
 
 ---
 

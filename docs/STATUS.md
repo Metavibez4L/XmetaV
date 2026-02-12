@@ -1,7 +1,27 @@
-# Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-12
+# Status — XmetaV / OpenClaw Command Center
+**Last verified:** 2026-02-12  
+**System:** metavibez4L (WSL2)  
+**XmetaV Version:** v10 (Voice Commands + x402 Payments + ERC-8004 Identity)
 
-This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
+This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
+
+---
+
+## Quick Health Check
+
+```bash
+# One-command system fix and verification
+./scripts/openclaw-fix.sh
+
+# Check all components
+./scripts/health-check.sh
+
+# Verify OpenClaw
+openclaw health
+openclaw --version  # Expected: 2026.2.1
+```
+
+---
 
 ## Versions
 
@@ -328,6 +348,36 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## Voice Commands (v10)
+
+XmetaV v10 adds voice interaction capability via OpenAI Whisper (STT) + TTS HD.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Voice API | Active | `/api/voice/transcribe` (STT) + `/api/voice/synthesize` (TTS) |
+| React Hook | Active | `useVoice()` with mic capture, audio playback, state management |
+| Dashboard UI | Active | Voice toggle in Agent Chat header with mic button |
+| x402 Gating | Active | Endpoints payment-gated: $0.005 (transcribe), $0.01 (synthesize) |
+
+### Usage
+
+**Dashboard:** Click the mic icon in Agent Chat to toggle voice mode. Speak, then release to send. Responses auto-play when voice mode is on.
+
+**CLI:**
+```bash
+cd dashboard
+npx ts-node scripts/voice-cli.ts
+```
+
+### Environment variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Dashboard `.env` | Required for Whisper + TTS |
+| `X402_BUDGET_LIMIT` | (in voice mode) | Must be ≥ $0.01 for TTS payments |
 
 ---
 
