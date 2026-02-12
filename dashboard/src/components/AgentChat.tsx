@@ -8,6 +8,8 @@ import { useWakeWord } from "@/hooks/useWakeWord";
 import { AgentSelector } from "./AgentSelector";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { VoiceSettingsPanel } from "./VoiceSettings";
+import { ChatHistory } from "./ChatHistory";
+import type { HistoryEntry } from "./ChatHistory";
 import {
   Send,
   Loader2,
@@ -19,6 +21,7 @@ import {
   VolumeX,
   Radio,
   Repeat,
+  History,
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 
@@ -169,6 +172,7 @@ export function AgentChat() {
   const [agentId, setAgentId] = useState("main");
   const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -210,6 +214,56 @@ export function AgentChat() {
     });
 
   useAutoResize(inputRef, input);
+
+  // ── Load conversation from history ──
+  const handleLoadConversation = useCallback(
+    (entries: HistoryEntry[]) => {
+      const loaded: ChatMessage[] = [];
+      for (const entry of entries) {
+        // User message
+        loaded.push({
+          id: `hist-user-${entry.id}`,
+          role: "user",
+          content: entry.message,
+          commandId: entry.id,
+          agentId: entry.agentId,
+          timestamp: entry.createdAt,
+        });
+        // Agent response (if any)
+        if (entry.response) {
+          loaded.push({
+            id: `hist-agent-${entry.id}`,
+            role: "agent",
+            content: entry.response,
+            commandId: entry.id,
+            status: entry.status === "failed" ? "failed" : "completed",
+            agentId: entry.agentId,
+            timestamp: entry.createdAt,
+          });
+        }
+      }
+      setMessages(loaded);
+      setActiveCommandId(null);
+      setSending(false);
+      // Set agent to match the loaded conversation
+      if (entries.length > 0) {
+        setAgentId(entries[entries.length - 1].agentId);
+      }
+      shouldScrollRef.current = true;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+        inputRef.current?.focus();
+      }, 100);
+    },
+    []
+  );
+
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setActiveCommandId(null);
+    setSending(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
 
   // ── Smart auto-scroll: only if user is near bottom ──
   const checkShouldScroll = useCallback(() => {
@@ -477,6 +531,24 @@ export function AgentChat() {
             style={{ background: "#00f0ff15" }}
           />
           <AgentSelector value={agentId} onChange={setAgentId} />
+          <div
+            className="h-4 w-px hidden sm:block"
+            style={{ background: "#00f0ff15" }}
+          />
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+            style={{
+              color: "#4a6a8a",
+              border: "1px solid #00f0ff10",
+            }}
+            title="Chat history"
+          >
+            <History className="h-3.5 w-3.5" />
+            <span className="text-[8px] font-mono uppercase tracking-wider hidden sm:inline">
+              History
+            </span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Voice toggle */}
@@ -789,6 +861,15 @@ export function AgentChat() {
           </div>
         </div>
       </div>
+
+      {/* Chat History Sidebar */}
+      <ChatHistory
+        agentId={agentId}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onNewChat={handleNewChat}
+        onLoadConversation={handleLoadConversation}
+      />
     </div>
   );
 }
