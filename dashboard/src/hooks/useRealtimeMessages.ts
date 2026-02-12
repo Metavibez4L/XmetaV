@@ -9,21 +9,50 @@ import type { AgentResponse } from "@/lib/types";
  * Returns accumulated response text as it streams in.
  *
  * Optimizations:
- * - Memoized fullText (only recomputes when chunks change)
- * - Deduplication guard on chunk IDs
- * - Stable callback refs to avoid re-subscriptions
- * - Proper cleanup on unmount and commandId change
+ *  - Ref-based text accumulator (avoids rebuilding full string on each chunk)
+ *  - Deduplication guard on chunk IDs
+ *  - Throttled state updates (batches rapid chunks into single render)
+ *  - Stable callback refs to avoid re-subscriptions
+ *  - Proper cleanup on unmount and commandId change
  */
+const THROTTLE_MS = 80; // batch rapid chunks — update UI at ~12fps
+
 export function useRealtimeMessages(commandId: string | null) {
-  const [chunks, setChunks] = useState<AgentResponse[]>([]);
+  const [fullText, setFullText] = useState("");
   const [isComplete, setIsComplete] = useState(false);
+
   const seenIds = useRef(new Set<string>());
+  const textRef = useRef(""); // running text accumulator
+  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
+  /** Push accumulated text to React state (throttled) */
+  const scheduleUpdate = useCallback(() => {
+    if (throttleRef.current) return; // already scheduled
+    throttleRef.current = setTimeout(() => {
+      throttleRef.current = null;
+      setFullText(textRef.current);
+    }, THROTTLE_MS);
+  }, []);
+
+  /** Flush immediately (for final chunk or catch-up) */
+  const flushNow = useCallback(() => {
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+      throttleRef.current = null;
+    }
+    setFullText(textRef.current);
+  }, []);
+
   const reset = useCallback(() => {
-    setChunks([]);
+    setFullText("");
     setIsComplete(false);
+    textRef.current = "";
     seenIds.current.clear();
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+      throttleRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -41,9 +70,14 @@ export function useRealtimeMessages(commandId: string | null) {
       .then(({ data }) => {
         if (cancelled || !data || data.length === 0) return;
         const ids = new Set<string>();
-        data.forEach((r) => ids.add(r.id));
+        let text = "";
+        data.forEach((r) => {
+          ids.add(r.id);
+          text += r.content;
+        });
         seenIds.current = ids;
-        setChunks(data);
+        textRef.current = text;
+        flushNow();
         if (data.some((r) => r.is_final)) setIsComplete(true);
       });
 
@@ -64,20 +98,26 @@ export function useRealtimeMessages(commandId: string | null) {
           // Deduplicate (Realtime can fire for rows already fetched)
           if (seenIds.current.has(row.id)) return;
           seenIds.current.add(row.id);
-          setChunks((prev) => [...prev, row]);
-          if (row.is_final) setIsComplete(true);
+
+          // Append to accumulator (no array copy)
+          textRef.current += row.content;
+
+          if (row.is_final) {
+            flushNow();
+            setIsComplete(true);
+          } else {
+            scheduleUpdate();
+          }
         }
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      if (throttleRef.current) clearTimeout(throttleRef.current);
       supabase.removeChannel(channel);
     };
-  }, [commandId, reset, supabase]);
+  }, [commandId, reset, supabase, scheduleUpdate, flushNow]);
 
-  // Only recompute when chunks array reference changes
-  const fullText = useMemo(() => chunks.map((c) => c.content).join(""), [chunks]);
-
-  return { chunks, fullText, isComplete, reset };
+  return { fullText, isComplete, reset };
 }

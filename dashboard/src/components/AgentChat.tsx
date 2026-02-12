@@ -47,7 +47,7 @@ function nextId() {
 }
 
 // ────────────────────────────────────────────────────
-// Memoized message bubble
+// Memoized message bubble (completed / historical messages)
 // ────────────────────────────────────────────────────
 
 const MessageBubble = React.memo(function MessageBubble({
@@ -85,20 +85,6 @@ const MessageBubble = React.memo(function MessageBubble({
             >
               {msg.agentId}
             </span>
-            {msg.status === "running" && (
-              <div className="flex items-center gap-1.5">
-                <Loader2
-                  className="h-3 w-3 animate-spin"
-                  style={{ color: "#00f0ff66" }}
-                />
-                <span
-                  className="text-[8px] font-mono"
-                  style={{ color: "#00f0ff44" }}
-                >
-                  STREAMING
-                </span>
-              </div>
-            )}
             {msg.status === "pending" && (
               <span
                 className="text-[8px] font-mono animate-pulse"
@@ -136,8 +122,66 @@ const MessageBubble = React.memo(function MessageBubble({
           {msg.content ||
             (msg.status === "pending" ? "// waiting for bridge..." : "")}
         </pre>
+      </div>
+    </div>
+  );
+});
 
-        {msg.status === "running" && (
+// ────────────────────────────────────────────────────
+// Streaming bubble — renders live text without copying messages array
+// ────────────────────────────────────────────────────
+
+function StreamingBubble({
+  agentId: streamAgentId,
+  fullText: streamText,
+  isComplete: streamDone,
+}: {
+  agentId: string;
+  fullText: string;
+  isComplete: boolean;
+}) {
+  return (
+    <div className="flex justify-start">
+      <div
+        className="max-w-[85%] rounded-lg px-4 py-3 relative"
+        style={{
+          background: "linear-gradient(135deg, #0a0f1a, #0d1525)",
+          border: `1px solid #00f0ff12`,
+        }}
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <span
+            className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{
+              color: "#a855f7",
+              background: "#a855f710",
+              border: "1px solid #a855f720",
+            }}
+          >
+            {streamAgentId}
+          </span>
+          {!streamDone && (
+            <div className="flex items-center gap-1.5">
+              <Loader2
+                className="h-3 w-3 animate-spin"
+                style={{ color: "#00f0ff66" }}
+              />
+              <span
+                className="text-[8px] font-mono"
+                style={{ color: "#00f0ff44" }}
+              >
+                STREAMING
+              </span>
+            </div>
+          )}
+        </div>
+        <pre
+          className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
+          style={{ color: "#c8d6e5cc" }}
+        >
+          {streamText || "// waiting for bridge..."}
+        </pre>
+        {!streamDone && (
           <span
             className="inline-block w-2 h-4 ml-0.5 animate-pulse"
             style={{ background: "#00f0ff", boxShadow: "0 0 4px #00f0ff" }}
@@ -146,7 +190,7 @@ const MessageBubble = React.memo(function MessageBubble({
       </div>
     </div>
   );
-});
+}
 
 // ────────────────────────────────────────────────────
 // Auto-resize textarea hook
@@ -287,36 +331,36 @@ export function AgentChat() {
     }
   }, []);
 
-  // ── Update streaming message ──
+  // ── Scroll while streaming (fullText changes via throttled hook) ──
   useEffect(() => {
-    if (!activeCommandId || !fullText) return;
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === "agent" && last.commandId === activeCommandId) {
-        return [
-          ...prev.slice(0, -1),
-          {
-            ...last,
-            content: fullText,
-            status: isComplete ? "completed" : "running",
-          },
-        ];
-      }
-      return prev;
-    });
-    scrollToBottom();
-  }, [fullText, isComplete, activeCommandId, scrollToBottom]);
+    if (activeCommandId && fullText) {
+      scrollToBottom();
+    }
+  }, [fullText, activeCommandId, scrollToBottom]);
 
-  // ── Command complete — track which command just finished ──
+  // ── Command complete — merge final text into messages array once ──
   const [lastCompletedCmdId, setLastCompletedCmdId] = useState<string | null>(null);
   useEffect(() => {
     if (isComplete && activeCommandId) {
-      setLastCompletedCmdId(activeCommandId);
+      // Merge final content into messages (single array update at end of stream)
+      const finalText = fullText;
+      const completedId = activeCommandId;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "agent" && last.commandId === completedId) {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, content: finalText, status: "completed" },
+          ];
+        }
+        return prev;
+      });
+      setLastCompletedCmdId(completedId);
       setActiveCommandId(null);
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isComplete, activeCommandId]);
+  }, [isComplete, activeCommandId, fullText]);
 
   // ── Send message (accepts optional text for voice input) ──
   const sendMessage = useCallback(
@@ -709,9 +753,26 @@ export function AgentChat() {
             </div>
           )}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} />
-          ))}
+          {messages.map((msg) => {
+            // Skip the placeholder agent msg while streaming — StreamingBubble handles it
+            if (
+              activeCommandId &&
+              msg.role === "agent" &&
+              msg.commandId === activeCommandId
+            ) {
+              return null;
+            }
+            return <MessageBubble key={msg.id} msg={msg} />;
+          })}
+
+          {/* Live streaming bubble — rendered separately to avoid messages array copies */}
+          {activeCommandId && (
+            <StreamingBubble
+              agentId={agentId}
+              fullText={fullText}
+              isComplete={isComplete}
+            />
+          )}
         </div>
       </div>
 
