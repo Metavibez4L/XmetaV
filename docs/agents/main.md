@@ -240,6 +240,36 @@ X402_BUDGET_LIMIT=1.00        # Max payment per request in USD
 
 Full protocol reference: `capabilities/x402-payments.md`
 
+## ERC-8004 On-Chain Identity (Base mainnet)
+
+The main agent is registered on-chain as **XmetaV** — an ERC-8004 identity NFT on Base mainnet.
+
+### On-chain registration
+
+| Property | Value |
+|----------|-------|
+| Agent ID | `16905` |
+| Name | XmetaV |
+| Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
+| Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
+
+### What main does with ERC-8004
+
+- **Owns** the on-chain agent identity (ERC-721 NFT)
+- **Publishes** capabilities and services via metadata URI
+- **Accumulates** reputation through the ReputationRegistry
+- **Verifiable** by any third party via Base mainnet contracts
+
+### Environment variables
+
+```bash
+ERC8004_AGENT_ID=16905        # On-chain agent ID
+EVM_PRIVATE_KEY=0x...         # Wallet key (shared with x402)
+```
+
+Full protocol reference: `capabilities/erc8004-identity.md`
+
 ## Browser automation (optional)
 
 Browser automation is primarily operated via the deterministic CLI:

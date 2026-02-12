@@ -204,6 +204,25 @@ The **Swarms** page (`/swarms`) provides a complete interface for swarm orchestr
 
 Swarm runs created from the dashboard are stored in Supabase (`swarm_runs` + `swarm_tasks`) and executed by the bridge daemon's swarm executor.
 
+### Dashboard Payments
+
+The **Payments** page (`/payments`) shows x402 autonomous payment activity:
+
+- Wallet address and connection status
+- Total and daily USDC spend tracking
+- Transaction count and history table with BaseScan links
+- List of x402-gated endpoints with pricing
+
+### Dashboard Identity
+
+The **Identity** page (`/identity`) shows ERC-8004 on-chain agent identity:
+
+- Registration status and agent ID (NFT #16905)
+- Owner address and wallet details
+- Capabilities and services from metadata
+- Trust model and contract addresses
+- Agent ID lookup for viewing other agents
+
 ## Swarm Orchestration (CLI + Dashboard)
 
 The `main` agent can coordinate multi-agent operations using the Swarm skill, `swarm.sh` engine, or the dashboard.

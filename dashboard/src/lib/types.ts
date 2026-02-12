@@ -165,6 +165,31 @@ export interface IntentConversationMessage {
 }
 
 // ============================================================
+// ERC-8004 Identity types
+// ============================================================
+
+/** On-chain agent identity from the ERC-8004 IdentityRegistry */
+export interface ERC8004Identity {
+  agentId: string;
+  name: string;
+  owner: string;
+  agentWallet: string;
+  tokenURI: string;
+  registered: boolean;
+  network: string;
+  registryAddress: string;
+  reputationAddress: string;
+  basescanUrl: string;
+}
+
+/** Reputation summary from the ERC-8004 ReputationRegistry */
+export interface ERC8004Reputation {
+  count: number;
+  score: string;
+  decimals: number;
+}
+
+// ============================================================
 // x402 Payment types
 // ============================================================
 

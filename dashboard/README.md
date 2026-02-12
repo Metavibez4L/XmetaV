@@ -90,6 +90,8 @@ Set the three environment variables in Vercel project settings.
 | `/agent` | **Agent Chat** | Full-screen streaming chat with agent selector dropdown |
 | `/swarms` | **Swarms** | Create, monitor, and review multi-agent swarm runs (3 tabs) |
 | `/fleet` | **Fleet** | Agent status table with enable/disable toggles and send-task dialog |
+| `/payments` | **Payments** | x402 wallet status, daily spend tracking, payment history, gated endpoints |
+| `/identity` | **Identity** | ERC-8004 on-chain agent identity, reputation, capabilities, and NFT details |
 | `/auth/login` | **Login** | Supabase email/password authentication |
 
 ### Swarms Page (Tabs)
@@ -112,6 +114,8 @@ Set the three environment variables in Vercel project settings.
 | `agent_controls` | Agent enable/disable state | `id`, `agent_id`, `enabled` |
 | `swarm_runs` | Swarm run metadata | `id`, `name`, `mode`, `status`, `manifest`, `synthesis` |
 | `swarm_tasks` | Per-task status and output | `id`, `swarm_id`, `agent_id`, `message`, `status`, `output` |
+| `x402_payments` | x402 payment transaction log | `id`, `endpoint`, `amount`, `tx_hash`, `payer_address`, `status` |
+| `intent_sessions` | Intent resolution sessions | `id`, `query`, `cursor_agent_id`, `status` |
 
 All tables have:
 - RLS policies (authenticated users: SELECT, INSERT, UPDATE)
@@ -131,6 +135,10 @@ All tables have:
 | `/api/swarms/[id]` | GET | Get swarm run details + tasks |
 | `/api/swarms/[id]/cancel` | POST | Cancel a running/pending swarm |
 | `/api/swarms/templates` | GET | List available swarm templates from disk |
+| `/api/x402/payments` | GET | List x402 payment history with filters |
+| `/api/x402/wallet` | GET | Wallet info, spend stats, bridge status |
+| `/api/erc8004/identity` | GET | On-chain agent identity and metadata |
+| `/api/intent` | POST | Intent resolution (agent routing) |
 
 ## Project Structure
 
@@ -143,6 +151,8 @@ dashboard/
         agent/page.tsx          # Agent Chat
         swarms/page.tsx         # Swarms (create, active, history)
         fleet/page.tsx          # Agent Fleet
+        payments/page.tsx       # x402 Payments dashboard
+        identity/page.tsx       # ERC-8004 Agent Identity
         layout.tsx              # Dashboard layout with Sidebar
       auth/login/page.tsx       # Login page
       api/
@@ -158,6 +168,12 @@ dashboard/
             route.ts            # Get swarm details
             cancel/route.ts     # Cancel swarm
           templates/route.ts    # List swarm templates
+        x402/
+          payments/route.ts     # Payment history API
+          wallet/route.ts       # Wallet info + spend stats
+        erc8004/
+          identity/route.ts     # On-chain identity resolution
+        intent/route.ts         # Intent resolution API
       globals.css               # Cyberpunk theme (neon blue, scanlines, glitch)
       layout.tsx                # Root layout
     components/
@@ -174,6 +190,8 @@ dashboard/
       SwarmCreate.tsx           # Template picker + custom swarm builder
       SwarmHistory.tsx          # Past swarm runs with filters
       SystemHealth.tsx          # Bridge health indicator
+      PaymentsDashboard.tsx    # x402 payments UI (wallet, history, endpoints)
+      AgentIdentity.tsx        # ERC-8004 identity viewer (NFT, reputation, lookup)
     hooks/
       useAgentControls.ts       # Agent enable/disable state
       useAgentSessions.ts       # Agent session listing
@@ -186,8 +204,20 @@ dashboard/
       supabase-browser.ts       # Browser Supabase client
       supabase-server.ts        # Server Supabase client
       supabase-admin.ts         # Admin client (service role key)
-      types.ts                  # Shared TypeScript types
+      types.ts                  # Shared TypeScript types (includes X402Payment, ERC8004Identity)
     middleware.ts               # Auth middleware (protects dashboard routes)
+  x402-server/                  # x402 payment-gated Express service
+    index.ts                    # Express server with paymentMiddleware
+    package.json                # @x402/express, @x402/core, @x402/evm, express
+    .env.example                # EVM_ADDRESS, FACILITATOR_URL, PORT, NETWORK
+  erc8004/                      # ERC-8004 agent identity
+    register.ts                 # Registration script (mints agent NFT)
+    registration.json           # Agent metadata (name, capabilities, services)
+    lib/client.ts               # Viem client for identity + reputation lookups
+    abis/                       # Minimal contract ABIs
+      IdentityRegistry.ts
+      ReputationRegistry.ts
+    package.json                # dotenv, tsx, viem
   bridge/
     src/
       index.ts                  # Bridge daemon entry point (v1.1.0)
@@ -198,6 +228,7 @@ dashboard/
     lib/
       supabase.ts               # Supabase client for bridge
       openclaw.ts               # OpenClaw CLI wrapper (spawn child processes)
+      x402-client.ts            # x402 fetch wrapper (auto-pays 402 responses)
     .gitignore                  # Ignores bridge PID file
   scripts/
     setup-db.sql                # Base tables migration
@@ -230,6 +261,33 @@ The bridge daemon (`bridge/`) is a Node.js process that runs on the same machine
 - Output buffer deduplication: avoids sending duplicate output chunks
 - Configurable timeouts per task
 - Optional synthesis step (any agent can synthesize results)
+
+## x402 Payment Service
+
+The `x402-server/` directory contains a standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol.
+
+```bash
+cd dashboard/x402-server
+cp .env.example .env  # fill in EVM_ADDRESS, FACILITATOR_URL
+npm install
+npm start             # starts on port 4021
+```
+
+Gated endpoints: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02). Free endpoint: `/health`.
+
+## ERC-8004 Agent Identity
+
+The `erc8004/` directory contains the on-chain identity integration for the XmetaV agent on Base mainnet.
+
+- **Agent ID**: 16905
+- **Contract**: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistryUpgradeable)
+- **NFT**: [View on BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905)
+
+```bash
+cd dashboard/erc8004
+npm install
+npx tsx register.ts   # register or re-register the agent
+```
 
 ## UI Theme
 
@@ -265,3 +323,6 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | Cancel not working | Verify RLS UPDATE policies exist on `swarm_runs` and `swarm_tasks` (run `setup-db-swarms.sql`) |
 | Port 3000 in use | `pkill -f "next dev"` and `rm -f .next/dev/lock` |
 | Hydration errors | Clear `.next` cache: `rm -rf .next && npm run dev` |
+| x402 payments not logging | Check `EVM_PRIVATE_KEY` is set in `bridge/.env`; verify `x402_payments` table exists |
+| Identity page empty | Verify `ERC8004_AGENT_ID=16905` in `bridge/.env`; check Base RPC connectivity |
+| x402-server won't start | Check `EVM_ADDRESS` and `FACILITATOR_URL` in `x402-server/.env` |

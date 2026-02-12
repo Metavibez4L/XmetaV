@@ -1,5 +1,5 @@
 # Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-10
+Last verified: 2026-02-11
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -270,8 +270,12 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `agent_controls` | Agent enable/disable state | Authenticated: SELECT, INSERT, UPDATE |
 | `swarm_runs` | Swarm run metadata and status | Authenticated: SELECT, INSERT, UPDATE |
 | `swarm_tasks` | Per-task status and output | Authenticated: SELECT, INSERT, UPDATE |
+| `x402_payments` | x402 payment transaction log | Authenticated: SELECT, INSERT |
+| `intent_sessions` | Intent resolution sessions | Authenticated: SELECT, INSERT |
 
 All tables have Realtime enabled for live updates.
+
+View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments`.
 
 ### Dashboard pages
 
@@ -281,6 +285,8 @@ All tables have Realtime enabled for live updates.
 | `/agent` | Agent Chat | Streaming chat with agent selector |
 | `/swarms` | Swarms | Create (templates/custom), active runs (live), history (filterable) |
 | `/fleet` | Fleet | Agent table with enable/disable toggles |
+| `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
+| `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 
 ### Dashboard health checks
 
@@ -322,6 +328,65 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## x402 Payments (Base network)
+
+XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| x402 Express Server | Ready | `cd dashboard/x402-server && npm start` |
+| Bridge x402 Client | Ready | Auto-pays 402 responses when `EVM_PRIVATE_KEY` is set |
+| Supabase `x402_payments` table | Active | Payment logging with daily spend view |
+| Dashboard `/payments` page | Active | Wallet status, history, gated endpoint list |
+
+### Gated endpoints (x402-server)
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /agent-task` | $0.01 | Queue a task for any agent |
+| `POST /intent` | $0.005 | Create an intent resolution session |
+| `GET /fleet-status` | $0.001 | Get fleet status summary |
+| `POST /swarm` | $0.02 | Launch a multi-agent swarm |
+
+### Environment variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `EVM_PRIVATE_KEY` | `bridge/.env` | Agent wallet private key (Base) |
+| `EVM_ADDRESS` | `x402-server/.env` | Address receiving payments |
+| `FACILITATOR_URL` | `x402-server/.env` | Coinbase x402 facilitator |
+| `X402_BUDGET_LIMIT` | `bridge/.env` | Max payment per request in USD |
+
+---
+
+## ERC-8004 Agent Identity (Base mainnet)
+
+The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
+
+| Property | Value |
+|----------|-------|
+| Agent ID | `16905` |
+| Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
+| Network | Base Mainnet |
+| Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
+| Tx | [BaseScan](https://basescan.org/tx/0xee8da73203e1a6ce48560f66731a02fb4a74c346d6f1a02bd4cf94d7e05adb3b) |
+
+### Dashboard `/identity` page
+
+Shows agent registration status, owner, wallet, capabilities, services, trust model, and contract addresses. Supports lookup by agent ID.
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `ERC8004_AGENT_ID` | `bridge/.env` | On-chain agent ID (16905) |
+| `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
+
+Full reference: `capabilities/erc8004-identity.md`
 
 ---
 
