@@ -10,6 +10,7 @@ import { VoiceWaveform } from "./VoiceWaveform";
 import { VoiceSettingsPanel } from "./VoiceSettings";
 import { ChatHistory } from "./ChatHistory";
 import type { HistoryEntry } from "./ChatHistory";
+import { AgentTerminal } from "./AgentTerminal";
 import {
   Send,
   Loader2,
@@ -22,6 +23,7 @@ import {
   Radio,
   Repeat,
   History,
+  Terminal,
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 
@@ -173,6 +175,7 @@ export function AgentChat() {
   const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -549,6 +552,21 @@ export function AgentChat() {
               History
             </span>
           </button>
+          <button
+            onClick={() => setTerminalOpen(!terminalOpen)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+            style={{
+              color: terminalOpen ? "#39ff14" : "#4a6a8a",
+              background: terminalOpen ? "#39ff1408" : "transparent",
+              border: `1px solid ${terminalOpen ? "#39ff1420" : "#00f0ff10"}`,
+            }}
+            title="Toggle terminal"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span className="text-[8px] font-mono uppercase tracking-wider hidden sm:inline">
+              Terminal
+            </span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Voice toggle */}
@@ -861,6 +879,12 @@ export function AgentChat() {
           </div>
         </div>
       </div>
+
+      {/* Embedded Terminal */}
+      <AgentTerminal
+        open={terminalOpen}
+        onClose={() => setTerminalOpen(false)}
+      />
 
       {/* Chat History Sidebar */}
       <ChatHistory
