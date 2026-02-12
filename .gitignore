@@ -29,6 +29,7 @@ yarn-error.log*
 *.swo
 
 # Supabase temp
+.temp/
 supabase/.temp/
 
 # TypeScript
