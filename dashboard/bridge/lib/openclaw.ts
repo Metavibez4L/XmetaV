@@ -7,16 +7,13 @@ const ALLOWED_AGENTS = new Set(["main", "akua", "akua_web", "basedintern", "base
 /** Default timeout for agent calls (seconds) */
 const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "120", 10);
 
-/** Fallback model when primary (kimi) times out or fails */
-const FALLBACK_MODEL = process.env.FALLBACK_MODEL || "ollama/qwen2.5:7b-instruct";
-
 export interface OpenClawOptions {
   agentId: string;
   message: string;
   onChunk: (text: string) => void;
   onExit: (code: number | null) => void;
-  /** Override model (e.g. for fallback retry) */
-  model?: string;
+  /** Whether this is a retry attempt (prevents infinite retry loops) */
+  isRetry?: boolean;
   /** Timeout in seconds (default 120). Set 0 to disable. */
   timeoutSeconds?: number;
 }
@@ -26,7 +23,7 @@ export interface OpenClawOptions {
  * Returns a handle to kill the process if needed.
  */
 export function runAgent(options: OpenClawOptions): ChildProcess {
-  const { agentId, message, onChunk, onExit, model, timeoutSeconds } = options;
+  const { agentId, message, onChunk, onExit, timeoutSeconds } = options;
 
   if (!ALLOWED_AGENTS.has(agentId)) {
     throw new Error(`Agent "${agentId}" is not in the allowed list`);
@@ -43,11 +40,6 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
     "--thinking", "off",
     "-m", message,
   ];
-
-  // Override model if specified (used for fallback retries)
-  if (model) {
-    args.push("--model", model);
-  }
 
   console.log(`[openclaw] Spawning: ${openclawPath} ${args.join(" ")}${timeout > 0 ? ` (timeout: ${timeout}s)` : ""}`);
 
@@ -113,8 +105,8 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
 }
 
 /**
- * Run an agent with automatic fallback to a faster local model on timeout or failure.
- * On timeout (exit 124) or non-zero exit: retries once with FALLBACK_MODEL.
+ * Run an agent with automatic retry on timeout or failure.
+ * On timeout (exit 124) or non-zero exit: retries once.
  */
 export function runAgentWithFallback(options: OpenClawOptions): ChildProcess {
   const { agentId, message, onChunk, onExit } = options;
@@ -124,15 +116,16 @@ export function runAgentWithFallback(options: OpenClawOptions): ChildProcess {
   const child = runAgent({
     ...options,
     onExit: (code) => {
-      // If timed out or failed, retry with fallback model
-      if ((code === 124 || (code !== null && code !== 0)) && !options.model) {
-        console.log(`[openclaw] Primary model failed (exit ${code}), retrying with fallback: ${FALLBACK_MODEL}`);
-        onChunk(`\n[Bridge] Retrying with local model (${FALLBACK_MODEL})...\n`);
+      // If timed out or failed, retry once (OpenClaw model is configured
+      // via ~/.openclaw-dev/agents/<id>/agent/models.json, not CLI flags)
+      if ((code === 124 || (code !== null && code !== 0)) && !options.isRetry) {
+        console.log(`[openclaw] Primary attempt failed (exit ${code}), retrying once...`);
+        onChunk(`\n[Bridge] First attempt failed — retrying...\n`);
 
         runAgent({
           agentId,
           message,
-          model: FALLBACK_MODEL,
+          isRetry: true,
           timeoutSeconds: options.timeoutSeconds ?? DEFAULT_TIMEOUT_S,
           onChunk,
           onExit: originalOnExit,
