@@ -2,9 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-2026.2.1-red?style=flat-square)](https://openclaw.dev)
-[![Platform](https://img.shields.io/badge/Platform-WSL2%20%7C%20Linux-blue?style=flat-square)](https://docs.microsoft.com/en-us/windows/wsl/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
 
 ```
  ___   ___                    __           ___   ___
@@ -18,6 +16,8 @@
  |                                               |
  |   agents:  main | basedintern | akua          |
  |   swarm:   parallel | pipeline | collab       |
+ |   payments: x402 USDC micro-payments (Base)   |
+ |   identity: ERC-8004 NFT #16905 (Base)        |
  |   dashboard: Next.js + Supabase (cyberpunk)   |
  |   models:  kimi-k2.5:cloud (256k, all agents) |
  |   gateway: ws://127.0.0.1:18789              |
@@ -34,15 +34,23 @@
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
-- Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
-- Multi-model support (local qwen2.5 + cloud kimi-k2.5)
+- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
+- **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
+- **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
+- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating)
+- **ERC-8004 Identity** — On-chain agent identity (NFT #16905) and reputation tracking on Base mainnet
+- **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration
+- **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs with live streaming output
+- **Agent Factory** — Main agent creates agents, scaffolds apps, manages GitHub repos, and orchestrates fleet
+- **Swarm Orchestration** — Parallel, pipeline, and collaborative multi-agent task execution
+- **Fleet Controls** — Enable/disable agents from dashboard with bridge-side enforcement
+- Multi-agent management (`main`, `basedintern`, `akua`, `basedintern_web`, `akua_web`, `dynamic`)
+- Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
-- One-command setup and troubleshooting scripts
-- Ollama integration for local LLMs with GPU acceleration
-- Full tool calling (exec, read, write, process, browser, web)
+- GitHub integration for automated repo creation and pushing
+- Full tool calling (exec, read, write, process, browser, web, cron, gateway, sessions)
 - OpenClaw-managed browser automation
-- GitHub skill integration for repo operations
-- WSL2/Linux optimized workflows
+- Ollama integration with GPU acceleration (RTX 4070 + CUDA)
 
 ---
 
@@ -57,6 +65,8 @@
 - **Setup & Fix Scripts** -- Automated solutions for common issues
 - **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
 - **Documentation** -- Runbooks, checklists, and troubleshooting guides
+- **x402 Payment Service** -- Express server gating XmetaV endpoints with USDC micro-payments on Base
+- **ERC-8004 Identity** -- On-chain agent NFT (identity + reputation) on Base mainnet
 - **Agent Definitions** -- Multi-agent profiles and workspaces
 - **Infrastructure as Code** -- Reproducible OpenClaw deployments
 
@@ -80,7 +90,9 @@ XmetaV/
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
-|   |   +-- lib/              # openclaw CLI wrapper, Supabase client
+|   |   +-- lib/              # openclaw CLI wrapper, Supabase client, x402 client
+|   |-- x402-server/          # x402 payment-gated Express service
+|   |-- erc8004/              # ERC-8004 agent identity (registration, ABIs, client)
 |   |-- scripts/              # DB migrations (setup-db*.sql)
 |   +-- README.md             # Dashboard documentation
 |
@@ -118,7 +130,9 @@ XmetaV/
 |   |-- agent-tasks.md        # AI agent usage examples
 |   |-- cheatsheet.md         # One-page reference card
 |   |-- management.md         # System administration commands
-|   +-- expand.md             # How to add models, skills, channels, agents
+|   |-- expand.md             # How to add models, skills, channels, agents
+|   |-- x402-payments.md      # x402 autonomous payment protocol reference
+|   +-- erc8004-identity.md   # ERC-8004 on-chain agent identity reference
 |
 +-- docs/                     # Documentation & runbooks
     |-- ARCHITECTURE.md       # System architecture overview
@@ -389,6 +403,8 @@ cd dashboard/bridge && npm install && npm start
 | `/agent` | **Agent Chat** -- full-screen streaming chat with agent selector |
 | `/swarms` | **Swarms** -- create, monitor, and review multi-agent swarm runs |
 | `/fleet` | **Fleet** -- agent status table with enable/disable toggles and task dispatch |
+| `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
+| `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
@@ -493,11 +509,18 @@ flowchart TB
         GH["GitHub\nMetavibez4L"]
     end
 
+    subgraph BASE["Base Mainnet"]
+        direction LR
+        X402P["x402 USDC\nPayments"]
+        ERC["ERC-8004\nIdentity #16905"]
+    end
+
     XMETAV ==> GW
     GW --> GWSVC --> ORCH
     ORCH --> FLEET
     FAC -.->|--github| GH
     FLEET ==> PROV
+    FLEET -.->|pay / identify| BASE
 
     style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
     style RUNTIME fill:#16213e,stroke:#e94560,color:#fff
@@ -508,6 +531,7 @@ flowchart TB
     style PROV fill:#222,stroke:#888,color:#fff
     style EXT fill:#161b22,stroke:#58a6ff,color:#fff
     style GH fill:#161b22,stroke:#58a6ff,color:#fff
+    style BASE fill:#0052ff,stroke:#fff,color:#fff
 ```
 
 ---
@@ -586,16 +610,20 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 
 | Document | Description |
 |----------|-------------|
-| [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** -- setup, architecture, pages, bridge |
+| [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** — setup, architecture, pages, bridge |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive (includes dashboard) |
-| [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
+| [AGENTS.md](docs/AGENTS.md) | Agent configuration, tool profiles, and customization |
 | [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions (includes dashboard, x402, voice) |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
+| [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 autonomous payment protocol reference |
+| [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 on-chain agent identity reference |
+| [capabilities/voice-commands.md](capabilities/voice-commands.md) | Voice command & response system reference |
+| [capabilities/quick-commands.md](capabilities/quick-commands.md) | Essential daily-use commands |
 
 ---
 
@@ -627,6 +655,44 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-12 (v10.1) — Voice System Optimization
+- **Streaming TTS** — Stream audio via MediaSource API for ~200ms first-byte playback latency
+- **Push-to-Talk** — Hold SPACE key to record, release to send (hands-free alternative)
+- **Wake Word** — Say "Hey XmetaV" to activate voice mode automatically
+- **Continuous Conversation** — Keep mic active between turns for natural back-and-forth
+- **Waveform Visualizer** — Canvas-based audio visualization during recording and playback
+- **Voice Settings Panel** — Configure voice (alloy/echo/fable/onyx/nova/shimmer), model (tts-1/tts-1-hd), speed (0.5-2x)
+- **TTS Model Switch** — Default changed from tts-1-hd to tts-1 for lower latency
+- **SourceBuffer Race Fix** — Safe sequential append pattern prevents audio glitches
+
+### 2026-02-12 (v10) — Voice Commands
+- **Voice Command System** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS
+- Voice mode toggle in Agent Chat header with mic button, auto-speak, and visual feedback
+- API routes `/api/voice/transcribe` (STT) and `/api/voice/synthesize` (TTS)
+- `useVoice` React hook with mic capture, audio playback, and state management
+- x402 payment-gated voice endpoints (`POST /voice/transcribe` $0.005, `POST /voice/synthesize` $0.01)
+- CLI voice mode (`scripts/voice-cli.ts`) for terminal-based voice interaction
+- Voice capability documentation (`capabilities/voice-commands.md`)
+
+### 2026-02-11 (v9) — ERC-8004 Agent Identity
+- **ERC-8004 On-Chain Identity** — Registered XmetaV agent as NFT #16905 on Base mainnet via IdentityRegistry
+- Registration script (`erc8004/register.ts`) mints agent NFT with metadata URI
+- Shared client library (`erc8004/lib/client.ts`) for identity and reputation lookups
+- Dashboard `/identity` page showing agent registration, owner, capabilities, trust model, and reputation
+- API route `/api/erc8004/identity` for on-chain identity resolution
+- Contract ABIs for IdentityRegistryUpgradeable and ReputationRegistryUpgradeable
+- ERC-8004 capability documentation (`capabilities/erc8004-identity.md`)
+
+### 2026-02-11 (v8) — x402 Autonomous Payments
+- **x402 Payment Protocol** — End-to-end implementation: server gates endpoints, agents pay through them
+- Express payment-gated service (`x402-server/`) with endpoints: `/agent-task`, `/intent`, `/fleet-status`, `/swarm`
+- Bridge x402 client (`bridge/lib/x402-client.ts`) wrapping fetch with automatic 402 payment handling
+- Supabase `x402_payments` table with payment logging, indexes, RLS, and daily spend view
+- Dashboard `/payments` page with wallet status, spend tracking, and transaction history
+- API routes `/api/x402/payments` and `/api/x402/wallet` for payment data
+- x402 capability documentation (`capabilities/x402-payments.md`)
+- Updated agent docs (main, akua) with correct `@x402/*` SDK references
 
 ### 2026-02-10 (v7) — Swarm Dashboard Optimization
 - **Swarm Feature Optimized** — memoized components, visibility-aware polling, lazy-loaded task history, cancellation-aware execution
@@ -712,5 +778,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | Agent Factory + GitHub | Swarm Orchestration</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
 </p>

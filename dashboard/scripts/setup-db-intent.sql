@@ -15,6 +15,9 @@ create table if not exists intent_sessions (
   commands jsonb not null default '[]'::jsonb,
   executed_command_ids jsonb,
   conversation jsonb,
+  retry_count integer not null default 0,
+  max_retries integer not null default 2,
+  timeout_seconds integer not null default 120,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

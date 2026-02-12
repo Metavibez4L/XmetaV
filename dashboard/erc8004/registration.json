@@ -1,0 +1,43 @@
+{
+  "type": "erc8004:agent-registration:1.0",
+  "name": "XmetaV",
+  "description": "Orchestrator agent for the XmetaV multi-agent system. Coordinates a fleet of specialized agents (akua, basedintern) for smart contract development, TypeScript apps, swarm orchestration, and autonomous x402 payments on Base.",
+  "image": "",
+  "services": [
+    {
+      "type": "x402",
+      "url": "http://localhost:4021",
+      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints"
+    },
+    {
+      "type": "dashboard",
+      "url": "http://localhost:3000",
+      "description": "XmetaV Control Plane Dashboard"
+    }
+  ],
+  "registrations": [
+    {
+      "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+      "agentId": "16905"
+    }
+  ],
+  "supportedTrust": [
+    "reputation"
+  ],
+  "capabilities": [
+    "agent-orchestration",
+    "swarm-execution",
+    "intent-resolution",
+    "x402-payments",
+    "smart-contract-deployment",
+    "fleet-management"
+  ],
+  "fleet": {
+    "agents": [
+      "main",
+      "akua",
+      "basedintern"
+    ],
+    "model": "ollama/kimi-k2.5:cloud"
+  }
+}

@@ -12,6 +12,8 @@ flowchart TB
         UI_CHAT["Agent Chat"]
         UI_SWARM["Swarms"]
         UI_FLEET["Fleet"]
+        UI_PAY["Payments"]
+        UI_ID["Identity"]
     end
 
     subgraph SUPABASE["Supabase (Cloud Postgres + Realtime)"]
@@ -21,6 +23,13 @@ flowchart TB
         TBL_CTRL["agent_controls"]
         TBL_SRUN["swarm_runs"]
         TBL_STASK["swarm_tasks"]
+        TBL_X402["x402_payments"]
+    end
+
+    subgraph BASE["Base Mainnet"]
+        direction LR
+        X402["x402 USDC\nPayments"]
+        ERC8004["ERC-8004\nIdentity NFT #16905"]
     end
 
     subgraph LOCAL["Local Machine (WSL2)"]
@@ -79,9 +88,13 @@ flowchart TB
     FLEET --> PROVIDERS
     FACTORY -->|--github| GITHUB
     DASHBOARD -.->|deployed to| VERCEL
+    BRIDGE -->|auto-pay 402| X402
+    UI_ID -->|read identity| ERC8004
+    UI_PAY -->|payment history| TBL_X402
 
     style DASHBOARD fill:#0a0e1a,stroke:#00f0ff,color:#00f0ff
     style SUPABASE fill:#1a1a2e,stroke:#3ecf8e,color:#fff
+    style BASE fill:#0052ff,stroke:#fff,color:#fff
     style LOCAL fill:#0d1117,stroke:#e94560,color:#fff
     style BRIDGE fill:#16213e,stroke:#00f0ff,color:#fff
     style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
@@ -102,7 +115,7 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity
 
 ### Supabase (Message Bus + Database)
 
@@ -110,7 +123,7 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `swarm_runs`, `swarm_tasks`
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
 ### Bridge Daemon (Node.js)
@@ -121,7 +134,29 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
+- **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
 - **Location**: `dashboard/bridge/`
+
+### x402 Payment Service (Express)
+
+A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
+
+- **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
+- **Endpoints**: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02)
+- **Settlement**: USDC on Base (mainnet or Sepolia)
+- **Facilitator**: Coinbase x402 facilitator verifies and settles payments
+- **Location**: `dashboard/x402-server/`
+
+### ERC-8004 Agent Identity
+
+On-chain identity for the XmetaV agent using the ERC-8004 standard (ERC-721 NFTs) on Base mainnet.
+
+- **Agent ID**: 16905 (minted via `IdentityRegistryUpgradeable`)
+- **Identity Contract**: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
+- **Reputation Contract**: `0x8004b1041543F0eB1f3459E8a2FC4Ab06ceC7251`
+- **Registration**: `register.ts` script mints the agent NFT with a metadata URI
+- **Client Library**: `lib/client.ts` reads identity and reputation data via `viem`
+- **Location**: `dashboard/erc8004/`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`

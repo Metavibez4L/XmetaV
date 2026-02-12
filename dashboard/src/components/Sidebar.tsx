@@ -4,7 +4,7 @@ import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -13,6 +13,8 @@ const NAV_ITEMS = [
   { href: "/agent", label: "Agent Chat", icon: MessageSquare, shortcut: "03", key: "3" },
   { href: "/swarms", label: "Swarms", icon: Network, shortcut: "04", key: "4" },
   { href: "/fleet", label: "Fleet", icon: Users, shortcut: "05", key: "5" },
+  { href: "/payments", label: "Payments", icon: Wallet, shortcut: "06", key: "6" },
+  { href: "/identity", label: "Identity", icon: Fingerprint, shortcut: "07", key: "7" },
 ];
 
 interface SidebarProps {

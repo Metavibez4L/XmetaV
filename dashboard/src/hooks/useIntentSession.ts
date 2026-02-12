@@ -49,19 +49,29 @@ export function useIntentSession(sessionId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSession = useCallback(async () => {
+  // Terminal states that don't need polling
+  const isTerminal = useCallback(
+    (status: string) => ["READY", "COMPLETED", "FAILED", "CANCELLED"].includes(status),
+    []
+  );
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const fetchSessionInner = useCallback(async () => {
     if (!sessionId) return;
-    setLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/intent/${sessionId}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as IntentSession;
         setSession(data);
-        // Stop polling if no longer THINKING
-        if (data.status !== "THINKING" && pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
+        // Stop polling when we reach a terminal state
+        if (isTerminal(data.status)) {
+          stopPolling();
         }
       } else {
         const err = await res.json().catch(() => ({ error: "Unknown" }));
@@ -70,24 +80,44 @@ export function useIntentSession(sessionId: string | null) {
     } catch {
       setError("Network error");
     }
-    setLoading(false);
-  }, [sessionId]);
+  }, [sessionId, isTerminal, stopPolling]);
 
-  // Poll while THINKING
+  const startPolling = useCallback(
+    (interval = 3000) => {
+      stopPolling();
+      pollRef.current = setInterval(fetchSessionInner, interval);
+    },
+    [stopPolling, fetchSessionInner]
+  );
+
+  const fetchSession = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    await fetchSessionInner();
+    setLoading(false);
+  }, [sessionId, fetchSessionInner]);
+
+  // Poll while in an active state (THINKING or EXECUTING)
   useEffect(() => {
     if (!sessionId) return;
+
+    // If session is already in a terminal state, fetch once and stop polling
+    if (session && isTerminal(session.status)) {
+      stopPolling();
+      // still refresh once to ensure UI has final state
+      fetchSession();
+      return;
+    }
+
     fetchSession();
 
-    // Poll every 3s while THINKING
-    pollRef.current = setInterval(fetchSession, 3000);
+    // Poll every 3s for THINKING, every 5s for EXECUTING
+    const interval = session?.status === "EXECUTING" ? 5000 : 3000;
+    startPolling(interval);
 
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [sessionId, fetchSession]);
+    return () => stopPolling();
+  }, [sessionId, session?.status, session, isTerminal, fetchSession, startPolling, stopPolling]);
 
   const createSession = useCallback(
     async (goal: string, repository?: string, model?: string) => {
@@ -100,9 +130,15 @@ export function useIntentSession(sessionId: string | null) {
           body: JSON.stringify({ goal, repository, model }),
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = await res.json() as IntentSession;
           setSession(data);
-          return data as IntentSession;
+
+          // If session is already in a terminal state (local Ollama → READY), no polling
+          if (!isTerminal(data.status)) {
+            startPolling(3000);
+          }
+
+          return data;
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
           setError(err.error || "Failed to create");
@@ -115,7 +151,7 @@ export function useIntentSession(sessionId: string | null) {
         setLoading(false);
       }
     },
-    []
+    [isTerminal, startPolling]
   );
 
   const sendFollowup = useCallback(
@@ -129,13 +165,10 @@ export function useIntentSession(sessionId: string | null) {
           body: JSON.stringify({ message }),
         });
         if (res.ok) {
-          // Restart polling
           setSession((prev) =>
             prev ? { ...prev, status: "THINKING" } : prev
           );
-          if (!pollRef.current) {
-            pollRef.current = setInterval(fetchSession, 3000);
-          }
+          startPolling(3000);
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
           setError(err.error || "Failed to send follow-up");
@@ -144,7 +177,7 @@ export function useIntentSession(sessionId: string | null) {
         setError("Network error");
       }
     },
-    [sessionId, fetchSession]
+    [sessionId, startPolling]
   );
 
   const executeCommands = useCallback(
@@ -162,6 +195,8 @@ export function useIntentSession(sessionId: string | null) {
           setSession((prev) =>
             prev ? { ...prev, status: "EXECUTING" } : prev
           );
+          // Start polling to detect EXECUTING → COMPLETED/FAILED
+          startPolling(5000);
           return data;
         } else {
           const err = await res.json().catch(() => ({ error: "Unknown" }));
@@ -173,7 +208,7 @@ export function useIntentSession(sessionId: string | null) {
         return null;
       }
     },
-    [sessionId]
+    [sessionId, startPolling]
   );
 
   const stopSession = useCallback(async () => {
@@ -183,14 +218,11 @@ export function useIntentSession(sessionId: string | null) {
       setSession((prev) =>
         prev ? { ...prev, status: "CANCELLED" } : prev
       );
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
+      stopPolling();
     } catch {
       setError("Failed to stop");
     }
-  }, [sessionId]);
+  }, [sessionId, stopPolling]);
 
   return {
     session,

@@ -9,6 +9,7 @@ import {
   MessageSquare,
   StopCircle,
   GitBranch,
+  RefreshCw,
 } from "lucide-react";
 import type { IntentSession, IntentConversationMessage } from "@/lib/types";
 
@@ -33,17 +34,27 @@ export const IntentChat = React.memo(function IntentChat({
   const [followup, setFollowup] = useState("");
   const [selectedModel, setSelectedModel] = useState("auto");
   const [selectedRepo, setSelectedRepo] = useState("https://github.com/Metavibez4L/XmetaV");
-  const [models, setModels] = useState<string[]>([]);
+  const [cursorModels, setCursorModels] = useState<string[]>([]);
+  const [localModels, setLocalModels] = useState<string[]>([]);
   const [repos, setRepos] = useState<{ owner: string; name: string; repository: string }[]>([]);
   const [showConfig, setShowConfig] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conversationContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch models and repos on mount
+  const isLocalModel = selectedModel.startsWith("local:");
+
+  // Fetch Cursor models, local Ollama models, and repos on mount
   useEffect(() => {
     fetch("/api/cursor/models")
       .then((r) => r.json())
       .then((d) => {
-        if (d.models) setModels(d.models);
+        if (d.models) setCursorModels(d.models);
+      })
+      .catch(() => {});
+    fetch("/api/ollama/models")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.models) setLocalModels(d.models);
       })
       .catch(() => {});
     fetch("/api/cursor/repos")
@@ -54,9 +65,15 @@ export const IntentChat = React.memo(function IntentChat({
       .catch(() => {});
   }, []);
 
-  // Auto-scroll conversation
+  // Auto-scroll conversation (only scroll the chat container, not the page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = conversationContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [session?.conversation]);
 
   const handleSubmitGoal = useCallback(
@@ -65,12 +82,12 @@ export const IntentChat = React.memo(function IntentChat({
       if (!goal.trim() || loading) return;
       onSubmitGoal(
         goal.trim(),
-        selectedRepo || undefined,
+        isLocalModel ? undefined : selectedRepo || undefined,
         selectedModel === "auto" ? undefined : selectedModel
       );
       setShowConfig(false);
     },
-    [goal, loading, onSubmitGoal, selectedRepo, selectedModel]
+    [goal, loading, onSubmitGoal, selectedRepo, selectedModel, isLocalModel]
   );
 
   const handleFollowup = useCallback(
@@ -119,66 +136,88 @@ export const IntentChat = React.memo(function IntentChat({
                 style={{
                   background: sc.cardBg,
                   border: `1px solid ${sc.border}`,
-                  color: sc.neon,
+                  color: isLocalModel ? "#f7b731" : sc.neon,
                 }}
               >
-                <option value="auto">Auto (recommended)</option>
-                {models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
-                style={{ color: sc.dimText }}
-              />
-            </div>
-          </div>
-
-          {/* Repo selector */}
-          <div>
-            <label
-              className="block text-[9px] font-mono uppercase tracking-wider mb-1.5"
-              style={{ color: sc.dimText }}
-            >
-              <GitBranch className="inline h-3 w-3 mr-1" />
-              Repository Context
-            </label>
-            <div className="relative">
-              <select
-                value={selectedRepo}
-                onChange={(e) => setSelectedRepo(e.target.value)}
-                className="w-full px-3 py-2 rounded text-[11px] font-mono appearance-none cursor-pointer"
-                style={{
-                  background: sc.cardBg,
-                  border: `1px solid ${sc.border}`,
-                  color: "#fff",
-                }}
-              >
-                <option value="https://github.com/Metavibez4L/XmetaV">
-                  Metavibez4L/XmetaV
-                </option>
-                {repos
-                  .filter((r) => r.repository !== "https://github.com/Metavibez4L/XmetaV")
-                  .map((r) => (
-                    <option key={r.repository} value={r.repository}>
-                      {r.owner}/{r.name}
+                {localModels.length > 0 && (
+                  <optgroup label="⚡ Local (fast, seconds)">
+                    {localModels.map((m) => (
+                      <option key={`local:${m}`} value={`local:${m}`}>
+                        {m}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="🧠 Cursor (deep, minutes)">
+                  <option value="auto">Auto (recommended)</option>
+                  {cursorModels.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
                     </option>
                   ))}
+                </optgroup>
               </select>
               <ChevronDown
                 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
                 style={{ color: sc.dimText }}
               />
             </div>
+            {isLocalModel && (
+              <p className="text-[8px] font-mono mt-1" style={{ color: "#f7b731" }}>
+                Local mode — instant response via Ollama, no repo context
+              </p>
+            )}
           </div>
+
+          {/* Repo selector -- hidden for local models (no repo context) */}
+          {!isLocalModel && (
+            <div>
+              <label
+                className="block text-[9px] font-mono uppercase tracking-wider mb-1.5"
+                style={{ color: sc.dimText }}
+              >
+                <GitBranch className="inline h-3 w-3 mr-1" />
+                Repository Context
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  className="w-full px-3 py-2 rounded text-[11px] font-mono appearance-none cursor-pointer"
+                  style={{
+                    background: sc.cardBg,
+                    border: `1px solid ${sc.border}`,
+                    color: "#fff",
+                  }}
+                >
+                  {repos.length === 0 ? (
+                    <>
+                      <option value="https://github.com/Metavibez4L/XmetaV">Metavibez4L/XmetaV</option>
+                      <option value="https://github.com/Metavibez4L/basedintern">Metavibez4L/basedintern</option>
+                      <option value="https://github.com/Metavibez4L/akua">Metavibez4L/akua</option>
+                    </>
+                  ) : null}
+                  {repos
+                    .map((r) => (
+                      <option key={r.repository} value={r.repository}>
+                        {r.owner}/{r.name}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
+                  style={{ color: sc.dimText }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Conversation */}
       {hasSession && (
         <div
+          ref={conversationContainerRef}
           className="flex-1 overflow-y-auto space-y-3 mb-4 pr-1"
           style={{ maxHeight: "calc(100vh - 420px)" }}
         >
@@ -197,6 +236,19 @@ export const IntentChat = React.memo(function IntentChat({
             <ConversationBubble key={msg.id || i} msg={msg} sc={sc} />
           ))}
 
+          {/* Timeout retry indicator */}
+          {session.retry_count > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2">
+              <RefreshCw className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "#f7b731" }} />
+              <div>
+                <p className="text-[10px] font-mono" style={{ color: "#f7b731" }}>
+                  Previous commands timed out — Cursor is generating alternatives
+                  (retry {session.retry_count}/{session.max_retries})
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Thinking indicator */}
           {isThinking && (
             <div className="flex items-center gap-2 px-3 py-2">
@@ -205,7 +257,48 @@ export const IntentChat = React.memo(function IntentChat({
                 style={{ color: sc.neon }}
               />
               <span className="text-[10px] font-mono" style={{ color: sc.dimText }}>
-                Cursor is thinking...
+                {session.retry_count > 0
+                  ? "Cursor is rethinking with alternative approaches..."
+                  : session.model?.startsWith("local:")
+                    ? "Ollama is generating commands..."
+                    : "Cursor is thinking..."}
+              </span>
+            </div>
+          )}
+
+          {/* Status indicators for terminal/active states */}
+          {session.status === "READY" && (session.commands?.length ?? 0) > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Zap className="h-3.5 w-3.5" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#00ff88" }}>
+                {session.commands!.length} command{session.commands!.length !== 1 ? "s" : ""} ready — review on the right panel
+              </span>
+            </div>
+          )}
+
+          {session.status === "EXECUTING" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#00ff88" }}>
+                Executing commands via bridge...
+              </span>
+            </div>
+          )}
+
+          {session.status === "COMPLETED" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Zap className="h-3.5 w-3.5" style={{ color: "#00ff88" }} />
+              <span className="text-[10px] font-mono font-medium" style={{ color: "#00ff88" }}>
+                All commands executed successfully
+              </span>
+            </div>
+          )}
+
+          {session.status === "FAILED" && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <StopCircle className="h-3.5 w-3.5" style={{ color: "#ff6b6b" }} />
+              <span className="text-[10px] font-mono" style={{ color: "#ff6b6b" }}>
+                Session failed
               </span>
             </div>
           )}
@@ -263,13 +356,15 @@ export const IntentChat = React.memo(function IntentChat({
             </button>
           </div>
           <p className="text-[8px] font-mono mt-1.5 opacity-30 text-center">
-            Cursor will analyze the repo and generate OpenClaw commands
+            {isLocalModel
+              ? "Ollama will generate commands instantly (no repo context)"
+              : "Cursor will analyze the repo and generate OpenClaw commands"}
           </p>
         </form>
       ) : (
         <div className="mt-auto space-y-2">
           {/* Follow-up or stop */}
-          {isThinking ? (
+          {isThinking || session.status === "EXECUTING" ? (
             <button
               onClick={onStop}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all"
@@ -280,7 +375,7 @@ export const IntentChat = React.memo(function IntentChat({
               }}
             >
               <StopCircle className="h-3.5 w-3.5" />
-              Stop Thinking
+              {session.status === "EXECUTING" ? "Cancel Execution" : "Stop Thinking"}
             </button>
           ) : session.status === "READY" ? (
             <form onSubmit={handleFollowup} className="relative">
@@ -332,7 +427,7 @@ const ConversationBubble = React.memo(function ConversationBubble({
           <div className="flex items-center gap-1.5 mb-1">
             <MessageSquare className="h-2.5 w-2.5" style={{ color: sc.neon }} />
             <span style={{ color: sc.neon }} className="text-[8px] uppercase tracking-wider">
-              Cursor
+              {msg.id?.startsWith("ollama") ? "Ollama" : "Cursor"}
             </span>
           </div>
         )}

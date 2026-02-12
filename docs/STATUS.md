@@ -1,7 +1,27 @@
-# Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-10
+# Status — XmetaV / OpenClaw Command Center
+**Last verified:** 2026-02-12  
+**System:** metavibez4L (WSL2)  
+**XmetaV Version:** v10 (Voice Commands + x402 Payments + ERC-8004 Identity)
 
-This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
+This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
+
+---
+
+## Quick Health Check
+
+```bash
+# One-command system fix and verification
+./scripts/openclaw-fix.sh
+
+# Check all components
+./scripts/health-check.sh
+
+# Verify OpenClaw
+openclaw health
+openclaw --version  # Expected: 2026.2.1
+```
+
+---
 
 ## Versions
 
@@ -270,8 +290,12 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `agent_controls` | Agent enable/disable state | Authenticated: SELECT, INSERT, UPDATE |
 | `swarm_runs` | Swarm run metadata and status | Authenticated: SELECT, INSERT, UPDATE |
 | `swarm_tasks` | Per-task status and output | Authenticated: SELECT, INSERT, UPDATE |
+| `x402_payments` | x402 payment transaction log | Authenticated: SELECT, INSERT |
+| `intent_sessions` | Intent resolution sessions | Authenticated: SELECT, INSERT |
 
 All tables have Realtime enabled for live updates.
+
+View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments`.
 
 ### Dashboard pages
 
@@ -281,6 +305,8 @@ All tables have Realtime enabled for live updates.
 | `/agent` | Agent Chat | Streaming chat with agent selector |
 | `/swarms` | Swarms | Create (templates/custom), active runs (live), history (filterable) |
 | `/fleet` | Fleet | Agent table with enable/disable toggles |
+| `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
+| `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 
 ### Dashboard health checks
 
@@ -322,6 +348,146 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## Voice Commands (v10 — optimized)
+
+XmetaV v10 adds voice interaction with streaming TTS, push-to-talk, wake word detection, and continuous conversation.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Voice API (streaming) | Active | `/api/voice/transcribe` (STT) + `/api/voice/synthesize` (streaming TTS) |
+| React Hook | Active | `useVoice()` — streaming playback, PTT, analyser node, settings |
+| Wake Word | Active | `useWakeWord()` — "Hey XmetaV" via Web Speech API (Chrome/Edge) |
+| Waveform Visualizer | Active | `VoiceWaveform` — canvas-based frequency bars during record/playback |
+| Settings Panel | Active | `VoiceSettings` — voice, model, speed, PTT, wake, continuous toggles |
+| Dashboard UI | Active | Voice toggle + gear icon in Agent Chat header |
+| x402 Gating | Active | Endpoints payment-gated: $0.005 (transcribe), $0.01 (synthesize) |
+
+### Usage
+
+**Dashboard:** Click the voice toggle in Agent Chat header. Use the gear icon for settings.
+- **Click-to-talk**: Click mic to record, click again to send
+- **Push-to-talk**: Hold SPACE to record, release to send (enable in settings)
+- **Wake word**: Say "Hey XmetaV" hands-free (enable in settings, Chrome/Edge)
+- **Continuous**: Auto-listen after agent speaks (enable in settings)
+- **Streaming TTS**: Audio starts playing within ~200ms via MediaSource API
+
+**CLI:**
+```bash
+cd dashboard
+npx tsx scripts/voice-cli.ts
+```
+
+### Environment variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Dashboard `.env.local` | Required for Whisper + TTS |
+| `X402_BUDGET_LIMIT` | (in voice mode) | Must be >= $0.01 for TTS payments |
+
+---
+
+## x402 Payments (Base Mainnet) ✅ PRODUCTION
+
+XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` |
+| Bridge x402 Client | **Mainnet** ✅ | Auto-pays with `EVM_PRIVATE_KEY` |
+| Supabase `x402_payments` table | Active | Payment logging with daily spend view |
+| Dashboard `/payments` page | Active | Wallet status, history, gated endpoints |
+
+### Network Configuration
+
+| Setting | Value | Network |
+|---------|-------|---------|
+| `NETWORK` | `eip155:8453` | **Base Mainnet** ✅ |
+| `FACILITATOR_URL` | `https://api.cdp.coinbase.com/platform/v2/x402` | Production |
+| `EVM_ADDRESS` | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` | Receives USDC |
+
+### Gated endpoints (x402-server)
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /agent-task` | $0.01 | Queue a task for any agent |
+| `POST /intent` | $0.005 | Create an intent resolution session |
+| `GET /fleet-status` | $0.001 | Get fleet status summary |
+| `POST /swarm` | $0.02 | Launch a multi-agent swarm |
+
+### Environment variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `EVM_PRIVATE_KEY` | `bridge/.env` | Agent wallet private key (Base) |
+| `EVM_ADDRESS` | `x402-server/.env` | Address receiving payments |
+| `FACILITATOR_URL` | `x402-server/.env` | Coinbase x402 facilitator |
+| `X402_BUDGET_LIMIT` | `bridge/.env` | Max payment per request in USD |
+
+---
+
+## ERC-8004 Agent Identity (Base mainnet)
+
+The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
+
+| Property | Value |
+|----------|-------|
+| Agent ID | `16905` |
+| Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
+| Network | Base Mainnet |
+| Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
+| Tx | [BaseScan](https://basescan.org/tx/0xee8da73203e1a6ce48560f66731a02fb4a74c346d6f1a02bd4cf94d7e05adb3b) |
+
+### Dashboard `/identity` page
+
+Shows agent registration status, owner, wallet, capabilities, services, trust model, and contract addresses. Supports lookup by agent ID.
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `ERC8004_AGENT_ID` | `bridge/.env` | On-chain agent ID (16905) |
+| `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
+
+Full reference: `capabilities/erc8004-identity.md`
+
+---
+
+## Voice Commands (OpenAI Whisper + Streaming TTS)
+
+Optimized voice system with streaming TTS, push-to-talk, wake word, continuous conversation, and waveform visualizer.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Streaming TTS | Ready | `/api/voice/synthesize` streams MP3 chunks via MediaSource API |
+| STT (Whisper) | Ready | `/api/voice/transcribe` — audio in, text out |
+| Push-to-talk | Ready | Hold SPACE to record (enable in voice settings) |
+| Wake word | Ready | "Hey XmetaV" via Web Speech API (Chrome/Edge only) |
+| Continuous mode | Ready | Auto-listen after agent finishes speaking |
+| Waveform visualizer | Ready | Canvas-based frequency bars (recording + playback) |
+| Voice settings panel | Ready | Voice, model, speed, PTT, wake, continuous toggles |
+| x402 voice endpoints | Ready | `POST /voice/transcribe` ($0.005), `POST /voice/synthesize` ($0.01) |
+| CLI voice mode | Ready | `npx tsx scripts/voice-cli.ts` (requires `sox`) |
+
+### Models
+
+| Model | Type | Default | Notes |
+|-------|------|---------|-------|
+| `whisper-1` | STT | Yes | Only Whisper model |
+| `tts-1` | TTS | Yes | Fast, lower latency |
+| `tts-1-hd` | TTS | No | Higher quality, selectable in settings |
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | `dashboard/.env.local` | OpenAI API key for Whisper + TTS |
+| `OPENAI_API_KEY` | `x402-server/.env` | Same key for x402-gated voice |
+
+Full reference: `capabilities/voice-commands.md`
 
 ---
 

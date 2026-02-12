@@ -194,6 +194,82 @@ Results are stored in `~/.openclaw/swarm/<run-id>/` with per-task outputs and a 
 
 See `docs/SWARM.md` for the full reference.
 
+## x402 Autonomous Payments (Base network)
+
+The main agent can orchestrate **x402 payment protocol** deployments across the fleet. x402 (by Coinbase) enables agents to autonomously pay for services via USDC on Base — no API keys or subscriptions needed.
+
+### What main does with x402
+
+- **Delegates** x402 server-side work to `akua` (Solidity/Hardhat, payment middleware)
+- **Delegates** x402 client-side work to `basedintern` (XMTP chat agents, TypeScript SDK)
+- **Coordinates** multi-agent deployments via swarm pipelines
+- **Manages** payment budgets and safety thresholds
+
+### Swarm patterns for x402
+
+```bash
+# Pipeline: deploy payment-gated API, then build the paying client
+./scripts/swarm.sh --pipeline \
+  akua "Deploy x402 payment middleware on the NFT floor price endpoint" \
+  basedintern "Build an XMTP agent that pays for NFT data via x402"
+
+# Collaborative: both agents review an x402 integration
+./scripts/swarm.sh --collab \
+  "Audit the x402 payment flow for security issues" \
+  akua basedintern
+```
+
+### Key concepts
+
+| Concept | Description |
+|---------|-------------|
+| HTTP 402 | Server returns payment requirements via `PAYMENT-REQUIRED` header |
+| `PAYMENT-SIGNATURE` header | Client sends signed payment proof on retry |
+| USDC on Base | Settlement currency and network |
+| `@x402/fetch` | Client SDK — wraps fetch with automatic payment handling |
+| `@x402/express` | Server middleware for gating endpoints |
+| `@x402/evm` | EVM scheme support (Base Sepolia / Base Mainnet) |
+| `@xmtp/agent-sdk` | Chat agent framework (XMTP v4) |
+
+### Environment variables (agent wallet)
+
+```bash
+EVM_PRIVATE_KEY=0x...         # Agent wallet private key (Base)
+X402_BUDGET_LIMIT=1.00        # Max payment per request in USD
+```
+
+Full protocol reference: `capabilities/x402-payments.md`
+
+## ERC-8004 On-Chain Identity (Base mainnet)
+
+The main agent is registered on-chain as **XmetaV** — an ERC-8004 identity NFT on Base mainnet.
+
+### On-chain registration
+
+| Property | Value |
+|----------|-------|
+| Agent ID | `16905` |
+| Name | XmetaV |
+| Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
+| Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
+
+### What main does with ERC-8004
+
+- **Owns** the on-chain agent identity (ERC-721 NFT)
+- **Publishes** capabilities and services via metadata URI
+- **Accumulates** reputation through the ReputationRegistry
+- **Verifiable** by any third party via Base mainnet contracts
+
+### Environment variables
+
+```bash
+ERC8004_AGENT_ID=16905        # On-chain agent ID
+EVM_PRIVATE_KEY=0x...         # Wallet key (shared with x402)
+```
+
+Full protocol reference: `capabilities/erc8004-identity.md`
+
 ## Browser automation (optional)
 
 Browser automation is primarily operated via the deterministic CLI:

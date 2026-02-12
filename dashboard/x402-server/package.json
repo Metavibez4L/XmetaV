@@ -1,0 +1,23 @@
+{
+  "name": "xmetav-x402-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "@x402/core": "latest",
+    "@x402/evm": "latest",
+    "@x402/express": "latest",
+    "dotenv": "^17.2.4",
+    "express": "^5.1.0",
+    "openai": "^6.21.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0"
+  }
+}

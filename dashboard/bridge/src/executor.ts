@@ -1,10 +1,10 @@
 import { supabase } from "../lib/supabase.js";
-import { runAgent } from "../lib/openclaw.js";
+import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
-const running = new Map<string, ChildProcess>();
+export const running = new Map<string, ChildProcess>();
 
 async function isAgentEnabled(agentId: string): Promise<boolean> {
   try {
@@ -79,7 +79,7 @@ export async function executeCommand(command: {
   streamer.start();
 
   try {
-    const child = runAgent({
+    const child = runAgentWithFallback({
       agentId: agent_id,
       message,
       onChunk: (text) => streamer.write(text),

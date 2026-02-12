@@ -2,7 +2,7 @@
 // Shared TypeScript types for the XmetaV Control Plane
 // ============================================================
 
-export type CommandStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type CommandStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "timeout";
 export type AgentStatus = "online" | "idle" | "busy" | "offline";
 
 export interface AgentControl {
@@ -149,6 +149,9 @@ export interface IntentSession {
   commands: IntentCommand[];
   executed_command_ids: string[] | null;
   conversation: IntentConversationMessage[] | null;
+  retry_count: number;
+  max_retries: number;
+  timeout_seconds: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -160,6 +163,67 @@ export interface IntentConversationMessage {
   type: "user_message" | "assistant_message";
   text: string;
 }
+
+// ============================================================
+// ERC-8004 Identity types
+// ============================================================
+
+/** On-chain agent identity from the ERC-8004 IdentityRegistry */
+export interface ERC8004Identity {
+  agentId: string;
+  name: string;
+  owner: string;
+  agentWallet: string;
+  tokenURI: string;
+  registered: boolean;
+  network: string;
+  registryAddress: string;
+  reputationAddress: string;
+  basescanUrl: string;
+}
+
+/** Reputation summary from the ERC-8004 ReputationRegistry */
+export interface ERC8004Reputation {
+  count: number;
+  score: string;
+  decimals: number;
+}
+
+// ============================================================
+// x402 Payment types
+// ============================================================
+
+export type X402PaymentStatus = "pending" | "completed" | "failed";
+
+/** Row in the x402_payments table */
+export interface X402Payment {
+  id: string;
+  command_id: string | null;
+  session_id: string | null;
+  agent_id: string;
+  endpoint: string;
+  amount: string;
+  currency: string;
+  network: string;
+  tx_hash: string | null;
+  payer_address: string | null;
+  payee_address: string | null;
+  status: X402PaymentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Wallet info returned by /api/x402/wallet */
+export interface X402WalletInfo {
+  address: string | null;
+  configured: boolean;
+  network: string;
+  budgetLimit: string;
+}
+
+// ============================================================
+// Agent fleet
+// ============================================================
 
 /** Known agent fleet (matches OpenClaw config) */
 export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [

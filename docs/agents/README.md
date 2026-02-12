@@ -44,6 +44,21 @@ All agents can be managed from the **Control Plane Dashboard** at http://localho
 - Cancel running swarms with one click
 - Filterable history of past runs
 
+### Payments Page (`/payments`)
+
+- x402 wallet address and connection status
+- Total and daily USDC spend tracking on Base
+- Payment history table with BaseScan transaction links
+- List of x402-gated API endpoints with pricing
+
+### Identity Page (`/identity`)
+
+- ERC-8004 on-chain agent identity (NFT #16905 on Base mainnet)
+- Registration status, owner, and wallet details
+- Agent capabilities, services, and trust model from metadata
+- Contract addresses with BaseScan links
+- Agent ID lookup for inspecting other registered agents
+
 See the [dashboard README](../../dashboard/README.md) for setup and full documentation.
 
 ## Swarm Orchestration (CLI)

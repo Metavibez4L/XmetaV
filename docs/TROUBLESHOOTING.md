@@ -302,10 +302,166 @@ timeout 30 openclaw agent --agent main --local --session-id test_$(date +%s) --t
 
 ---
 
+## Dashboard Troubleshooting
+
+### Problem: Dashboard won't start (port 3000 in use)
+
+**Symptoms:**
+```
+Error: listen EADDRINUSE: address already in use :::3000
+```
+
+**Fix:**
+```bash
+# Find and kill process on port 3000
+lsof -ti:3000 | xargs kill -9
+
+# Or use different port
+cd dashboard && npm run dev -- --port 3001
+```
+
+### Problem: Bridge daemon connection errors
+
+**Symptoms:**
+- Dashboard shows "Bridge Offline"
+- Commands don't execute
+- Supabase realtime not receiving responses
+
+**Fix:**
+```bash
+# Start bridge daemon
+cd dashboard/bridge && npm start
+
+# Check bridge status
+curl http://localhost:3000/api/bridge/status
+
+# Verify Supabase connection
+curl -H "Authorization: Bearer <anon-key>" \
+  https://ptlneqcjsnrxxruutsxm.supabase.co/rest/v1/agent_commands?limit=1
+```
+
+### Problem: Hydration errors in dashboard
+
+**Symptoms:**
+- React hydration mismatch warnings
+- UI components not interactive
+
+**Fix:**
+- Clear Next.js cache:
+  ```bash
+  cd dashboard && rm -rf .next && npm run dev
+  ```
+- Check for nested `<button>` elements (common cause)
+
+---
+
+## x402 Payment Troubleshooting
+
+### Problem: "No scheme registered" when paying 402 response
+
+**Symptoms:**
+```
+Error: No scheme registered for network eip155:84532
+```
+
+**Cause:** EVM scheme not registered on x402 client
+
+**Fix:**
+```bash
+# In bridge or client code, ensure:
+import { registerExactEvmScheme } from "@x402/evm/exact/client";
+registerExactEvmScheme(client, { signer });
+```
+
+### Problem: Insufficient funds for payment
+
+**Symptoms:**
+- Payment fails with "insufficient balance"
+- 402 response keeps returning
+
+**Fix:**
+```bash
+# Check wallet balance on Base Sepolia
+# Fund wallet from faucet: https://faucet.circle.com/
+
+# Set higher budget limit
+export X402_BUDGET_LIMIT=5.00  # $5 USD max per request
+```
+
+### Problem: Payment succeeds but request still fails
+
+**Symptoms:**
+- Payment signature accepted
+- 200 response not returned
+
+**Check:**
+1. Verify facilitator URL is correct
+2. Check `x402-server` logs for settlement errors
+3. Ensure `EVM_ADDRESS` matches the server's receiving address
+
+---
+
+## Voice Command Troubleshooting
+
+### Problem: Mic not working in dashboard
+
+**Symptoms:**
+- Mic button shows "Permission denied"
+- No audio input detected
+
+**Fix:**
+```bash
+# Check browser permissions (Chrome/Edge)
+# 1. Click lock icon in address bar
+# 2. Ensure Microphone = "Allow"
+# 3. Reload page
+
+# Check system audio
+arecord -l  # List recording devices
+```
+
+### Problem: Voice endpoints return 402 Payment Required
+
+**Symptoms:**
+```
+POST /api/voice/transcribe 402
+```
+
+**Cause:** x402 payment not configured
+
+**Fix:**
+```bash
+# Set OpenAI API key (required for Whisper + TTS)
+export OPENAI_API_KEY=sk-...
+
+# Set budget for voice payments
+export X402_BUDGET_LIMIT=0.50  # Must be >= $0.01 for TTS
+```
+
+### Problem: TTS audio not playing
+
+**Symptoms:**
+- Response received but no audio output
+- Audio element shows but silent
+
+**Fix:**
+```bash
+# Check audio output
+aplay -l  # List playback devices
+
+# Check browser autoplay policy
+# Click anywhere on page to enable audio context
+```
+
+---
+
 ## Collecting logs
 
 - Gateway logs: `~/.openclaw/gateway.log`
 - Main logs: `/tmp/openclaw/openclaw-*.log`
+- Dashboard logs: `dashboard/.next/logs`
+- Bridge logs: `dashboard/bridge/logs`
+- x402 server logs: `dashboard/x402-server/logs`
 - Quick health + agent test:
   ```bash
   ./scripts/health-check.sh

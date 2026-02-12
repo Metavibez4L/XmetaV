@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase.js";
-import { runAgent } from "../lib/openclaw.js";
+import { runAgentWithFallback } from "../lib/openclaw.js";
 import type { ChildProcess } from "child_process";
 
 // ============================================================
@@ -407,7 +407,7 @@ async function executeTask(
     let child: ChildProcess | null = null;
 
     try {
-      child = runAgent({
+      child = runAgentWithFallback({
         agentId: taskRow.agent_id,
         message,
         onChunk: (text) => { outputBuffer += text; },
