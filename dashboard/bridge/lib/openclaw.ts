@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
+import { randomUUID } from "crypto";
 
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set(["main", "akua", "akua_web", "basedintern", "basedintern_web"]);
@@ -33,11 +34,15 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   const nodePath = process.env.NODE_PATH || "node";
   const timeout = timeoutSeconds ?? DEFAULT_TIMEOUT_S;
 
+  // Use a unique session ID per command to avoid lock contention
+  const sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+
   const args = [
     "agent",
     "--agent", agentId,
     "--local",
     "--thinking", "off",
+    "--session-id", sessionId,
     "-m", message,
   ];
 
