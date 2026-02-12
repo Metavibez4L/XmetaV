@@ -389,16 +389,24 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
-## x402 Payments (Base network)
+## x402 Payments (Base Mainnet) ✅ PRODUCTION
 
 XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| x402 Express Server | Ready | `cd dashboard/x402-server && npm start` |
-| Bridge x402 Client | Ready | Auto-pays 402 responses when `EVM_PRIVATE_KEY` is set |
+| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` |
+| Bridge x402 Client | **Mainnet** ✅ | Auto-pays with `EVM_PRIVATE_KEY` |
 | Supabase `x402_payments` table | Active | Payment logging with daily spend view |
-| Dashboard `/payments` page | Active | Wallet status, history, gated endpoint list |
+| Dashboard `/payments` page | Active | Wallet status, history, gated endpoints |
+
+### Network Configuration
+
+| Setting | Value | Network |
+|---------|-------|---------|
+| `NETWORK` | `eip155:8453` | **Base Mainnet** ✅ |
+| `FACILITATOR_URL` | `https://api.cdp.coinbase.com/platform/v2/x402` | Production |
+| `EVM_ADDRESS` | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` | Receives USDC |
 
 ### Gated endpoints (x402-server)
 
