@@ -48,8 +48,11 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
 
   console.log(`[openclaw] Spawning: ${openclawPath} ${args.join(" ")}${timeout > 0 ? ` (timeout: ${timeout}s)` : ""}`);
 
+  // Run from the XmetaV project root so the agent has direct repo context
+  const projectRoot = process.env.XMETAV_ROOT || resolve(process.env.HOME || "/home/manifest", "XmetaV");
+
   const child = spawn(openclawPath, args, {
-    cwd: resolve(process.env.HOME || "/home/manifest"),
+    cwd: projectRoot,
     env: {
       ...process.env,
       PATH: `${resolve(nodePath, "..")}:${process.env.PATH}`,
