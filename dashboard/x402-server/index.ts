@@ -14,7 +14,7 @@ import OpenAI from "openai";
 const evmAddress = process.env.EVM_ADDRESS as `0x${string}`;
 const facilitatorUrl = process.env.FACILITATOR_URL;
 const port = parseInt(process.env.PORT || "4021", 10);
-const network = process.env.NETWORK || "eip155:84532"; // Base Sepolia default
+const network = process.env.NETWORK || "eip155:8453"; // Base Mainnet default
 
 if (!evmAddress) {
   console.error("EVM_ADDRESS environment variable is required");
