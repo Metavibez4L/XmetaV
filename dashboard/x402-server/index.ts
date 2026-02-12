@@ -46,6 +46,7 @@ app.use(express.json());
 
 // ---- x402 Payment Middleware ----
 // Gates XmetaV platform endpoints with USDC micro-payments on Base
+// PRICING: Cost + margin for profitability
 
 app.use(
   paymentMiddleware(
@@ -54,7 +55,7 @@ app.use(
         accepts: [
           {
             scheme: "exact",
-            price: "$0.01",
+            price: "$0.10",  // Was $0.01 — 10x for agent execution value
             network,
             payTo: evmAddress,
           },
@@ -66,7 +67,7 @@ app.use(
         accepts: [
           {
             scheme: "exact",
-            price: "$0.005",
+            price: "$0.05",  // Was $0.005 — 10x for intent resolution value
             network,
             payTo: evmAddress,
           },
@@ -78,7 +79,7 @@ app.use(
         accepts: [
           {
             scheme: "exact",
-            price: "$0.001",
+            price: "$0.01",  // Was $0.001 — 10x minimum viable
             network,
             payTo: evmAddress,
           },
@@ -90,7 +91,7 @@ app.use(
         accepts: [
           {
             scheme: "exact",
-            price: "$0.02",
+            price: "$0.50",  // Was $0.02 — 25x for multi-agent orchestration
             network,
             payTo: evmAddress,
           },
@@ -104,7 +105,7 @@ app.use(
               accepts: [
                 {
                   scheme: "exact",
-                  price: "$0.005",
+                  price: "$0.05",  // Was $0.005 — 10x (covers Whisper ~$0.006 + margin)
                   network,
                   payTo: evmAddress,
                 },
@@ -116,7 +117,26 @@ app.use(
               accepts: [
                 {
                   scheme: "exact",
-                  price: "$0.01",
+                  price: "$0.08",  // Was $0.01 — 8x (covers TTS $0.015 + healthy margin)
+                  network,
+                  payTo: evmAddress,
+                },
+              ],
+              description: "Text-to-speech synthesis via OpenAI TTS",
+              mimeType: "audio/mpeg",
+            },
+          }
+        : {}),
+                },
+              ],
+              description: "Speech-to-text transcription via Whisper",
+              mimeType: "application/json",
+            },
+            "POST /voice/synthesize": {
+              accepts: [
+                {
+                  scheme: "exact",
+                  price: "$0.08",  // Was $0.01 — 8x (covers TTS $0.015 + healthy margin)
                   network,
                   payTo: evmAddress,
                 },
