@@ -1,5 +1,7 @@
 # Voice Commands — XmetaV
 
+**Last Updated:** 2026-02-12 (v10.1 — Streaming TTS, Push-to-Talk, Wake Word, Waveform)
+
 Voice command and response system using OpenAI Whisper (STT) and OpenAI TTS. Speak to your agents, hear their responses.
 
 ## Architecture
