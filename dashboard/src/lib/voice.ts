@@ -8,11 +8,28 @@ const openai = new OpenAI({
 
 // ── Voice options ──
 
-export type VoiceName = "alloy" | "echo" | "fable" | "nova" | "onyx" | "shimmer";
+export type VoiceName =
+  | "alloy"
+  | "echo"
+  | "fable"
+  | "nova"
+  | "onyx"
+  | "shimmer";
+
+export const VALID_VOICES: VoiceName[] = [
+  "alloy",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "shimmer",
+];
+
+export type TTSModel = "tts-1" | "tts-1-hd";
 
 export const DEFAULT_VOICE: VoiceName = "nova";
 export const DEFAULT_STT_MODEL = "whisper-1";
-export const DEFAULT_TTS_MODEL = "tts-1-hd"; // "tts-1" for faster/cheaper
+export const DEFAULT_TTS_MODEL: TTSModel = "tts-1"; // fast by default; "tts-1-hd" for quality
 
 // ── Speech-to-Text (Whisper) ──
 
@@ -37,29 +54,59 @@ export async function transcribeAudio(
   return response.text;
 }
 
-// ── Text-to-Speech ──
+// ── Text-to-Speech (buffered, legacy) ──
 
 /**
  * Synthesize text to speech using OpenAI TTS.
- * Returns an mp3 audio buffer.
+ * Returns an mp3 audio buffer (fully buffered).
  */
 export async function synthesizeSpeech(
   text: string,
-  voice: VoiceName = DEFAULT_VOICE
+  voice: VoiceName = DEFAULT_VOICE,
+  model: TTSModel = DEFAULT_TTS_MODEL,
+  speed: number = 1.0
 ): Promise<Buffer> {
   const response = await openai.audio.speech.create({
-    model: DEFAULT_TTS_MODEL,
+    model,
     voice,
     input: text,
     response_format: "mp3",
-    speed: 1.0,
+    speed: clampSpeed(speed),
   });
 
   const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
 }
 
+// ── Text-to-Speech (streaming) ──
+
+/**
+ * Synthesize text to speech and return the raw Response for streaming.
+ * The caller can pipe response.body directly to the client.
+ */
+export async function synthesizeSpeechStream(
+  text: string,
+  voice: VoiceName = DEFAULT_VOICE,
+  model: TTSModel = DEFAULT_TTS_MODEL,
+  speed: number = 1.0
+): Promise<Response> {
+  const response = await openai.audio.speech.create({
+    model,
+    voice,
+    input: text,
+    response_format: "mp3",
+    speed: clampSpeed(speed),
+  });
+
+  // OpenAI SDK returns a Response-like object with a body ReadableStream
+  return response as unknown as Response;
+}
+
 // ── Helpers ──
+
+function clampSpeed(speed: number): number {
+  return Math.min(4.0, Math.max(0.25, speed));
+}
 
 function getMimeType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();

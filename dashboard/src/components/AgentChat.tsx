@@ -1,11 +1,25 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { useVoice } from "@/hooks/useVoice";
+import { useWakeWord } from "@/hooks/useWakeWord";
 import { AgentSelector } from "./AgentSelector";
-import { Send, Loader2, ChevronRight, Hexagon, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { VoiceWaveform } from "./VoiceWaveform";
+import { VoiceSettingsPanel } from "./VoiceSettings";
+import {
+  Send,
+  Loader2,
+  ChevronRight,
+  Hexagon,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio,
+  Repeat,
+} from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 
 // ────────────────────────────────────────────────────
@@ -31,20 +45,26 @@ function nextId() {
 // Memoized message bubble
 // ────────────────────────────────────────────────────
 
-const MessageBubble = React.memo(function MessageBubble({ msg }: { msg: ChatMessage }) {
+const MessageBubble = React.memo(function MessageBubble({
+  msg,
+}: {
+  msg: ChatMessage;
+}) {
   return (
-    <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+    >
       <div
         className="max-w-[85%] rounded-lg px-4 py-3 relative"
         style={
           msg.role === "user"
             ? {
-                background: 'linear-gradient(135deg, #00f0ff18, #00f0ff08)',
-                border: '1px solid #00f0ff30',
+                background: "linear-gradient(135deg, #00f0ff18, #00f0ff08)",
+                border: "1px solid #00f0ff30",
               }
             : {
-                background: 'linear-gradient(135deg, #0a0f1a, #0d1525)',
-                border: `1px solid ${msg.status === "failed" ? '#ff2d5e20' : '#00f0ff12'}`,
+                background: "linear-gradient(135deg, #0a0f1a, #0d1525)",
+                border: `1px solid ${msg.status === "failed" ? "#ff2d5e20" : "#00f0ff12"}`,
               }
         }
       >
@@ -52,20 +72,33 @@ const MessageBubble = React.memo(function MessageBubble({ msg }: { msg: ChatMess
           <div className="mb-2 flex items-center gap-2">
             <span
               className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ color: '#a855f7', background: '#a855f710', border: '1px solid #a855f720' }}
+              style={{
+                color: "#a855f7",
+                background: "#a855f710",
+                border: "1px solid #a855f720",
+              }}
             >
               {msg.agentId}
             </span>
             {msg.status === "running" && (
               <div className="flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" style={{ color: '#00f0ff66' }} />
-                <span className="text-[8px] font-mono" style={{ color: '#00f0ff44' }}>
+                <Loader2
+                  className="h-3 w-3 animate-spin"
+                  style={{ color: "#00f0ff66" }}
+                />
+                <span
+                  className="text-[8px] font-mono"
+                  style={{ color: "#00f0ff44" }}
+                >
                   STREAMING
                 </span>
               </div>
             )}
             {msg.status === "pending" && (
-              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#f59e0b66' }}>
+              <span
+                className="text-[8px] font-mono animate-pulse"
+                style={{ color: "#f59e0b66" }}
+              >
                 QUEUED
               </span>
             )}
@@ -74,8 +107,11 @@ const MessageBubble = React.memo(function MessageBubble({ msg }: { msg: ChatMess
 
         {msg.role === "user" && (
           <div className="mb-1.5 flex items-center gap-2">
-            <ChevronRight className="h-3 w-3" style={{ color: '#00f0ff66' }} />
-            <span className="text-[8px] font-mono uppercase tracking-wider" style={{ color: '#00f0ff44' }}>
+            <ChevronRight className="h-3 w-3" style={{ color: "#00f0ff66" }} />
+            <span
+              className="text-[8px] font-mono uppercase tracking-wider"
+              style={{ color: "#00f0ff44" }}
+            >
               OPERATOR
             </span>
           </div>
@@ -84,16 +120,22 @@ const MessageBubble = React.memo(function MessageBubble({ msg }: { msg: ChatMess
         <pre
           className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
           style={{
-            color: msg.role === "user" ? '#00f0ffcc' : msg.status === "failed" ? '#ff2d5ecc' : '#c8d6e5cc',
+            color:
+              msg.role === "user"
+                ? "#00f0ffcc"
+                : msg.status === "failed"
+                  ? "#ff2d5ecc"
+                  : "#c8d6e5cc",
           }}
         >
-          {msg.content || (msg.status === "pending" ? "// waiting for bridge..." : "")}
+          {msg.content ||
+            (msg.status === "pending" ? "// waiting for bridge..." : "")}
         </pre>
 
         {msg.status === "running" && (
           <span
             className="inline-block w-2 h-4 ml-0.5 animate-pulse"
-            style={{ background: '#00f0ff', boxShadow: '0 0 4px #00f0ff' }}
+            style={{ background: "#00f0ff", boxShadow: "0 0 4px #00f0ff" }}
           />
         )}
       </div>
@@ -105,7 +147,10 @@ const MessageBubble = React.memo(function MessageBubble({ msg }: { msg: ChatMess
 // Auto-resize textarea hook
 // ────────────────────────────────────────────────────
 
-function useAutoResize(ref: React.RefObject<HTMLTextAreaElement | null>, value: string) {
+function useAutoResize(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  value: string
+) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -146,7 +191,23 @@ export function AgentChat() {
     error: voiceError,
     voiceEnabled,
     toggleVoice,
+    settings,
+    updateSettings,
+    analyserNode,
+    isPTTActive,
   } = useVoice();
+
+  // Wake word detection
+  const { isSupported: wakeWordSupported, isActive: wakeWordActive } =
+    useWakeWord({
+      enabled: voiceEnabled && settings.wakeWord,
+      onWake: () => {
+        // Wake word detected — start recording
+        if (!isListening && !isTranscribing && !sending) {
+          startListening();
+        }
+      },
+    });
 
   useAutoResize(inputRef, input);
 
@@ -177,7 +238,11 @@ export function AgentChat() {
       if (last?.role === "agent" && last.commandId === activeCommandId) {
         return [
           ...prev.slice(0, -1),
-          { ...last, content: fullText, status: isComplete ? "completed" : "running" },
+          {
+            ...last,
+            content: fullText,
+            status: isComplete ? "completed" : "running",
+          },
         ];
       }
       return prev;
@@ -195,75 +260,82 @@ export function AgentChat() {
   }, [isComplete, activeCommandId]);
 
   // ── Send message (accepts optional text for voice input) ──
-  const sendMessage = useCallback(async (overrideText?: string) => {
-    const trimmed = (overrideText ?? input).trim();
-    if (!trimmed || sending) return;
+  const sendMessage = useCallback(
+    async (overrideText?: string) => {
+      const trimmed = (overrideText ?? input).trim();
+      if (!trimmed || sending) return;
 
-    setSending(true);
-    if (!overrideText) setInput("");
-    shouldScrollRef.current = true;
+      setSending(true);
+      if (!overrideText) setInput("");
+      shouldScrollRef.current = true;
 
-    const userMsg: ChatMessage = {
-      id: nextId(),
-      role: "user",
-      content: trimmed,
-      agentId,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    scrollToBottom();
-
-    try {
-      const res = await fetch("/api/commands", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent_id: agentId, message: trimmed }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to send command");
-      }
-
-      const command: AgentCommand = await res.json();
-
-      const agentMsg: ChatMessage = {
+      const userMsg: ChatMessage = {
         id: nextId(),
-        role: "agent",
-        content: "",
-        commandId: command.id,
-        status: "pending",
+        role: "user",
+        content: trimmed,
         agentId,
-        timestamp: command.created_at,
-      };
-      setMessages((prev) => [...prev, agentMsg]);
-      setActiveCommandId(command.id);
-      scrollToBottom();
-    } catch (err) {
-      setSending(false);
-      const errorMsg: ChatMessage = {
-        id: nextId(),
-        role: "agent",
-        content: `[ERROR] ${err instanceof Error ? err.message : "Unknown error"}`,
-        status: "failed",
         timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, errorMsg]);
-    }
-  }, [input, agentId, sending, scrollToBottom]);
+      setMessages((prev) => [...prev, userMsg]);
+      scrollToBottom();
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }, [sendMessage]);
+      try {
+        const res = await fetch("/api/commands", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent_id: agentId, message: trimmed }),
+        });
 
-  // ── Auto-speak response when voice mode is on ──
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to send command");
+        }
+
+        const command: AgentCommand = await res.json();
+
+        const agentMsg: ChatMessage = {
+          id: nextId(),
+          role: "agent",
+          content: "",
+          commandId: command.id,
+          status: "pending",
+          agentId,
+          timestamp: command.created_at,
+        };
+        setMessages((prev) => [...prev, agentMsg]);
+        setActiveCommandId(command.id);
+        scrollToBottom();
+      } catch (err) {
+        setSending(false);
+        const errorMsg: ChatMessage = {
+          id: nextId(),
+          role: "agent",
+          content: `[ERROR] ${err instanceof Error ? err.message : "Unknown error"}`,
+          status: "failed",
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      }
+    },
+    [input, agentId, sending, scrollToBottom]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    },
+    [sendMessage]
+  );
+
+  // ── Auto-speak response when voice mode + autoSpeak is on ──
   const lastSpokenRef = useRef<string | null>(null);
   useEffect(() => {
     if (
       voiceEnabled &&
+      settings.autoSpeak &&
       isComplete &&
       fullText &&
       fullText !== lastSpokenRef.current &&
@@ -272,7 +344,31 @@ export function AgentChat() {
       lastSpokenRef.current = fullText;
       speak(fullText);
     }
-  }, [voiceEnabled, isComplete, fullText, isSpeaking, speak]);
+  }, [voiceEnabled, settings.autoSpeak, isComplete, fullText, isSpeaking, speak]);
+
+  // ── Continuous conversation: auto-listen after TTS finishes ──
+  const wasSpeakingRef = useRef(false);
+  useEffect(() => {
+    if (isSpeaking) {
+      wasSpeakingRef.current = true;
+    } else if (wasSpeakingRef.current) {
+      wasSpeakingRef.current = false;
+      if (voiceEnabled && settings.continuous && !isListening && !sending) {
+        // Short delay before re-listening
+        const timer = setTimeout(() => {
+          startListening();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [
+    isSpeaking,
+    voiceEnabled,
+    settings.continuous,
+    isListening,
+    sending,
+    startListening,
+  ]);
 
   // ── Voice mic toggle ──
   const handleMicToggle = useCallback(async () => {
@@ -286,12 +382,46 @@ export function AgentChat() {
     }
   }, [isListening, stopListening, startListening, sendMessage]);
 
+  // ── Push-to-talk release handler ──
+  useEffect(() => {
+    if (!voiceEnabled || !settings.pushToTalk) return;
+
+    const handler = async () => {
+      if (isListening) {
+        const text = await stopListening();
+        if (text) {
+          sendMessage(text);
+        }
+      }
+    };
+
+    window.addEventListener("xmetav-ptt-release", handler);
+    return () => window.removeEventListener("xmetav-ptt-release", handler);
+  }, [voiceEnabled, settings.pushToTalk, isListening, stopListening, sendMessage]);
+
+  // ── Continuous mode: auto-stop + send after silence ──
+  // (Silence detection is handled inside useVoice via startSilenceDetection)
+  // When recording stops via silence detection in continuous mode, we handle it here
+  const wasListeningRef = useRef(false);
+  useEffect(() => {
+    if (isListening) {
+      wasListeningRef.current = true;
+    } else if (wasListeningRef.current && settings.continuous) {
+      wasListeningRef.current = false;
+      // The recorder stopped (possibly from silence detection) —
+      // stopListening will be called by the onstop handler in useVoice
+      // We rely on the existing flow in handleMicToggle / PTT
+    }
+  }, [isListening, settings.continuous]);
+
   // ── Global keyboard shortcut: / to focus input ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
         const active = document.activeElement;
-        const isInput = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+        const isInput =
+          active instanceof HTMLInputElement ||
+          active instanceof HTMLTextAreaElement;
         if (!isInput) {
           e.preventDefault();
           inputRef.current?.focus();
@@ -302,34 +432,60 @@ export function AgentChat() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // ── Build status text for the voice state ──
+  const voiceStatusText = isListening
+    ? settings.continuous
+      ? "LISTENING..."
+      : isPTTActive
+        ? "HOLD TO SPEAK..."
+        : "RECORDING..."
+    : isTranscribing
+      ? "TRANSCRIBING..."
+      : isSpeaking
+        ? "SPEAKING..."
+        : null;
+
   return (
     <div className="flex h-full flex-col">
       {/* Header bar */}
       <div
         className="flex items-center justify-between px-4 sm:px-5 py-3 border-b shrink-0"
-        style={{ borderColor: '#00f0ff10', background: 'linear-gradient(90deg, #0a0f1a, #05080f)' }}
+        style={{
+          borderColor: "#00f0ff10",
+          background: "linear-gradient(90deg, #0a0f1a, #05080f)",
+        }}
       >
         <div className="flex items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
-            <Hexagon className="h-4 w-4" style={{ color: '#00f0ff66' }} />
-            <h1 className="text-sm font-bold font-mono tracking-wider hidden sm:block" style={{ color: '#00f0ff' }}>
+            <Hexagon className="h-4 w-4" style={{ color: "#00f0ff66" }} />
+            <h1
+              className="text-sm font-bold font-mono tracking-wider hidden sm:block"
+              style={{ color: "#00f0ff" }}
+            >
               AGENT INTERFACE
             </h1>
           </div>
-          <div className="h-4 w-px hidden sm:block" style={{ background: '#00f0ff15' }} />
+          <div
+            className="h-4 w-px hidden sm:block"
+            style={{ background: "#00f0ff15" }}
+          />
           <AgentSelector value={agentId} onChange={setAgentId} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Voice toggle */}
           <button
             onClick={toggleVoice}
             className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
             style={{
-              color: voiceEnabled ? '#39ff14' : '#4a6a8a',
-              background: voiceEnabled ? '#39ff1408' : 'transparent',
-              border: `1px solid ${voiceEnabled ? '#39ff1420' : '#00f0ff10'}`,
+              color: voiceEnabled ? "#39ff14" : "#4a6a8a",
+              background: voiceEnabled ? "#39ff1408" : "transparent",
+              border: `1px solid ${voiceEnabled ? "#39ff1420" : "#00f0ff10"}`,
             }}
-            title={voiceEnabled ? "Voice mode ON — click to disable" : "Voice mode OFF — click to enable"}
+            title={
+              voiceEnabled
+                ? "Voice mode ON -- click to disable"
+                : "Voice mode OFF -- click to enable"
+            }
           >
             {voiceEnabled ? (
               <Volume2 className="h-3.5 w-3.5" />
@@ -341,18 +497,71 @@ export function AgentChat() {
             </span>
           </button>
 
-          <div className="h-4 w-px" style={{ background: '#00f0ff10' }} />
+          {/* Voice settings gear (only when voice is on) */}
+          {voiceEnabled && (
+            <VoiceSettingsPanel
+              settings={settings}
+              onUpdate={updateSettings}
+              wakeWordSupported={wakeWordSupported}
+            />
+          )}
+
+          {/* Mode badges */}
+          {voiceEnabled && settings.continuous && (
+            <div
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+              style={{
+                background: "#a855f708",
+                border: "1px solid #a855f720",
+              }}
+            >
+              <Repeat className="h-2.5 w-2.5" style={{ color: "#a855f7" }} />
+              <span
+                className="text-[7px] font-mono uppercase tracking-wider hidden sm:inline"
+                style={{ color: "#a855f788" }}
+              >
+                CONTINUOUS
+              </span>
+            </div>
+          )}
+
+          {voiceEnabled && settings.wakeWord && wakeWordActive && (
+            <div
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+              style={{
+                background: "#f59e0b08",
+                border: "1px solid #f59e0b20",
+              }}
+            >
+              <Radio className="h-2.5 w-2.5" style={{ color: "#f59e0b" }} />
+              <span
+                className="text-[7px] font-mono uppercase tracking-wider hidden sm:inline"
+                style={{ color: "#f59e0b88" }}
+              >
+                WAKE
+              </span>
+            </div>
+          )}
+
+          <div className="h-4 w-px" style={{ background: "#00f0ff10" }} />
 
           {/* Bridge status */}
           <div className="flex items-center gap-2">
             <div
               className="h-2 w-2 rounded-full"
               style={{
-                background: isOnline ? '#39ff14' : '#ff2d5e',
-                boxShadow: isOnline ? '0 0 6px #39ff14' : '0 0 6px #ff2d5e',
+                background: isOnline ? "#39ff14" : "#ff2d5e",
+                boxShadow: isOnline
+                  ? "0 0 6px #39ff14"
+                  : "0 0 6px #ff2d5e",
               }}
             />
-            <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: isOnline ? '#39ff1488' : '#ff2d5e88' }}>
+            <span
+              className="text-[9px] font-mono uppercase tracking-wider"
+              style={{
+                color: isOnline ? "#39ff1488" : "#ff2d5e88",
+              }}
+            >
               {isOnline ? "Online" : "Offline"}
             </span>
           </div>
@@ -370,16 +579,34 @@ export function AgentChat() {
             <div className="flex h-64 items-center justify-center">
               <div className="text-center">
                 <div className="mb-4 flex justify-center">
-                  <Hexagon className="h-12 w-12" style={{ color: '#00f0ff15' }} />
+                  <Hexagon
+                    className="h-12 w-12"
+                    style={{ color: "#00f0ff15" }}
+                  />
                 </div>
-                <p className="text-sm font-mono neon-glow" style={{ color: '#00f0ff88' }}>
+                <p
+                  className="text-sm font-mono neon-glow"
+                  style={{ color: "#00f0ff88" }}
+                >
                   [ AWAITING INPUT ]
                 </p>
-                <p className="mt-2 text-[11px] font-mono" style={{ color: '#4a6a8a' }}>
+                <p
+                  className="mt-2 text-[11px] font-mono"
+                  style={{ color: "#4a6a8a" }}
+                >
                   Send commands, delegate to akua, or orchestrate your fleet.
                 </p>
-                <p className="mt-3 text-[9px] font-mono" style={{ color: '#4a6a8a44' }}>
+                <p
+                  className="mt-3 text-[9px] font-mono"
+                  style={{ color: "#4a6a8a44" }}
+                >
                   Press / to focus input
+                  {voiceEnabled && settings.pushToTalk
+                    ? " | HOLD SPACE to speak"
+                    : ""}
+                  {voiceEnabled && settings.wakeWord
+                    ? ' | Say "Hey XmetaV"'
+                    : ""}
                 </p>
               </div>
             </div>
@@ -392,12 +619,18 @@ export function AgentChat() {
       </div>
 
       {/* Input */}
-      <div className="border-t px-4 sm:px-5 py-3 sm:py-4 shrink-0" style={{ borderColor: '#00f0ff10', background: 'linear-gradient(0deg, #0a0f1a, transparent)' }}>
+      <div
+        className="border-t px-4 sm:px-5 py-3 sm:py-4 shrink-0"
+        style={{
+          borderColor: "#00f0ff10",
+          background: "linear-gradient(0deg, #0a0f1a, transparent)",
+        }}
+      >
         <div className="mx-auto flex max-w-3xl gap-2 items-end">
           <div className="flex-1 relative">
             <ChevronRight
               className="absolute left-3 top-3 h-4 w-4 pointer-events-none"
-              style={{ color: '#00f0ff44' }}
+              style={{ color: "#00f0ff44" }}
             />
             <textarea
               ref={inputRef}
@@ -410,6 +643,27 @@ export function AgentChat() {
               rows={1}
             />
           </div>
+
+          {/* Waveform visualizer (shown during recording or speaking) */}
+          {voiceEnabled && (isListening || isSpeaking) && (
+            <div
+              className="shrink-0 flex items-center justify-center h-11 px-1 rounded"
+              style={{
+                background: isListening ? "#ff2d5e08" : "#39ff1408",
+                border: `1px solid ${isListening ? "#ff2d5e15" : "#39ff1415"}`,
+              }}
+            >
+              <VoiceWaveform
+                analyser={analyserNode}
+                isRecording={isListening}
+                isSpeaking={isSpeaking}
+                width={80}
+                height={28}
+                barCount={10}
+              />
+            </div>
+          )}
+
           {/* Mic button (shown when voice enabled) */}
           {voiceEnabled && (
             <button
@@ -418,27 +672,50 @@ export function AgentChat() {
               className="h-11 w-11 rounded flex items-center justify-center shrink-0 transition-all"
               style={{
                 background: isListening
-                  ? '#ff2d5e18'
+                  ? "#ff2d5e18"
                   : isTranscribing
-                  ? '#f59e0b10'
-                  : '#00f0ff08',
+                    ? "#f59e0b10"
+                    : isPTTActive
+                      ? "#a855f710"
+                      : "#00f0ff08",
                 border: `1px solid ${
                   isListening
-                    ? '#ff2d5e40'
+                    ? "#ff2d5e40"
                     : isTranscribing
-                    ? '#f59e0b30'
-                    : '#00f0ff20'
+                      ? "#f59e0b30"
+                      : isPTTActive
+                        ? "#a855f730"
+                        : "#00f0ff20"
                 }`,
-                boxShadow: isListening ? '0 0 12px #ff2d5e30' : 'none',
+                boxShadow: isListening
+                  ? "0 0 12px #ff2d5e30"
+                  : isPTTActive
+                    ? "0 0 8px #a855f720"
+                    : "none",
               }}
-              title={isListening ? "Stop recording" : "Start voice command"}
+              title={
+                isListening
+                  ? "Stop recording"
+                  : settings.pushToTalk
+                    ? "Hold SPACE or click to record"
+                    : "Start voice command"
+              }
             >
               {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" style={{ color: '#f59e0b' }} />
+                <Loader2
+                  className="h-4 w-4 animate-spin"
+                  style={{ color: "#f59e0b" }}
+                />
               ) : isListening ? (
-                <MicOff className="h-4 w-4 animate-pulse" style={{ color: '#ff2d5e' }} />
+                <MicOff
+                  className="h-4 w-4 animate-pulse"
+                  style={{ color: "#ff2d5e" }}
+                />
               ) : (
-                <Mic className="h-4 w-4" style={{ color: '#00f0ff88' }} />
+                <Mic
+                  className="h-4 w-4"
+                  style={{ color: isPTTActive ? "#a855f7" : "#00f0ff88" }}
+                />
               )}
             </button>
           )}
@@ -450,39 +727,55 @@ export function AgentChat() {
             className="h-11 w-11 rounded flex items-center justify-center cyber-btn shrink-0 disabled:opacity-30"
           >
             {sending ? (
-              <Loader2 className="h-4 w-4 animate-spin" style={{ color: '#00f0ff' }} />
+              <Loader2
+                className="h-4 w-4 animate-spin"
+                style={{ color: "#00f0ff" }}
+              />
             ) : (
               <Send className="h-4 w-4" />
             )}
           </button>
         </div>
         <div className="mx-auto max-w-3xl mt-1.5 flex items-center justify-between">
-          <span className="text-[8px] font-mono" style={{ color: '#4a6a8a33' }}>
-            ENTER send | SHIFT+ENTER newline | / focus{voiceEnabled ? " | MIC voice" : ""}
+          <span
+            className="text-[8px] font-mono"
+            style={{ color: "#4a6a8a33" }}
+          >
+            ENTER send | SHIFT+ENTER newline | / focus
+            {voiceEnabled && settings.pushToTalk
+              ? " | SPACE hold-to-talk"
+              : voiceEnabled
+                ? " | MIC voice"
+                : ""}
           </span>
           <div className="flex items-center gap-2">
             {voiceError && (
-              <span className="text-[8px] font-mono" style={{ color: '#ff2d5e66' }}>
+              <span
+                className="text-[8px] font-mono"
+                style={{ color: "#ff2d5e66" }}
+              >
                 {voiceError}
               </span>
             )}
-            {isListening && (
-              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#ff2d5e88' }}>
-                RECORDING...
+            {voiceStatusText && (
+              <span
+                className="text-[8px] font-mono animate-pulse"
+                style={{
+                  color: isListening
+                    ? "#ff2d5e88"
+                    : isTranscribing
+                      ? "#f59e0b88"
+                      : "#39ff1488",
+                }}
+              >
+                {voiceStatusText}
               </span>
             )}
-            {isTranscribing && (
-              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#f59e0b88' }}>
-                TRANSCRIBING...
-              </span>
-            )}
-            {isSpeaking && (
-              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#39ff1488' }}>
-                SPEAKING...
-              </span>
-            )}
-            {!isListening && !isTranscribing && !isSpeaking && (
-              <span className="text-[8px] font-mono hidden sm:block" style={{ color: '#4a6a8a33' }}>
+            {!voiceStatusText && (
+              <span
+                className="text-[8px] font-mono hidden sm:block"
+                style={{ color: "#4a6a8a33" }}
+              >
                 XMETAV::ENCRYPTED_CHANNEL
               </span>
             )}

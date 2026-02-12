@@ -351,33 +351,41 @@ Templates are loaded from `XmetaV/templates/swarms/*.json`.
 
 ---
 
-## Voice Commands (v10)
+## Voice Commands (v10 — optimized)
 
-XmetaV v10 adds voice interaction capability via OpenAI Whisper (STT) + TTS HD.
+XmetaV v10 adds voice interaction with streaming TTS, push-to-talk, wake word detection, and continuous conversation.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Voice API | Active | `/api/voice/transcribe` (STT) + `/api/voice/synthesize` (TTS) |
-| React Hook | Active | `useVoice()` with mic capture, audio playback, state management |
-| Dashboard UI | Active | Voice toggle in Agent Chat header with mic button |
+| Voice API (streaming) | Active | `/api/voice/transcribe` (STT) + `/api/voice/synthesize` (streaming TTS) |
+| React Hook | Active | `useVoice()` — streaming playback, PTT, analyser node, settings |
+| Wake Word | Active | `useWakeWord()` — "Hey XmetaV" via Web Speech API (Chrome/Edge) |
+| Waveform Visualizer | Active | `VoiceWaveform` — canvas-based frequency bars during record/playback |
+| Settings Panel | Active | `VoiceSettings` — voice, model, speed, PTT, wake, continuous toggles |
+| Dashboard UI | Active | Voice toggle + gear icon in Agent Chat header |
 | x402 Gating | Active | Endpoints payment-gated: $0.005 (transcribe), $0.01 (synthesize) |
 
 ### Usage
 
-**Dashboard:** Click the mic icon in Agent Chat to toggle voice mode. Speak, then release to send. Responses auto-play when voice mode is on.
+**Dashboard:** Click the voice toggle in Agent Chat header. Use the gear icon for settings.
+- **Click-to-talk**: Click mic to record, click again to send
+- **Push-to-talk**: Hold SPACE to record, release to send (enable in settings)
+- **Wake word**: Say "Hey XmetaV" hands-free (enable in settings, Chrome/Edge)
+- **Continuous**: Auto-listen after agent speaks (enable in settings)
+- **Streaming TTS**: Audio starts playing within ~200ms via MediaSource API
 
 **CLI:**
 ```bash
 cd dashboard
-npx ts-node scripts/voice-cli.ts
+npx tsx scripts/voice-cli.ts
 ```
 
 ### Environment variables
 
 | Variable | Location | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Dashboard `.env` | Required for Whisper + TTS |
-| `X402_BUDGET_LIMIT` | (in voice mode) | Must be ≥ $0.01 for TTS payments |
+| `OPENAI_API_KEY` | Dashboard `.env.local` | Required for Whisper + TTS |
+| `X402_BUDGET_LIMIT` | (in voice mode) | Must be >= $0.01 for TTS payments |
 
 ---
 
@@ -440,17 +448,29 @@ Full reference: `capabilities/erc8004-identity.md`
 
 ---
 
-## Voice Commands (OpenAI Whisper + TTS)
+## Voice Commands (OpenAI Whisper + Streaming TTS)
 
-Voice command and response system using OpenAI Whisper (STT) and TTS HD.
+Optimized voice system with streaming TTS, push-to-talk, wake word, continuous conversation, and waveform visualizer.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Dashboard voice mode | Ready | Toggle in Agent Chat header; requires `OPENAI_API_KEY` |
+| Streaming TTS | Ready | `/api/voice/synthesize` streams MP3 chunks via MediaSource API |
 | STT (Whisper) | Ready | `/api/voice/transcribe` — audio in, text out |
-| TTS (OpenAI HD) | Ready | `/api/voice/synthesize` — text in, audio out |
+| Push-to-talk | Ready | Hold SPACE to record (enable in voice settings) |
+| Wake word | Ready | "Hey XmetaV" via Web Speech API (Chrome/Edge only) |
+| Continuous mode | Ready | Auto-listen after agent finishes speaking |
+| Waveform visualizer | Ready | Canvas-based frequency bars (recording + playback) |
+| Voice settings panel | Ready | Voice, model, speed, PTT, wake, continuous toggles |
 | x402 voice endpoints | Ready | `POST /voice/transcribe` ($0.005), `POST /voice/synthesize` ($0.01) |
 | CLI voice mode | Ready | `npx tsx scripts/voice-cli.ts` (requires `sox`) |
+
+### Models
+
+| Model | Type | Default | Notes |
+|-------|------|---------|-------|
+| `whisper-1` | STT | Yes | Only Whisper model |
+| `tts-1` | TTS | Yes | Fast, lower latency |
+| `tts-1-hd` | TTS | No | Higher quality, selectable in settings |
 
 ### Environment
 

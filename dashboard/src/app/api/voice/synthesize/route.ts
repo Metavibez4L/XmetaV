@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
-import { synthesizeSpeech, isVoiceConfigured } from "@/lib/voice";
-import type { VoiceName } from "@/lib/voice";
+import {
+  synthesizeSpeechStream,
+  isVoiceConfigured,
+  VALID_VOICES,
+  DEFAULT_VOICE,
+  DEFAULT_TTS_MODEL,
+} from "@/lib/voice";
+import type { VoiceName, TTSModel } from "@/lib/voice";
 
 export const runtime = "nodejs";
 
-const VALID_VOICES: VoiceName[] = [
-  "alloy",
-  "echo",
-  "fable",
-  "nova",
-  "onyx",
-  "shimmer",
-];
+const VALID_MODELS: TTSModel[] = ["tts-1", "tts-1-hd"];
 
 /**
  * POST /api/voice/synthesize
- * Receives { text, voice? } JSON, returns audio/mpeg stream.
+ * Receives { text, voice?, model?, speed? } JSON.
+ * Streams audio/mpeg back — first bytes arrive as soon as OpenAI starts generating.
  */
 export async function POST(request: NextRequest) {
   // Auth
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { text, voice } = body;
+    const { text, voice, model, speed } = body;
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json(
@@ -56,16 +56,37 @@ export async function POST(request: NextRequest) {
     }
 
     const selectedVoice: VoiceName =
-      voice && VALID_VOICES.includes(voice) ? voice : "nova";
+      voice && VALID_VOICES.includes(voice) ? voice : DEFAULT_VOICE;
+    const selectedModel: TTSModel =
+      model && VALID_MODELS.includes(model) ? model : DEFAULT_TTS_MODEL;
+    const selectedSpeed =
+      typeof speed === "number" ? speed : 1.0;
 
-    const audioBuffer = await synthesizeSpeech(text.trim(), selectedVoice);
+    // Get streaming response from OpenAI
+    const openaiResponse = await synthesizeSpeechStream(
+      text.trim(),
+      selectedVoice,
+      selectedModel,
+      selectedSpeed
+    );
 
-    return new NextResponse(audioBuffer, {
+    // Pipe the stream through to the client — no buffering
+    const stream = openaiResponse.body;
+    if (!stream) {
+      return NextResponse.json(
+        { error: "No audio stream received" },
+        { status: 500 }
+      );
+    }
+
+    return new NextResponse(stream as ReadableStream, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
-        "Content-Length": audioBuffer.length.toString(),
+        "Transfer-Encoding": "chunked",
         "Cache-Control": "no-cache",
+        "X-Voice": selectedVoice,
+        "X-Model": selectedModel,
       },
     });
   } catch (err) {
