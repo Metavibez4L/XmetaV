@@ -656,8 +656,18 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 
 ## Changelog
 
+### 2026-02-12 (v10.1) — Voice System Optimization
+- **Streaming TTS** — Stream audio via MediaSource API for ~200ms first-byte playback latency
+- **Push-to-Talk** — Hold SPACE key to record, release to send (hands-free alternative)
+- **Wake Word** — Say "Hey XmetaV" to activate voice mode automatically
+- **Continuous Conversation** — Keep mic active between turns for natural back-and-forth
+- **Waveform Visualizer** — Canvas-based audio visualization during recording and playback
+- **Voice Settings Panel** — Configure voice (alloy/echo/fable/onyx/nova/shimmer), model (tts-1/tts-1-hd), speed (0.5-2x)
+- **TTS Model Switch** — Default changed from tts-1-hd to tts-1 for lower latency
+- **SourceBuffer Race Fix** — Safe sequential append pattern prevents audio glitches
+
 ### 2026-02-12 (v10) — Voice Commands
-- **Voice Command System** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS HD
+- **Voice Command System** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS
 - Voice mode toggle in Agent Chat header with mic button, auto-speak, and visual feedback
 - API routes `/api/voice/transcribe` (STT) and `/api/voice/synthesize` (TTS)
 - `useVoice` React hook with mic capture, audio playback, and state management
