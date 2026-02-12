@@ -13,6 +13,7 @@ Quick reference for everything you can do with your OpenClaw setup.
 | [cheatsheet.md](cheatsheet.md) | One-page reference card |
 | [x402-payments.md](x402-payments.md) | x402 autonomous payment protocol (Coinbase/Base) |
 | [erc8004-identity.md](erc8004-identity.md) | ERC-8004 on-chain agent identity & reputation (Base) |
+| [voice-commands.md](voice-commands.md) | Voice command & response system (OpenAI Whisper + TTS) |
 
 ## Your Setup at a Glance
 

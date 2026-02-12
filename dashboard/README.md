@@ -45,6 +45,7 @@ Copy `.env.example` to `.env.local` and fill in the Supabase keys:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public, used in browser) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side API routes only) |
+| `OPENAI_API_KEY` | OpenAI API key for voice commands (Whisper STT + TTS) |
 
 ### 4. Run Dashboard Locally
 
@@ -139,6 +140,8 @@ All tables have:
 | `/api/x402/wallet` | GET | Wallet info, spend stats, bridge status |
 | `/api/erc8004/identity` | GET | On-chain agent identity and metadata |
 | `/api/intent` | POST | Intent resolution (agent routing) |
+| `/api/voice/transcribe` | POST | Speech-to-text via Whisper (multipart audio) |
+| `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (returns audio/mpeg) |
 
 ## Project Structure
 

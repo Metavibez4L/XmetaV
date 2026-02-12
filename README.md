@@ -38,6 +38,7 @@
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
+- **Voice Commands** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS, with x402 payment-gated API
 - Multi-agent management (`main` + `basedintern` + `akua` + dynamic agents)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -618,6 +619,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
 | [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 payment protocol reference |
 | [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 agent identity reference |
+| [capabilities/voice-commands.md](capabilities/voice-commands.md) | Voice command & response system reference |
 
 ---
 
@@ -649,6 +651,15 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 ---
 
 ## Changelog
+
+### 2026-02-12 (v10) — Voice Commands
+- **Voice Command System** — Speak to agents and hear responses via OpenAI Whisper (STT) + TTS HD
+- Voice mode toggle in Agent Chat header with mic button, auto-speak, and visual feedback
+- API routes `/api/voice/transcribe` (STT) and `/api/voice/synthesize` (TTS)
+- `useVoice` React hook with mic capture, audio playback, and state management
+- x402 payment-gated voice endpoints (`POST /voice/transcribe` $0.005, `POST /voice/synthesize` $0.01)
+- CLI voice mode (`scripts/voice-cli.ts`) for terminal-based voice interaction
+- Voice capability documentation (`capabilities/voice-commands.md`)
 
 ### 2026-02-11 (v9) — ERC-8004 Agent Identity
 - **ERC-8004 On-Chain Identity** — Registered XmetaV agent as NFT #16905 on Base mainnet via IdentityRegistry

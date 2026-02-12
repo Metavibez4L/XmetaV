@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
+import { useVoice } from "@/hooks/useVoice";
 import { AgentSelector } from "./AgentSelector";
-import { Send, Loader2, ChevronRight, Hexagon } from "lucide-react";
+import { Send, Loader2, ChevronRight, Hexagon, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 
 // ────────────────────────────────────────────────────
@@ -134,6 +135,18 @@ export function AgentChat() {
 
   const { fullText, isComplete } = useRealtimeMessages(activeCommandId);
   const { isOnline } = useBridgeStatus();
+  const {
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+    isListening,
+    isSpeaking,
+    isTranscribing,
+    error: voiceError,
+    voiceEnabled,
+    toggleVoice,
+  } = useVoice();
 
   useAutoResize(inputRef, input);
 
@@ -181,13 +194,13 @@ export function AgentChat() {
     }
   }, [isComplete, activeCommandId]);
 
-  // ── Send message ──
-  const sendMessage = useCallback(async () => {
-    const trimmed = input.trim();
+  // ── Send message (accepts optional text for voice input) ──
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const trimmed = (overrideText ?? input).trim();
     if (!trimmed || sending) return;
 
     setSending(true);
-    setInput("");
+    if (!overrideText) setInput("");
     shouldScrollRef.current = true;
 
     const userMsg: ChatMessage = {
@@ -246,6 +259,33 @@ export function AgentChat() {
     }
   }, [sendMessage]);
 
+  // ── Auto-speak response when voice mode is on ──
+  const lastSpokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      voiceEnabled &&
+      isComplete &&
+      fullText &&
+      fullText !== lastSpokenRef.current &&
+      !isSpeaking
+    ) {
+      lastSpokenRef.current = fullText;
+      speak(fullText);
+    }
+  }, [voiceEnabled, isComplete, fullText, isSpeaking, speak]);
+
+  // ── Voice mic toggle ──
+  const handleMicToggle = useCallback(async () => {
+    if (isListening) {
+      const text = await stopListening();
+      if (text) {
+        sendMessage(text);
+      }
+    } else {
+      await startListening();
+    }
+  }, [isListening, stopListening, startListening, sendMessage]);
+
   // ── Global keyboard shortcut: / to focus input ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -279,17 +319,43 @@ export function AgentChat() {
           <div className="h-4 w-px hidden sm:block" style={{ background: '#00f0ff15' }} />
           <AgentSelector value={agentId} onChange={setAgentId} />
         </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="h-2 w-2 rounded-full"
+        <div className="flex items-center gap-3">
+          {/* Voice toggle */}
+          <button
+            onClick={toggleVoice}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
             style={{
-              background: isOnline ? '#39ff14' : '#ff2d5e',
-              boxShadow: isOnline ? '0 0 6px #39ff14' : '0 0 6px #ff2d5e',
+              color: voiceEnabled ? '#39ff14' : '#4a6a8a',
+              background: voiceEnabled ? '#39ff1408' : 'transparent',
+              border: `1px solid ${voiceEnabled ? '#39ff1420' : '#00f0ff10'}`,
             }}
-          />
-          <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: isOnline ? '#39ff1488' : '#ff2d5e88' }}>
-            {isOnline ? "Online" : "Offline"}
-          </span>
+            title={voiceEnabled ? "Voice mode ON — click to disable" : "Voice mode OFF — click to enable"}
+          >
+            {voiceEnabled ? (
+              <Volume2 className="h-3.5 w-3.5" />
+            ) : (
+              <VolumeX className="h-3.5 w-3.5" />
+            )}
+            <span className="text-[8px] font-mono uppercase tracking-wider hidden sm:inline">
+              Voice {voiceEnabled ? "ON" : "OFF"}
+            </span>
+          </button>
+
+          <div className="h-4 w-px" style={{ background: '#00f0ff10' }} />
+
+          {/* Bridge status */}
+          <div className="flex items-center gap-2">
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{
+                background: isOnline ? '#39ff14' : '#ff2d5e',
+                boxShadow: isOnline ? '0 0 6px #39ff14' : '0 0 6px #ff2d5e',
+              }}
+            />
+            <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: isOnline ? '#39ff1488' : '#ff2d5e88' }}>
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -344,8 +410,42 @@ export function AgentChat() {
               rows={1}
             />
           </div>
+          {/* Mic button (shown when voice enabled) */}
+          {voiceEnabled && (
+            <button
+              onClick={handleMicToggle}
+              disabled={sending || isTranscribing}
+              className="h-11 w-11 rounded flex items-center justify-center shrink-0 transition-all"
+              style={{
+                background: isListening
+                  ? '#ff2d5e18'
+                  : isTranscribing
+                  ? '#f59e0b10'
+                  : '#00f0ff08',
+                border: `1px solid ${
+                  isListening
+                    ? '#ff2d5e40'
+                    : isTranscribing
+                    ? '#f59e0b30'
+                    : '#00f0ff20'
+                }`,
+                boxShadow: isListening ? '0 0 12px #ff2d5e30' : 'none',
+              }}
+              title={isListening ? "Stop recording" : "Start voice command"}
+            >
+              {isTranscribing ? (
+                <Loader2 className="h-4 w-4 animate-spin" style={{ color: '#f59e0b' }} />
+              ) : isListening ? (
+                <MicOff className="h-4 w-4 animate-pulse" style={{ color: '#ff2d5e' }} />
+              ) : (
+                <Mic className="h-4 w-4" style={{ color: '#00f0ff88' }} />
+              )}
+            </button>
+          )}
+
+          {/* Send button */}
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={sending || !input.trim()}
             className="h-11 w-11 rounded flex items-center justify-center cyber-btn shrink-0 disabled:opacity-30"
           >
@@ -358,11 +458,35 @@ export function AgentChat() {
         </div>
         <div className="mx-auto max-w-3xl mt-1.5 flex items-center justify-between">
           <span className="text-[8px] font-mono" style={{ color: '#4a6a8a33' }}>
-            ENTER send | SHIFT+ENTER newline | / focus
+            ENTER send | SHIFT+ENTER newline | / focus{voiceEnabled ? " | MIC voice" : ""}
           </span>
-          <span className="text-[8px] font-mono hidden sm:block" style={{ color: '#4a6a8a33' }}>
-            XMETAV::ENCRYPTED_CHANNEL
-          </span>
+          <div className="flex items-center gap-2">
+            {voiceError && (
+              <span className="text-[8px] font-mono" style={{ color: '#ff2d5e66' }}>
+                {voiceError}
+              </span>
+            )}
+            {isListening && (
+              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#ff2d5e88' }}>
+                RECORDING...
+              </span>
+            )}
+            {isTranscribing && (
+              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#f59e0b88' }}>
+                TRANSCRIBING...
+              </span>
+            )}
+            {isSpeaking && (
+              <span className="text-[8px] font-mono animate-pulse" style={{ color: '#39ff1488' }}>
+                SPEAKING...
+              </span>
+            )}
+            {!isListening && !isTranscribing && !isSpeaking && (
+              <span className="text-[8px] font-mono hidden sm:block" style={{ color: '#4a6a8a33' }}>
+                XMETAV::ENCRYPTED_CHANNEL
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 # Status — XmetaV / OpenClaw (local config)
-Last verified: 2026-02-11
+Last verified: 2026-02-12
 
 This file captures the **known-good** runtime settings for this machine/profile and the quickest commands to verify everything is healthy.
 
@@ -387,6 +387,29 @@ Shows agent registration status, owner, wallet, capabilities, services, trust mo
 | `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
 
 Full reference: `capabilities/erc8004-identity.md`
+
+---
+
+## Voice Commands (OpenAI Whisper + TTS)
+
+Voice command and response system using OpenAI Whisper (STT) and TTS HD.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Dashboard voice mode | Ready | Toggle in Agent Chat header; requires `OPENAI_API_KEY` |
+| STT (Whisper) | Ready | `/api/voice/transcribe` — audio in, text out |
+| TTS (OpenAI HD) | Ready | `/api/voice/synthesize` — text in, audio out |
+| x402 voice endpoints | Ready | `POST /voice/transcribe` ($0.005), `POST /voice/synthesize` ($0.01) |
+| CLI voice mode | Ready | `npx tsx scripts/voice-cli.ts` (requires `sox`) |
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | `dashboard/.env.local` | OpenAI API key for Whisper + TTS |
+| `OPENAI_API_KEY` | `x402-server/.env` | Same key for x402-gated voice |
+
+Full reference: `capabilities/voice-commands.md`
 
 ---
 

@@ -4,6 +4,7 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { createClient } from "@supabase/supabase-js";
+import OpenAI from "openai";
 
 // ============================================================
 // XmetaV x402 Payment-Gated API
@@ -35,6 +36,10 @@ const supabase =
     : null;
 
 const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
+
+// OpenAI for voice endpoints (optional — voice endpoints disabled if no key)
+const openaiKey = process.env.OPENAI_API_KEY;
+const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 
 const app = express();
 app.use(express.json());
@@ -93,6 +98,34 @@ app.use(
         description: "Launch a multi-agent swarm orchestration",
         mimeType: "application/json",
       },
+      ...(openai
+        ? {
+            "POST /voice/transcribe": {
+              accepts: [
+                {
+                  scheme: "exact",
+                  price: "$0.005",
+                  network,
+                  payTo: evmAddress,
+                },
+              ],
+              description: "Speech-to-text transcription via Whisper",
+              mimeType: "application/json",
+            },
+            "POST /voice/synthesize": {
+              accepts: [
+                {
+                  scheme: "exact",
+                  price: "$0.01",
+                  network,
+                  payTo: evmAddress,
+                },
+              ],
+              description: "Text-to-speech synthesis via OpenAI TTS",
+              mimeType: "audio/mpeg",
+            },
+          }
+        : {}),
     },
     new x402ResourceServer(facilitatorClient).register(
       network,
@@ -327,6 +360,83 @@ app.post("/swarm", async (req, res) => {
   }
 });
 
+// ---- Voice endpoints (gated, require OPENAI_API_KEY) ----
+
+if (openai) {
+  /**
+   * POST /voice/transcribe — speech-to-text via Whisper
+   * Body: multipart/form-data with "audio" file
+   */
+  app.post("/voice/transcribe", express.raw({ type: "audio/*", limit: "25mb" }), async (req, res) => {
+    try {
+      const audioBuffer = req.body as Buffer;
+
+      if (!audioBuffer || audioBuffer.length === 0) {
+        res.status(400).json({ error: "Audio data is required" });
+        return;
+      }
+
+      const file = new File([audioBuffer], "audio.webm", { type: "audio/webm" });
+
+      const response = await openai.audio.transcriptions.create({
+        model: "whisper-1",
+        file,
+        language: "en",
+      });
+
+      res.json({
+        text: response.text,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Transcription failed";
+      res.status(500).json({ error: message });
+    }
+  });
+
+  /**
+   * POST /voice/synthesize — text-to-speech via OpenAI TTS
+   * Body: { text: "...", voice?: "nova"|"alloy"|"echo"|"fable"|"onyx"|"shimmer" }
+   */
+  app.post("/voice/synthesize", async (req, res) => {
+    const { text, voice } = req.body;
+
+    if (!text || typeof text !== "string") {
+      res.status(400).json({ error: "text is required" });
+      return;
+    }
+
+    if (text.length > 4096) {
+      res.status(413).json({ error: "Text too long (max 4096 characters)" });
+      return;
+    }
+
+    const validVoices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"];
+    const selectedVoice = voice && validVoices.includes(voice) ? voice : "nova";
+
+    try {
+      const response = await openai.audio.speech.create({
+        model: "tts-1-hd",
+        voice: selectedVoice,
+        input: text.trim(),
+        response_format: "mp3",
+      });
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      res.set({
+        "Content-Type": "audio/mpeg",
+        "Content-Length": buffer.length.toString(),
+      });
+      res.send(buffer);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Synthesis failed";
+      res.status(500).json({ error: message });
+    }
+  });
+}
+
 // ---- Free endpoints (no payment required) ----
 
 app.get("/health", (_req, res) => {
@@ -337,12 +447,19 @@ app.get("/health", (_req, res) => {
     network,
     payTo: evmAddress,
     supabase: supabase ? "connected" : "not configured",
+    voice: openai ? "enabled" : "disabled (no OPENAI_API_KEY)",
     endpoints: {
       gated: {
         "POST /agent-task": "$0.01 — dispatch a task to an agent",
         "POST /intent": "$0.005 — resolve a goal into commands",
         "GET /fleet-status": "$0.001 — live agent fleet status",
         "POST /swarm": "$0.02 — launch multi-agent swarm",
+        ...(openai
+          ? {
+              "POST /voice/transcribe": "$0.005 — speech-to-text (Whisper)",
+              "POST /voice/synthesize": "$0.01 — text-to-speech (TTS HD)",
+            }
+          : {}),
       },
       free: {
         "GET /health": "this endpoint",
@@ -361,10 +478,15 @@ app.listen(port, () => {
   console.log(`  Pay-to:    ${evmAddress}`);
   console.log(`  Supabase:  ${supabase ? "connected" : "not configured"}`);
   console.log(`  Health:    http://localhost:${port}/health`);
+  console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
   console.log(`\n  Gated endpoints:`);
-  console.log(`    POST /agent-task    $0.01   Dispatch task to agent`);
-  console.log(`    POST /intent        $0.005  Resolve goal → commands`);
-  console.log(`    GET  /fleet-status  $0.001  Live fleet status`);
-  console.log(`    POST /swarm         $0.02   Multi-agent swarm`);
+  console.log(`    POST /agent-task       $0.01   Dispatch task to agent`);
+  console.log(`    POST /intent           $0.005  Resolve goal → commands`);
+  console.log(`    GET  /fleet-status     $0.001  Live fleet status`);
+  console.log(`    POST /swarm            $0.02   Multi-agent swarm`);
+  if (openai) {
+    console.log(`    POST /voice/transcribe $0.005  Speech-to-text (Whisper)`);
+    console.log(`    POST /voice/synthesize $0.01   Text-to-speech (TTS HD)`);
+  }
   console.log();
 });
