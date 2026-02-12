@@ -270,6 +270,37 @@ EVM_PRIVATE_KEY=0x...         # Wallet key (shared with x402)
 
 Full protocol reference: `capabilities/erc8004-identity.md`
 
+## $XMETAV Token (Base Mainnet)
+
+The main agent's wallet also holds the **$XMETAV** ERC-20 token, deployed on Base Mainnet.
+
+### Token details
+
+| Property | Value |
+|----------|-------|
+| Contract | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` |
+| Symbol | XMETAV |
+| Total Supply | 1,000,000,000 (1B) |
+| Deployer | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+
+### Tier discounts on x402 endpoints
+
+| Tier | Min Balance | Discount | Daily Limit |
+|------|-------------|----------|-------------|
+| None | 0 | 0% | $5 |
+| Bronze | 1,000 | 10% | $25 |
+| Silver | 10,000 | 20% | $100 |
+| Gold | 100,000 | 35% | $500 |
+| Diamond | 1,000,000 | 50% | $2,000 |
+
+### Environment variables
+
+```bash
+XMETAV_TOKEN_ADDRESS=0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54
+```
+
+Full token reference: `capabilities/xmetav-token.md`
+
 ## Browser automation (optional)
 
 Browser automation is primarily operated via the deterministic CLI:

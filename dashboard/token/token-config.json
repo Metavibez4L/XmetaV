@@ -1,0 +1,12 @@
+{
+  "name": "XmetaV",
+  "symbol": "XMETAV",
+  "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
+  "deployer": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+  "totalSupply": "1000000000000000000000000000",
+  "txHash": "0x95e5a7823862861f3f29a5b509f3d6a89babb176a6e6a97196d9752a6a97c819",
+  "blockNumber": 42065520,
+  "network": "eip155:8453",
+  "chainId": 8453,
+  "deployedAt": "2026-02-12T18:10:00.000Z"
+}

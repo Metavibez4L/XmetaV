@@ -2,7 +2,7 @@
 
 Quick reference for everything you can do with your OpenClaw Command Center.
 
-**Last updated:** 2026-02-12 (v10 - Voice Commands + x402 Payments + ERC-8004 Identity)
+**Last updated:** 2026-02-12 (v11 - $XMETAV Token + Voice Commands + x402 Payments + ERC-8004 Identity)
 
 ## Directory Contents
 
@@ -16,12 +16,13 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 | [x402-payments.md](x402-payments.md) | **x402 USDC micro-payments** (Coinbase/Base) — autonomous agent payments |
 | [erc8004-identity.md](erc8004-identity.md) | **ERC-8004 on-chain identity** — Agent NFT #16905 on Base |
 | [voice-commands.md](voice-commands.md) | **Voice Commands** — Whisper STT + TTS with x402 gating |
+| [xmetav-token.md](xmetav-token.md) | **$XMETAV Token** — ERC-20 on Base with tiered discounts |
 
 ## Your Setup at a Glance
 
 ```
 ┌─────────────────────────────────────────┐
-│         XmetaV Command Center v10       │
+│         XmetaV Command Center v11       │
 ├─────────────────────────────────────────┤
 │  Config:   ~/.openclaw/openclaw.json    │
 │  Gateway:  127.0.0.1:18789             │
@@ -44,6 +45,7 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 │    ✓ x402 USDC payments (Base)          │
 │    ✓ ERC-8004 Identity #16905           │
 │    ✓ Voice commands (STT/TTS)           │
+│    ✓ $XMETAV token (tiered discounts)   │
 │    ✓ Dashboard (Next.js + Supabase)     │
 │    ✓ GitHub integration                 │
 └─────────────────────────────────────────┘
@@ -103,6 +105,13 @@ Speak to agents via OpenAI Whisper:
 - TTS: $0.01 per synthesis
 - x402-gated endpoints
 - Dashboard voice toggle in Agent Chat
+
+### 🪙 $XMETAV Token
+ERC-20 on Base Mainnet with tiered discounts:
+- Contract: `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`
+- Tiers: None → Bronze (10%) → Silver (20%) → Gold (35%) → Diamond (50%)
+- Dashboard `/token` page with balance, tier table, holder benefits
+- x402 server checks `balanceOf()` on-chain for tier discounts
 
 ### 🖥️ Control Plane Dashboard
 Cyberpunk-themed web UI for remote management:

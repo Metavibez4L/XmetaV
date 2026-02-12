@@ -328,6 +328,9 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
             </div>
           </div>
 
+          {/* XMETAV Token Balance + Tier */}
+          <TokenBalanceRow wallet={data?.identity?.agentWallet || data?.identity?.owner} />
+
           {/* x402 Spend Stats */}
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -621,6 +624,64 @@ function ContractRow({
             <ExternalLink className="h-3 w-3" style={{ color: "#4a6a8a" }} />
           </a>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Token Balance Row ----
+
+function TokenBalanceRow({ wallet }: { wallet?: string | null }) {
+  const [tokenData, setTokenData] = useState<{
+    balance: number;
+    tier: string;
+    discount: string;
+    tierColor: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!wallet) return;
+    fetch(`/api/token?wallet=${wallet}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.wallet) {
+          setTokenData({
+            balance: d.wallet.balance,
+            tier: d.wallet.tier,
+            discount: d.wallet.discount,
+            tierColor: d.wallet.tierColor,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [wallet]);
+
+  if (!tokenData) return null;
+
+  return (
+    <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#00f0ff08" }}>
+      <div className="flex items-center gap-2">
+        <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#ffd70066" }}>
+          $XMETAV
+        </span>
+        <span className="text-sm font-mono font-bold" style={{ color: "#c8d6e5" }}>
+          {tokenData.balance.toLocaleString()}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded"
+          style={{
+            color: tokenData.tierColor,
+            background: tokenData.tierColor + "15",
+            border: `1px solid ${tokenData.tierColor}30`,
+          }}
+        >
+          {tokenData.tier}
+        </span>
+        <span className="text-[8px] font-mono" style={{ color: "#4a6a8a" }}>
+          {tokenData.discount} off
+        </span>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
+Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v11
 
 ```
  ___   ___                    __           ___   ___
@@ -18,6 +18,7 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
+ |   token:    $XMETAV ERC-20 (Base)             |
  |   dashboard: Next.js + Supabase (cyberpunk)   |
  |   models:  kimi-k2.5:cloud (256k, all agents) |
  |   gateway: ws://127.0.0.1:18789              |
@@ -37,13 +38,7 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
-- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating)
-- **ERC-8004 Identity** — On-chain agent identity (NFT #16905) and reputation tracking on Base mainnet
-- **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration
-- **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs with live streaming output
-- **Agent Factory** — Main agent creates agents, scaffolds apps, manages GitHub repos, and orchestrates fleet
-- **Swarm Orchestration** — Parallel, pipeline, and collaborative multi-agent task execution
-- **Fleet Controls** — Enable/disable agents from dashboard with bridge-side enforcement
+- **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
 - Multi-agent management (`main`, `basedintern`, `akua`, `basedintern_web`, `akua_web`, `dynamic`)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -405,6 +400,7 @@ cd dashboard/bridge && npm install && npm start
 | `/fleet` | **Fleet** -- agent status table with enable/disable toggles and task dispatch |
 | `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
+| `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
@@ -654,7 +650,32 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 
 ---
 
+## On-Chain Contracts (Base Mainnet)
+
+All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
+
+| Contract | Address | Description |
+|----------|---------|-------------|
+| **$XMETAV Token** | [`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`](https://basescan.org/token/0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54) | ERC-20 token (1B fixed supply) — tiered discounts on x402 |
+| **ERC-8004 Identity** | [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) | IdentityRegistry — Agent NFT #16905 |
+| **ERC-8004 Reputation** | [`0x8004b1041543F0eB1f3459E8a2FC4Ab06ceC7251`](https://basescan.org/address/0x8004b1041543F0eB1f3459E8a2FC4Ab06ceC7251) | ReputationRegistry — on-chain trust scores |
+
+| Wallet | Address | Role |
+|--------|---------|------|
+| **Agent / Deployer** | [`0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80`](https://basescan.org/address/0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80) | Owner of ERC-8004 NFT, deployer of $XMETAV, x402 payment receiver |
+
+---
+
 ## Changelog
+
+### 2026-02-12 (v11) — $XMETAV Token
+- **ERC-20 Token on Base Mainnet** — `$XMETAV` (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with 1B fixed supply
+- **Tier Discount System** — Hold XMETAV for 10–50% off x402 endpoints (Bronze → Diamond)
+- **Token Dashboard** — `/token` page with balance, tier table, holder benefits, contract links
+- **x402 Integration** — On-chain `balanceOf()` checks apply tier discounts to payment-gated endpoints
+- **Identity + Payments Integration** — Token balance and tier badge on `/identity` and `/payments` pages
+- New `/api/token` API route and `lib/token-tiers.ts` shared tier logic
+- Free `/token-info` endpoint on x402 server (port 4021)
 
 ### 2026-02-12 (v10.1) — Voice System Optimization
 - **Streaming TTS** — Stream audio via MediaSource API for ~200ms first-byte playback latency

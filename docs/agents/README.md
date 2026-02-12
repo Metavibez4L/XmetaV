@@ -50,6 +50,7 @@ All agents can be managed from the **Control Plane Dashboard** at http://localho
 - Total and daily USDC spend tracking on Base
 - Payment history table with BaseScan transaction links
 - List of x402-gated API endpoints with pricing
+- $XMETAV token tier card with current discount
 
 ### Identity Page (`/identity`)
 
@@ -58,6 +59,14 @@ All agents can be managed from the **Control Plane Dashboard** at http://localho
 - Agent capabilities, services, and trust model from metadata
 - Contract addresses with BaseScan links
 - Agent ID lookup for inspecting other registered agents
+- $XMETAV token balance and tier badge
+
+### Token Page (`/token`)
+
+- $XMETAV ERC-20 token overview (contract `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`)
+- Agent wallet balance and current tier (None / Bronze / Silver / Gold / Diamond)
+- Tier table with thresholds, discount %, and daily spend limits
+- Holder benefits and contract links to BaseScan
 
 See the [dashboard README](../../dashboard/README.md) for setup and full documentation.
 

@@ -142,6 +142,7 @@ All tables have:
 | `/api/intent` | POST | Intent resolution (agent routing) |
 | `/api/voice/transcribe` | POST | Speech-to-text via Whisper (multipart audio) |
 | `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (returns audio/mpeg) |
+| `/api/token` | GET | $XMETAV token info, balance, tier (query `?wallet=0x...`) |
 
 ## Project Structure
 
@@ -213,6 +214,11 @@ dashboard/
     index.ts                    # Express server with paymentMiddleware
     package.json                # @x402/express, @x402/core, @x402/evm, express
     .env.example                # EVM_ADDRESS, FACILITATOR_URL, PORT, NETWORK
+  token/                        # $XMETAV ERC-20 Hardhat project
+    contracts/XMETAV.sol        # ERC-20 contract (OpenZeppelin)
+    scripts/deploy.ts           # Deploy to Base Mainnet
+    hardhat.config.ts           # Network config
+    token-config.json           # Deployed contract details
   erc8004/                      # ERC-8004 agent identity
     register.ts                 # Registration script (mints agent NFT)
     registration.json           # Agent metadata (name, capabilities, services)
@@ -329,3 +335,4 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | x402 payments not logging | Check `EVM_PRIVATE_KEY` is set in `bridge/.env`; verify `x402_payments` table exists |
 | Identity page empty | Verify `ERC8004_AGENT_ID=16905` in `bridge/.env`; check Base RPC connectivity |
 | x402-server won't start | Check `EVM_ADDRESS` and `FACILITATOR_URL` in `x402-server/.env` |
+| Token tier shows "None" | Verify `XMETAV_TOKEN_ADDRESS` is set in `.env.local`; check wallet holds XMETAV |

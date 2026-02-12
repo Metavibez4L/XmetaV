@@ -190,6 +190,9 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
         </div>
       </div>
 
+      {/* Token Discount Tier */}
+      <TokenTierCard wallet={walletInfo?.address} />
+
       {/* x402 Server Status */}
       <div
         className="rounded-lg border p-4"
@@ -424,4 +427,54 @@ function formatTime(iso: string): string {
   } catch {
     return "—";
   }
+}
+
+// ── Token Tier Card ──
+
+function TokenTierCard({ wallet }: { wallet?: string | null }) {
+  const [tier, setTier] = useState<{
+    name: string;
+    discount: string;
+    color: string;
+    balance: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!wallet) return;
+    fetch(`/api/token?wallet=${wallet}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.wallet) {
+          setTier({
+            name: d.wallet.tier,
+            discount: d.wallet.discount,
+            color: d.wallet.tierColor,
+            balance: d.wallet.balance,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [wallet]);
+
+  return (
+    <div
+      className="rounded-lg border p-4"
+      style={{
+        background: "#0a1020",
+        borderColor: tier ? tier.color + "20" : "#00f0ff15",
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#ffd70066" }}>
+          Token Tier
+        </span>
+      </div>
+      <div className="text-lg font-mono font-bold" style={{ color: tier?.color || "#4a6a8a" }}>
+        {tier?.name || "—"}
+      </div>
+      <div className="text-[10px] font-mono mt-1" style={{ color: "#4a6a8a" }}>
+        {tier ? `${tier.discount} discount · ${tier.balance.toLocaleString()} XMETAV` : "Loading..."}
+      </div>
+    </div>
+  );
 }

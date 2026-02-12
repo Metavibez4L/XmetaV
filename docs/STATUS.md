@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-12  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v10 (Voice Commands + x402 Payments + ERC-8004 Identity)
+**XmetaV Version:** v11 ($XMETAV Token + Voice Commands + x402 Payments + ERC-8004 Identity)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -307,6 +307,7 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/fleet` | Fleet | Agent table with enable/disable toggles |
 | `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
+| `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
 
 ### Dashboard health checks
 
@@ -334,6 +335,8 @@ Required environment variables (in `dashboard/.env.local`):
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS |
+| `XMETAV_TOKEN_ADDRESS` | Deployed $XMETAV ERC-20 contract address |
 
 ### Swarm runs (dashboard)
 
@@ -348,6 +351,40 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## $XMETAV Token (v11)
+
+ERC-20 token on Base Mainnet with tiered discounts for x402 endpoints.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Contract | Deployed | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` on Base Mainnet |
+| Token API | Active | `/api/token?wallet=0x...` returns balance, tier, discount |
+| Dashboard Page | Active | `/token` — balance, tier table, holder benefits |
+| x402 Integration | Active | Tier middleware checks `balanceOf()` on-chain |
+| Identity Integration | Active | Token balance + tier badge on `/identity` page |
+| Payments Integration | Active | Token tier card on `/payments` page |
+
+### Tier Table
+
+| Tier | Min Balance | Discount | Daily Limit |
+|------|-------------|----------|-------------|
+| None | 0 | 0% | $5 |
+| Bronze | 1,000 | 10% | $25 |
+| Silver | 10,000 | 20% | $100 |
+| Gold | 100,000 | 35% | $500 |
+| Diamond | 1,000,000 | 50% | $2,000 |
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `XMETAV_TOKEN_ADDRESS` | `dashboard/.env.local` | Deployed contract address |
+| `XMETAV_TOKEN_ADDRESS` | `x402-server/.env` | Same for tier checks |
+
+Full reference: `capabilities/xmetav-token.md`
 
 ---
 
@@ -416,6 +453,15 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `POST /intent` | $0.005 | Create an intent resolution session |
 | `GET /fleet-status` | $0.001 | Get fleet status summary |
 | `POST /swarm` | $0.02 | Launch a multi-agent swarm |
+| `POST /voice/transcribe` | $0.005 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.01 | Text-to-speech (streaming TTS) |
+
+### Free endpoints (x402-server)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Server status and endpoint listing |
+| `GET /token-info` | $XMETAV token contract address and tier table |
 
 ### Environment variables
 
@@ -425,6 +471,8 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `EVM_ADDRESS` | `x402-server/.env` | Address receiving payments |
 | `FACILITATOR_URL` | `x402-server/.env` | Coinbase x402 facilitator |
 | `X402_BUDGET_LIMIT` | `bridge/.env` | Max payment per request in USD |
+| `XMETAV_TOKEN_ADDRESS` | `x402-server/.env` | $XMETAV contract for tier discounts |
+| `OPENAI_API_KEY` | `x402-server/.env` | OpenAI key for voice endpoints |
 
 ---
 
@@ -453,41 +501,6 @@ Shows agent registration status, owner, wallet, capabilities, services, trust mo
 | `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
 
 Full reference: `capabilities/erc8004-identity.md`
-
----
-
-## Voice Commands (OpenAI Whisper + Streaming TTS)
-
-Optimized voice system with streaming TTS, push-to-talk, wake word, continuous conversation, and waveform visualizer.
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Streaming TTS | Ready | `/api/voice/synthesize` streams MP3 chunks via MediaSource API |
-| STT (Whisper) | Ready | `/api/voice/transcribe` — audio in, text out |
-| Push-to-talk | Ready | Hold SPACE to record (enable in voice settings) |
-| Wake word | Ready | "Hey XmetaV" via Web Speech API (Chrome/Edge only) |
-| Continuous mode | Ready | Auto-listen after agent finishes speaking |
-| Waveform visualizer | Ready | Canvas-based frequency bars (recording + playback) |
-| Voice settings panel | Ready | Voice, model, speed, PTT, wake, continuous toggles |
-| x402 voice endpoints | Ready | `POST /voice/transcribe` ($0.005), `POST /voice/synthesize` ($0.01) |
-| CLI voice mode | Ready | `npx tsx scripts/voice-cli.ts` (requires `sox`) |
-
-### Models
-
-| Model | Type | Default | Notes |
-|-------|------|---------|-------|
-| `whisper-1` | STT | Yes | Only Whisper model |
-| `tts-1` | TTS | Yes | Fast, lower latency |
-| `tts-1-hd` | TTS | No | Higher quality, selectable in settings |
-
-### Environment
-
-| Variable | Location | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | `dashboard/.env.local` | OpenAI API key for Whisper + TTS |
-| `OPENAI_API_KEY` | `x402-server/.env` | Same key for x402-gated voice |
-
-Full reference: `capabilities/voice-commands.md`
 
 ---
 
