@@ -223,20 +223,19 @@ The main agent can orchestrate **x402 payment protocol** deployments across the 
 
 | Concept | Description |
 |---------|-------------|
-| HTTP 402 | Server returns payment requirements (amount, recipient, reference) |
-| `X-PAYMENT` header | Client sends signed payment proof on retry |
+| HTTP 402 | Server returns payment requirements via `PAYMENT-REQUIRED` header |
+| `PAYMENT-SIGNATURE` header | Client sends signed payment proof on retry |
 | USDC on Base | Settlement currency and network |
-| `@coinbase/x402-sdk` | Client SDK for executing payments |
-| `@coinbase/x402-middleware` | Server middleware for gating endpoints |
+| `@x402/fetch` | Client SDK — wraps fetch with automatic payment handling |
+| `@x402/express` | Server middleware for gating endpoints |
+| `@x402/evm` | EVM scheme support (Base Sepolia / Base Mainnet) |
 | `@xmtp/agent-sdk` | Chat agent framework (XMTP v4) |
 
 ### Environment variables (agent wallet)
 
 ```bash
-XMTP_WALLET_KEY=         # Agent wallet private key
-XMTP_DB_ENCRYPTION_KEY=  # XMTP local DB encryption
-XMTP_ENV=production      # XMTP network
-NETWORK=base             # Payment network
+EVM_PRIVATE_KEY=0x...         # Agent wallet private key (Base)
+X402_BUDGET_LIMIT=1.00        # Max payment per request in USD
 ```
 
 Full protocol reference: `capabilities/x402-payments.md`

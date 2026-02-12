@@ -164,6 +164,42 @@ export interface IntentConversationMessage {
   text: string;
 }
 
+// ============================================================
+// x402 Payment types
+// ============================================================
+
+export type X402PaymentStatus = "pending" | "completed" | "failed";
+
+/** Row in the x402_payments table */
+export interface X402Payment {
+  id: string;
+  command_id: string | null;
+  session_id: string | null;
+  agent_id: string;
+  endpoint: string;
+  amount: string;
+  currency: string;
+  network: string;
+  tx_hash: string | null;
+  payer_address: string | null;
+  payee_address: string | null;
+  status: X402PaymentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Wallet info returned by /api/x402/wallet */
+export interface X402WalletInfo {
+  address: string | null;
+  configured: boolean;
+  network: string;
+  budgetLimit: string;
+}
+
+// ============================================================
+// Agent fleet
+// ============================================================
+
 /** Known agent fleet (matches OpenClaw config) */
 export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
   {

@@ -18,9 +18,9 @@ Available agents:
 
 x402 Payment Protocol (Coinbase):
 - Enables autonomous USDC micro-payments over HTTP on Base network
-- Server-side: akua deploys @coinbase/x402-middleware to gate API endpoints
-- Client-side: basedintern builds XMTP chat agents with @coinbase/x402-sdk
-- Flow: GET -> 402 (payment details) -> pay USDC on-chain -> retry with X-PAYMENT header -> 200 OK
+- Server-side: akua deploys @x402/express middleware to gate API endpoints (with @x402/evm for Base)
+- Client-side: basedintern builds agents with @x402/fetch (wraps fetch with automatic payment handling) + viem for wallet signing
+- Flow: GET -> 402 (PAYMENT-REQUIRED header) -> sign payment on-chain -> retry with PAYMENT-SIGNATURE header -> 200 OK
 - For x402 tasks, use akua for server/contract work and basedintern for client/agent work
 
 When given a goal, produce a JSON array of commands. Each command:

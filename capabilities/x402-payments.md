@@ -2,7 +2,7 @@
 
 Reference for integrating **x402** — Coinbase's open payment protocol — with the XmetaV agent system.
 
-> Source: https://docs.base.org/base-app/agents/x402-agents
+> Source: https://github.com/coinbase/x402
 
 ## What is x402?
 
@@ -21,36 +21,43 @@ x402 enables instant, automatic **stablecoin payments over HTTP**. Instead of AP
 Client ──GET──▶ Server
                  │
               402 Payment Required
-              (amount, recipient, reference)
+              (PAYMENT-REQUIRED header)
                  │
 Client ◀────────┘
   │
-  ├── Execute payment (USDC on Base)
+  ├── Sign payment (USDC on Base via EVM)
   │
-Client ──GET──▶ Server (X-PAYMENT header)
+Client ──GET──▶ Server (PAYMENT-SIGNATURE header)
                  │
-              200 OK + X-PAYMENT-RESPONSE
+              200 OK + PAYMENT-RESPONSE header
 ```
 
 1. **Request** — Client hits a protected endpoint
-2. **402 Response** — Server returns payment details (amount, recipient, reference)
-3. **Pay** — Client signs and sends USDC payment on-chain
-4. **Retry** — Client retries with `X-PAYMENT` header containing the payment payload
-5. **Deliver** — Server verifies payment and returns content
+2. **402 Response** — Server returns payment requirements via `PAYMENT-REQUIRED` header
+3. **Pay** — Client selects a payment scheme/network and signs payment on-chain
+4. **Retry** — Client retries with `PAYMENT-SIGNATURE` header containing the payment payload
+5. **Verify & Settle** — Server verifies via facilitator, settles on-chain, returns content
 
 ## Dependencies
 
 ```bash
-npm i @xmtp/agent-sdk @coinbase/x402-sdk
+# Server (Express)
+npm i @x402/express @x402/core @x402/evm express
+
+# Client (Fetch wrapper)
+npm i @x402/fetch @x402/core @x402/evm viem
 ```
 
 ## Environment Variables
 
 ```bash
-XMTP_WALLET_KEY=         # Private key for the agent wallet
-XMTP_DB_ENCRYPTION_KEY=  # Encryption key for local XMTP database
-XMTP_ENV=production      # local, dev, production
-NETWORK=base             # Blockchain network for payments
+# Client (agent wallet)
+EVM_PRIVATE_KEY=0x...         # Private key for the agent wallet (Base)
+X402_BUDGET_LIMIT=1.00        # Max payment per request in USD
+
+# Server (payment recipient)
+EVM_ADDRESS=0x...              # Address receiving payments
+FACILITATOR_URL=https://x402.org/facilitator  # Coinbase facilitator
 ```
 
 ## Server-Side Setup (Payment Gating)
@@ -59,17 +66,45 @@ Apply x402 middleware to protect endpoints with micro-payments:
 
 ```typescript
 import express from 'express';
-import { paymentMiddleware } from '@coinbase/x402-middleware';
+import { paymentMiddleware, x402ResourceServer } from '@x402/express';
+import { ExactEvmScheme } from '@x402/evm/exact/server';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 
 const app = express();
+const evmAddress = process.env.EVM_ADDRESS as `0x${string}`;
+const facilitatorClient = new HTTPFacilitatorClient({
+  url: process.env.FACILITATOR_URL!,
+});
 
-// Gate endpoints with pricing
-app.use(paymentMiddleware(process.env.PAYMENT_ADDRESS, {
-  "/api/nft-floor/*": "$0.01",
-  "/api/market-data/*": "$0.005"
-}));
+// Gate endpoints with USDC pricing on Base Sepolia
+app.use(paymentMiddleware(
+  {
+    "GET /weather": {
+      accepts: [{
+        scheme: "exact",
+        price: "$0.001",
+        network: "eip155:84532",   // Base Sepolia
+        payTo: evmAddress,
+      }],
+      description: "Weather data",
+      mimeType: "application/json",
+    },
+    "GET /nft-floor/:collection": {
+      accepts: [{
+        scheme: "exact",
+        price: "$0.01",
+        network: "eip155:84532",
+        payTo: evmAddress,
+      }],
+      description: "NFT floor price data",
+      mimeType: "application/json",
+    },
+  },
+  new x402ResourceServer(facilitatorClient)
+    .register("eip155:84532", new ExactEvmScheme()),
+));
 
-app.get('/api/nft-floor/:collection', (req, res) => {
+app.get('/nft-floor/:collection', (req, res) => {
   res.json({
     collection: req.params.collection,
     floorPrice: "2.450",
@@ -77,62 +112,42 @@ app.get('/api/nft-floor/:collection', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.listen(4021, () => console.log('x402 server on :4021'));
 ```
 
-## Agent-Side Integration (XMTP + x402)
+## Client-Side Setup (Paying for Services)
 
-### Basic Payment Handler
+Use `@x402/fetch` to wrap fetch calls with automatic payment handling:
+
+```typescript
+import { x402Client, wrapFetchWithPayment } from '@x402/fetch';
+import { registerExactEvmScheme } from '@x402/evm/exact/client';
+import { privateKeyToAccount } from 'viem/accounts';
+
+const signer = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`);
+const client = new x402Client();
+registerExactEvmScheme(client, { signer });
+
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+
+// This automatically handles 402 -> sign -> retry
+const response = await fetchWithPayment('http://localhost:4021/weather');
+const data = await response.json();
+```
+
+### XMTP Chat Agent with x402
 
 ```typescript
 import { Agent } from '@xmtp/agent-sdk';
-import { PaymentFacilitator } from '@coinbase/x402-sdk';
+import { x402Client, wrapFetchWithPayment } from '@x402/fetch';
+import { registerExactEvmScheme } from '@x402/evm/exact/client';
+import { privateKeyToAccount } from 'viem/accounts';
 
-const facilitator = new PaymentFacilitator({
-  privateKey: process.env.XMTP_WALLET_KEY!,
-  network: process.env.NETWORK || 'base'
-});
-
-async function handlePaidRequest(ctx: any, endpoint: string) {
-  const response = await fetch(endpoint);
-
-  if (response.status === 402) {
-    const paymentDetails = await response.json();
-    await ctx.sendText(`Payment required: ${paymentDetails.amount} USDC. Processing...`);
-
-    // Execute on-chain payment
-    const payment = await facilitator.createPayment({
-      amount: paymentDetails.amount,
-      recipient: paymentDetails.recipient,
-      reference: paymentDetails.reference,
-      currency: 'USDC'
-    });
-
-    // Retry with payment proof
-    const retryResponse = await fetch(endpoint, {
-      headers: { "X-PAYMENT": payment.payload }
-    });
-
-    if (retryResponse.ok) {
-      const data = await retryResponse.json();
-      await ctx.sendText(`Data: ${JSON.stringify(data)}`);
-    }
-  } else if (response.ok) {
-    const data = await response.json();
-    await ctx.sendText(`Data: ${JSON.stringify(data)}`);
-  }
-}
-```
-
-### Full XMTP Chat Agent with x402
-
-```typescript
-import { Agent } from '@xmtp/agent-sdk';
-import { PaymentFacilitator } from '@coinbase/x402-sdk';
-
-const facilitator = new PaymentFacilitator({
-  privateKey: process.env.XMTP_WALLET_KEY!,
-  network: process.env.NETWORK || 'base'
-});
+const signer = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`);
+const client = new x402Client();
+registerExactEvmScheme(client, { signer });
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
 const agent = await Agent.createFromEnv({ env: 'production' });
 
@@ -140,63 +155,22 @@ agent.on('text', async (ctx) => {
   const content = ctx.message.content.toLowerCase();
 
   if (content.includes('floor price')) {
-    await handleFloorPrice(ctx, content);
-  } else if (content.includes('market data')) {
-    await handleMarketData(ctx, content);
+    const collection = extractCollection(content);
+    if (!collection) {
+      await ctx.sendText("Please specify an NFT collection.");
+      return;
+    }
+    try {
+      const res = await fetchWithPayment(`http://localhost:4021/nft-floor/${collection}`);
+      const data = await res.json();
+      await ctx.sendText(`Result: ${JSON.stringify(data, null, 2)}`);
+    } catch (error) {
+      await ctx.sendText(`Payment error: ${error.message}`);
+    }
   } else {
-    await ctx.sendText("I can help with:\n- NFT floor prices\n- Market data\n\nJust ask!");
+    await ctx.sendText("I can help with NFT floor prices. Just ask!");
   }
 });
-
-async function handleFloorPrice(ctx: any, content: string) {
-  const collection = extractCollection(content);
-  if (!collection) {
-    await ctx.sendText("Please specify an NFT collection.");
-    return;
-  }
-  await processPaymentAndRetry(ctx, `/api/nft-floor/${collection}`);
-}
-
-async function processPaymentAndRetry(ctx: any, endpoint: string) {
-  try {
-    const response = await fetch(endpoint);
-
-    if (response.status === 402) {
-      const details = await response.json();
-
-      // Safety check
-      if (parseFloat(details.amount) > 1.0) {
-        await ctx.sendText(`High payment: ${details.amount} USDC. Skipping.`);
-        return;
-      }
-
-      await ctx.sendText(`Payment: ${details.amount} USDC. Processing...`);
-
-      const payment = await facilitator.createPayment({
-        amount: details.amount,
-        recipient: details.recipient,
-        reference: details.reference,
-        currency: 'USDC'
-      });
-
-      const retry = await fetch(endpoint, {
-        headers: { "X-PAYMENT": payment.payload }
-      });
-
-      if (retry.ok) {
-        const data = await retry.json();
-        await ctx.sendText(`Result: ${JSON.stringify(data, null, 2)}`);
-      } else {
-        await ctx.sendText("Payment processed but service error.");
-      }
-    } else if (response.ok) {
-      const data = await response.json();
-      await ctx.sendText(`Result: ${JSON.stringify(data, null, 2)}`);
-    }
-  } catch (error) {
-    await ctx.sendText(`Payment error: ${error.message}`);
-  }
-}
 
 await agent.start();
 ```
@@ -248,15 +222,22 @@ When using the Intent page, describe your goal and the system will generate comm
 
 The Intent Layer will generate commands targeting `akua` (server-side) and `basedintern` (client-side).
 
+## Networks
+
+| Network | Chain ID (CAIP-2) | Use |
+|---------|-------------------|-----|
+| Base Sepolia | `eip155:84532` | Testnet (development) |
+| Base Mainnet | `eip155:8453` | Production |
+
 ## Resources
 
 | Resource | URL |
 |----------|-----|
 | x402 Protocol Docs | https://docs.cdp.coinbase.com/x402/welcome |
 | x402.org | https://www.x402.org |
-| Coinbase x402 SDK | https://github.com/coinbase/x402 |
+| x402 GitHub | https://github.com/coinbase/x402 |
 | XMTP Documentation | https://docs.xmtp.org |
-| Base Docs (x402 Agents) | https://docs.base.org/base-app/agents/x402-agents |
-| Agent SDK | `npm i @xmtp/agent-sdk` |
-| x402 Middleware | `npm i @coinbase/x402-middleware` |
-| x402 Client SDK | `npm i @coinbase/x402-sdk` |
+| Base Docs | https://docs.base.org |
+| Server SDK | `npm i @x402/express @x402/core @x402/evm` |
+| Client SDK | `npm i @x402/fetch @x402/core @x402/evm` |
+| EVM Wallet | `npm i viem` |

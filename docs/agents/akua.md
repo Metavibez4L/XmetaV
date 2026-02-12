@@ -192,7 +192,7 @@ openclaw agent --agent akua_web --local --thinking off \
 
 ### What akua does with x402
 
-- **Server-side**: Deploy `@coinbase/x402-middleware` to gate API endpoints with micro-payments
+- **Server-side**: Deploy `@x402/express` middleware to gate API endpoints with micro-payments
 - **Smart contracts**: Write and deploy Solidity contracts that interact with x402 settlement
 - **Payment verification**: On-chain USDC settlement verification on Base
 - **XMTP integration**: Build XMTP chat agents with autonomous payment capabilities
@@ -201,54 +201,68 @@ openclaw agent --agent akua_web --local --thinking off \
 
 ```typescript
 import express from 'express';
-import { paymentMiddleware } from '@coinbase/x402-middleware';
+import { paymentMiddleware, x402ResourceServer } from '@x402/express';
+import { ExactEvmScheme } from '@x402/evm/exact/server';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 
 const app = express();
+const evmAddress = process.env.EVM_ADDRESS as `0x${string}`;
+const facilitatorClient = new HTTPFacilitatorClient({
+  url: process.env.FACILITATOR_URL!,
+});
 
-// Gate endpoints with USDC pricing
-app.use(paymentMiddleware(process.env.PAYMENT_ADDRESS, {
-  "/api/nft-floor/*": "$0.01",
-  "/api/market-data/*": "$0.005"
-}));
+// Gate endpoints with USDC pricing on Base Sepolia
+app.use(paymentMiddleware(
+  {
+    "GET /nft-floor/:collection": {
+      accepts: [{
+        scheme: "exact",
+        price: "$0.01",
+        network: "eip155:84532",
+        payTo: evmAddress,
+      }],
+      description: "NFT floor price data",
+    },
+  },
+  new x402ResourceServer(facilitatorClient)
+    .register("eip155:84532", new ExactEvmScheme()),
+));
 ```
 
-### x402 client (XMTP agent paying for services)
+### x402 client (agent paying for services)
 
 ```typescript
-import { PaymentFacilitator } from '@coinbase/x402-sdk';
+import { x402Client, wrapFetchWithPayment } from '@x402/fetch';
+import { registerExactEvmScheme } from '@x402/evm/exact/client';
+import { privateKeyToAccount } from 'viem/accounts';
 
-const facilitator = new PaymentFacilitator({
-  privateKey: process.env.XMTP_WALLET_KEY!,
-  network: 'base'
-});
+const signer = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`);
+const client = new x402Client();
+registerExactEvmScheme(client, { signer });
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
-// When server returns 402, pay and retry
-const payment = await facilitator.createPayment({
-  amount: paymentDetails.amount,
-  recipient: paymentDetails.recipient,
-  reference: paymentDetails.reference,
-  currency: 'USDC'
-});
-
-const response = await fetch(endpoint, {
-  headers: { "X-PAYMENT": payment.payload }
-});
+// Automatic 402 -> sign -> retry flow
+const response = await fetchWithPayment('http://localhost:4021/nft-floor/boredapes');
+const data = await response.json();
 ```
 
 ### Dependencies
 
 ```bash
-npm i @coinbase/x402-sdk @coinbase/x402-middleware @xmtp/agent-sdk
+# Server
+npm i @x402/express @x402/core @x402/evm express
+
+# Client
+npm i @x402/fetch @x402/core @x402/evm viem @xmtp/agent-sdk
 ```
 
 ### Environment variables
 
 ```bash
-XMTP_WALLET_KEY=         # Agent wallet private key
-XMTP_DB_ENCRYPTION_KEY=  # XMTP DB encryption
-XMTP_ENV=production      # XMTP network
-NETWORK=base             # Payment settlement network
-PAYMENT_ADDRESS=         # Address receiving payments (server-side)
+EVM_PRIVATE_KEY=0x...         # Agent wallet private key (Base)
+EVM_ADDRESS=0x...              # Address receiving payments (server-side)
+FACILITATOR_URL=https://x402.org/facilitator  # Coinbase facilitator
+X402_BUDGET_LIMIT=1.00        # Max payment per request in USD
 ```
 
 ### Example tasks for akua
