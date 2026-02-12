@@ -19,6 +19,8 @@ interface WalletResponse {
   wallet: {
     configured: boolean;
     address: string | null;
+    owner: string | null;
+    agentId: string;
     network: string;
     budgetLimit: string;
   };

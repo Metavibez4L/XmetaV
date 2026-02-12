@@ -12,6 +12,10 @@ import {
   Globe,
   Star,
   Link2,
+  Wallet,
+  DollarSign,
+  ArrowUpRight,
+  Activity,
 } from "lucide-react";
 
 interface IdentityData {
@@ -33,6 +37,14 @@ interface IdentityData {
     services?: { type: string; url: string; description: string }[];
     capabilities?: string[];
     supportedTrust?: string[];
+  } | null;
+  x402: {
+    totalSpend: string;
+    todaySpend: string;
+    paymentCount: number;
+    currency: string;
+    network: string;
+    budgetLimit: string;
   } | null;
 }
 
@@ -84,6 +96,7 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
 
   const identity = data?.identity;
   const registration = data?.registration;
+  const x402 = data?.x402;
   const isRegistered = identity?.registered ?? false;
 
   return (
@@ -247,6 +260,135 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
           />
         </div>
       </div>
+
+      {/* Agent Wallet & x402 Payments */}
+      {isRegistered && (
+        <div
+          className="rounded-lg border overflow-hidden"
+          style={{ background: "#0a1020", borderColor: "#00f0ff15" }}
+        >
+          <div
+            className="p-4 border-b flex items-center gap-2"
+            style={{ borderColor: "#00f0ff10" }}
+          >
+            <Wallet className="h-4 w-4" style={{ color: "#00f0ff66" }} />
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
+              Agent Wallet & x402 Payments
+            </span>
+          </div>
+
+          {/* Wallet Address Row */}
+          <div className="p-4 border-b" style={{ borderColor: "#00f0ff08" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="h-10 w-10 rounded-lg flex items-center justify-center"
+                  style={{ background: "#00f0ff08", border: "1px solid #00f0ff15" }}
+                >
+                  <Hexagon className="h-5 w-5" style={{ color: "#00f0ff" }} />
+                </div>
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+                    Wallet Address
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <a
+                      href={`https://basescan.org/address/${identity?.agentWallet || identity?.owner}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-mono hover:underline"
+                      style={{ color: "#00f0ff" }}
+                    >
+                      {identity?.agentWallet || identity?.owner || "—"}
+                    </a>
+                    {(identity?.agentWallet || identity?.owner) && (
+                      <button
+                        onClick={() => copyToClipboard(identity?.agentWallet || identity?.owner || "", "walletFull")}
+                        className="shrink-0"
+                      >
+                        {copied === "walletFull" ? (
+                          <Check className="h-3 w-3" style={{ color: "#39ff14" }} />
+                        ) : (
+                          <Copy className="h-3 w-3" style={{ color: "#4a6a8a" }} />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div
+                  className="text-[10px] font-mono px-2 py-0.5 rounded inline-flex items-center gap-1"
+                  style={{ color: "#39ff14", background: "#39ff1408", border: "1px solid #39ff1415" }}
+                >
+                  <div className="h-1.5 w-1.5 rounded-full" style={{ background: "#39ff14", boxShadow: "0 0 4px #39ff14" }} />
+                  Base Mainnet
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* x402 Spend Stats */}
+          <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <DollarSign className="h-3 w-3" style={{ color: "#00f0ff44" }} />
+                <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+                  Total Spend
+                </span>
+              </div>
+              <div className="text-lg font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                ${x402?.totalSpend || "0.0000"}
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: "#4a6a8a66" }}>
+                {x402?.currency || "USDC"}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <ArrowUpRight className="h-3 w-3" style={{ color: "#00f0ff44" }} />
+                <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+                  Today
+                </span>
+              </div>
+              <div className="text-lg font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                ${x402?.todaySpend || "0.0000"}
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: "#4a6a8a66" }}>
+                Budget: ${x402?.budgetLimit || "1.00"}/req
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <Activity className="h-3 w-3" style={{ color: "#00f0ff44" }} />
+                <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+                  Transactions
+                </span>
+              </div>
+              <div className="text-lg font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                {x402?.paymentCount || 0}
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: "#4a6a8a66" }}>
+                x402 payments
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <Globe className="h-3 w-3" style={{ color: "#00f0ff44" }} />
+                <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>
+                  Protocol
+                </span>
+              </div>
+              <div className="text-sm font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                x402
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: "#4a6a8a66" }}>
+                USDC on Base
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       {registration?.description && (

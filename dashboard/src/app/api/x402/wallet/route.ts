@@ -1,9 +1,37 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
 
 export const runtime = "nodejs";
 
-/** GET /api/x402/wallet -- get wallet info and payment stats */
+// ---- ERC-8004 constants (same as identity route) ----
+const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
+const AGENT_ID = BigInt(process.env.ERC8004_AGENT_ID || "16905");
+
+const IDENTITY_ABI = [
+  {
+    name: "ownerOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    name: "getAgentWallet",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+const viemClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
+
+/** GET /api/x402/wallet -- wallet info (from ERC-8004 on-chain) + payment stats */
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -11,14 +39,46 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check bridge status — maybeSingle avoids error when no row exists
+  // ---- Read wallet address from ERC-8004 on-chain ----
+  let walletAddress: string | null = null;
+  let ownerAddress: string | null = null;
+  let onChainOk = false;
+
+  try {
+    const [owner, agentWallet] = await Promise.all([
+      viemClient
+        .readContract({
+          address: IDENTITY_REGISTRY,
+          abi: IDENTITY_ABI,
+          functionName: "ownerOf",
+          args: [AGENT_ID],
+        })
+        .catch(() => null),
+      viemClient
+        .readContract({
+          address: IDENTITY_REGISTRY,
+          abi: IDENTITY_ABI,
+          functionName: "getAgentWallet",
+          args: [AGENT_ID],
+        })
+        .catch(() => null),
+    ]);
+
+    ownerAddress = owner as string | null;
+    walletAddress = (agentWallet as string | null) || ownerAddress;
+    onChainOk = ownerAddress !== null;
+  } catch {
+    // On-chain read failed — wallet info will be null
+  }
+
+  // ---- Check bridge status ----
   const { data: bridgeSession } = await supabase
     .from("agent_sessions")
     .select("agent_id, status, last_heartbeat")
     .eq("agent_id", "bridge")
     .maybeSingle();
 
-  // Get payment stats
+  // ---- Get payment stats ----
   const { data: payments } = await supabase
     .from("x402_payments")
     .select("amount, status, created_at")
@@ -43,10 +103,12 @@ export async function GET() {
 
   return NextResponse.json({
     wallet: {
-      configured: false, // Bridge reports this via env var presence
-      address: null,     // Derived client-side from private key (never expose key)
-      network: "eip155:84532",
-      budgetLimit: "1.00",
+      configured: onChainOk,
+      address: walletAddress,
+      owner: ownerAddress,
+      agentId: AGENT_ID.toString(),
+      network: "eip155:8453",
+      budgetLimit: process.env.X402_BUDGET_LIMIT || "1.00",
     },
     stats: {
       totalSpend: totalSpend.toFixed(4),

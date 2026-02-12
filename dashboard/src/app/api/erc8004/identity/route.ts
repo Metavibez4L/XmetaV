@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
+import { createClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -123,6 +124,41 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ---- x402 payment stats (synced with wallet) ----
+    let x402Stats = null;
+    try {
+      const supabase = await createClient();
+      const { data: payments } = await supabase
+        .from("x402_payments")
+        .select("amount, status, created_at")
+        .eq("status", "completed");
+
+      const totalSpend = (payments || []).reduce(
+        (sum: number, p: { amount?: string }) => sum + parseFloat(p.amount || "0"),
+        0
+      );
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayPayments = (payments || []).filter(
+        (p: { created_at: string }) => new Date(p.created_at) >= todayStart
+      );
+      const todaySpend = todayPayments.reduce(
+        (sum: number, p: { amount?: string }) => sum + parseFloat(p.amount || "0"),
+        0
+      );
+
+      x402Stats = {
+        totalSpend: totalSpend.toFixed(4),
+        todaySpend: todaySpend.toFixed(4),
+        paymentCount: payments?.length || 0,
+        currency: "USDC",
+        network: "eip155:8453",
+        budgetLimit: process.env.X402_BUDGET_LIMIT || "1.00",
+      };
+    } catch {
+      // Supabase read failed — not critical for identity
+    }
+
     return NextResponse.json({
       identity: {
         agentId: agentIdParam,
@@ -139,6 +175,7 @@ export async function GET(request: NextRequest) {
           : null,
       },
       registration: registrationData,
+      x402: x402Stats,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to read on-chain identity";
