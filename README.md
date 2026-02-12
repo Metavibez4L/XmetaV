@@ -610,19 +610,20 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 
 | Document | Description |
 |----------|-------------|
-| [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** -- setup, architecture, pages, bridge |
+| [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** — setup, architecture, pages, bridge |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive (includes dashboard) |
-| [AGENTS.md](docs/AGENTS.md) | Agent configuration & customization |
+| [AGENTS.md](docs/AGENTS.md) | Agent configuration, tool profiles, and customization |
 | [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions (includes dashboard, x402, voice) |
 | [OLLAMA-SETUP.md](docs/OLLAMA-SETUP.md) | Ollama integration guide |
 | [OPENCLAW-FIX-CHECKLIST.md](docs/OPENCLAW-FIX-CHECKLIST.md) | Verification checklist |
 | [GITHUB-SKILL-STATUS.md](docs/GITHUB-SKILL-STATUS.md) | GitHub skill status |
-| [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 payment protocol reference |
-| [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 agent identity reference |
+| [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 autonomous payment protocol reference |
+| [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 on-chain agent identity reference |
 | [capabilities/voice-commands.md](capabilities/voice-commands.md) | Voice command & response system reference |
+| [capabilities/quick-commands.md](capabilities/quick-commands.md) | Essential daily-use commands |
 
 ---
 

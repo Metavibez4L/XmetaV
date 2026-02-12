@@ -29,6 +29,9 @@ For per-agent runbooks, see `docs/agents/`:
 - **Bridge daemon**: `cd dashboard/bridge && npm start`
 - **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
 - **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
+- **x402 payments**: See `capabilities/x402-payments.md`
+- **Voice commands**: See `capabilities/voice-commands.md`
+- **ERC-8004 identity**: See `capabilities/erc8004-identity.md`
 
 ## How agent routing works
 
@@ -99,6 +102,77 @@ Config fields that influence concurrency:
 - `agents.defaults.subagents.maxConcurrent`
 
 If you see lock contention or long waits, reduce concurrency temporarily and re-test.
+
+## Agent Tool Profiles
+
+XmetaV agents use **tool profiles** to control which tools are advertised to the model. This optimizes token usage and improves reliability.
+
+### Profile: `coding` (Default for repo agents)
+
+**Tools available:** ~4 tools
+- `exec` — Execute shell commands
+- `read` — Read file contents
+- `write` — Write/create files
+- `process` — Manage background processes
+
+**Use for:**
+- Code editing and refactoring
+- Running tests and builds
+- Repository operations
+- File system automation
+
+**Benefits:**
+- Smaller tool schema in prompts
+- Faster model responses
+- Less Kimi quota consumption
+- More reliable tool calling
+
+### Profile: `full` (Web variants)
+
+**Tools available:** 20+ tools
+- All `coding` tools, plus:
+- `browser` — Browser automation (open, click, snapshot)
+- `web_fetch` — Fetch page content
+- `web_search` — Brave Search API
+- `cron` — Scheduled jobs
+- `gateway` — Gateway management
+- `sessions_*` — Session management
+- `canvas` — Headless rendering
+
+**Use for:**
+- Web scraping and browser automation
+- Research tasks requiring search
+- Multi-session orchestration
+- Advanced system operations
+
+**Trade-offs:**
+- Larger tool schema in prompts
+- More tokens per request
+- Higher quota usage on cloud models
+
+### Profile Selection Guide
+
+| Task Type | Recommended Agent | Why |
+|-----------|-------------------|-----|
+| Code changes, tests | `basedintern` / `akua` | Lean, fast, reliable |
+| Web scraping | `basedintern_web` / `akua_web` | Full browser tools |
+| Research + summarize | `basedintern_web` | Search + fetch tools |
+| Multi-agent swarm | `main` | Full orchestration tools |
+| Quick command | Any with `--local` | Bypasses gateway |
+
+### Creating agents with specific profiles
+
+```bash
+# Create coding-only agent (default)
+./scripts/create-agent.sh --id myagent --template coding
+
+# Create agent + web variant
+./scripts/create-agent.sh --id myagent --template coding --web
+
+# This creates:
+#   myagent (coding profile)
+#   myagent_web (full profile)
+```
 
 ## Repo agents (example: `basedintern`)
 
