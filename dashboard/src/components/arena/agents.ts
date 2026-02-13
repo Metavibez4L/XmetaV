@@ -77,7 +77,16 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     color: 0x38bdf8,
     colorHex: "#38bdf8",
     room: "support",
-    tile: { col: 4.5, row: 7 },
+    tile: { col: 3, row: 7 },
+    size: 26,
+  },
+  {
+    id: "oracle",
+    label: "ORACLE",
+    color: 0xfbbf24,
+    colorHex: "#fbbf24",
+    room: "support",
+    tile: { col: 6, row: 7 },
     size: 26,
   },
 ];
@@ -94,7 +103,8 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "basedintern", angle: 30 },      // lower-right
   { agentId: "akua_web", angle: 150 },        // lower-left
   { agentId: "basedintern_web", angle: 90 },  // bottom
-  { agentId: "briefing", angle: 120 },         // bottom-left (between bottom and lower-left)
+  { agentId: "briefing", angle: 120 },         // bottom-left
+  { agentId: "oracle", angle: 60 },            // bottom-right (between lower-right and bottom)
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -106,4 +116,6 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["akua", "akua_web"],
   ["basedintern", "basedintern_web"],
   ["main", "briefing"],
+  ["main", "oracle"],
+  ["oracle", "briefing"],
 ];

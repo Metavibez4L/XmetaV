@@ -255,4 +255,11 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
   },
+  {
+    id: "oracle",
+    name: "Oracle (On-Chain Intel)",
+    workspace: "/home/manifest/oracle",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+  },
 ];

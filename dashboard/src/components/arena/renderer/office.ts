@@ -207,7 +207,7 @@ export function initOffice(
   }
 
   // -- Workstations (5 agent desks) -----------------------------------
-  const workstationAgents = ["akua", "akua_web", "basedintern", "basedintern_web", "briefing"];
+  const workstationAgents = ["akua", "akua_web", "basedintern", "basedintern_web", "briefing", "oracle"];
   for (const agentId of workstationAgents) {
     const cfg = ARENA_AGENTS.find((a) => a.id === agentId);
     if (!cfg) continue;

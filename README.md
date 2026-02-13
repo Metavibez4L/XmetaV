@@ -217,6 +217,7 @@ openclaw agent --agent main --local --thinking off \
 | **`swarm.sh`** | **Swarm** -- multi-agent orchestration (parallel, pipeline, collab) | `./scripts/swarm.sh --parallel ...` |
 | **`briefing-agent.sh`** | **Briefing Agent** -- health sentinel + auto-fix + distill + sitrep | `./scripts/briefing-agent.sh` |
 | **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
+| **`oracle-agent.sh`** | **Oracle Agent** -- on-chain intel, gas, prices, sentiment, alerts | `./scripts/oracle-agent.sh` |
 
 ---
 
@@ -321,6 +322,29 @@ The morning person who has the coffee ready. Maintains `SITREP.md` (live situati
 ```
 
 See [docs/agents/briefing.md](docs/agents/briefing.md) for full documentation.
+
+### Agent: `oracle` (on-chain intelligence)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | On-chain intelligence and market sentinel |
+| **Workspace** | `/home/manifest/oracle` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Monitor gas, prices, chain activity, protocol intel, crypto sentiment |
+
+Provides real-time market intelligence via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports and surfaces alerts before anyone has to ask.
+
+```bash
+# Run manually
+./scripts/oracle-agent.sh
+
+# Quick alerts every 15 min, full report every hour:
+# */15 * * * * /home/manifest/XmetaV/scripts/oracle-agent.sh --alerts >> /tmp/oracle-alerts.log 2>&1
+# 0 * * * *   /home/manifest/XmetaV/scripts/oracle-agent.sh --report >> /tmp/oracle-report.log 2>&1
+```
+
+See [docs/agents/oracle.md](docs/agents/oracle.md) for full documentation.
 
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
