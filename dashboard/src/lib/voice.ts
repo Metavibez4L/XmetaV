@@ -31,19 +31,35 @@ export const DEFAULT_VOICE: VoiceName = "nova";
 export const DEFAULT_STT_MODEL = "gpt-4o-transcribe";
 export const DEFAULT_TTS_MODEL: TTSModel = "tts-1"; // fast by default; "tts-1-hd" for quality
 
-// Domain-specific prompt to improve transcription accuracy for XmetaV terminology
+// Domain-specific prompt to improve transcription accuracy for XmetaV terminology.
+// Includes both vocabulary AND example phrases the operator commonly says,
+// which dramatically improves recognition for domain-specific speech.
 const STT_PROMPT = [
+  // ── Agent names & project terms ──
   "XmetaV, XMETAV, $XMETAV, command center, HQ, arena,",
-  "operator, main, briefing, oracle, alchemist, web3dev,",
+  "operator, main, briefing, oracle, alchemist, web3dev, sentinel,",
   "akua, basedintern, BasedIntern, Akua,",
-  "dispatch, fleet, swarm, bridge, meeting, intel room, dev floor,",
+  // ── Rooms & locations ──
+  "dispatch, fleet, swarm, bridge, meeting, intel room, dev floor, web3 lab, command room,",
+  // ── Web3 vocabulary ──
   "Solidity, Hardhat, Base chain, Base Mainnet, ERC-20, ERC-721, ERC-8004,",
-  "tokenomics, staking, vesting, liquidity, emissions,",
-  "Supabase, OpenClaw, x402, DeFi, DEX, AMM, TVL,",
+  "tokenomics, staking, vesting, liquidity, emissions, smart contract,",
+  "Supabase, OpenClaw, x402, DeFi, DEX, AMM, TVL, wallet,",
   "CoinGecko, Etherscan, BaseScan, DeFiLlama,",
-  "gas, gwei, wei, ETH, USDC, cbETH,",
-  "commit, push, deploy, compile, audit, scaffold,",
+  "gas, gwei, wei, ETH, USDC, cbETH, on-chain,",
+  // ── Dev commands ──
+  "commit, push, deploy, compile, audit, scaffold, restart server,",
   "SITREP, runbook, cron, daemon, heartbeat,",
+  // ── Common operator phrases (helps model understand conversational context) ──
+  "Call a meeting with the alchemist and oracle.",
+  "Hey main, give me a status report.",
+  "Send that to the briefing agent.",
+  "Restart the server. Commit and push.",
+  "What's the gas situation on Base?",
+  "Check the fleet health. Run a SITREP.",
+  "Tell the web3dev to audit the contracts.",
+  "How's the sentinel doing?",
+  "Let's update the registration.",
 ].join(" ");
 
 // ── Speech-to-Text (Whisper) ──

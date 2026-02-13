@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
 
     const filename =
       audioFile instanceof File ? audioFile.name : "recording.webm";
+
+    console.log(`[voice/transcribe] model=${sttModel} size=${buffer.length}b file=${filename}`);
+
     const text = await transcribeAudio(buffer, filename, sttModel);
+
+    console.log(`[voice/transcribe] result: "${text.slice(0, 120)}"`);
 
     return NextResponse.json({ text });
   } catch (err) {

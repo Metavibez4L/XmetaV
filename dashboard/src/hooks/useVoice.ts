@@ -109,6 +109,7 @@ export function useVoice(): UseVoiceReturn {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silenceRafRef = useRef<number | null>(null);
   const mediaSourceConnectedRef = useRef<Set<HTMLAudioElement>>(new Set());
+  const settingsRef = useRef<VoiceSettings>(DEFAULT_SETTINGS);
 
   // Load persisted preferences on mount
   useEffect(() => {
@@ -118,7 +119,9 @@ export function useVoice(): UseVoiceReturn {
     } catch {
       // localStorage unavailable
     }
-    setSettings(loadSettings());
+    const loaded = loadSettings();
+    setSettings(loaded);
+    settingsRef.current = loaded;
   }, []);
 
   const toggleVoice = useCallback(() => {
@@ -137,6 +140,7 @@ export function useVoice(): UseVoiceReturn {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
       saveSettings(next);
+      settingsRef.current = next;
       return next;
     });
   }, []);
@@ -354,7 +358,7 @@ export function useVoice(): UseVoiceReturn {
         try {
           const formData = new FormData();
           formData.append("audio", blob, "recording.webm");
-          formData.append("sttModel", settings.sttModel || "gpt-4o-transcribe");
+          formData.append("sttModel", settingsRef.current.sttModel || "gpt-4o-transcribe");
 
           const res = await fetch("/api/voice/transcribe", {
             method: "POST",
@@ -382,7 +386,7 @@ export function useVoice(): UseVoiceReturn {
 
       recorder.stop();
     });
-  }, [stopSilenceDetection, cleanupAnalyser]);
+  }, [stopSilenceDetection, cleanupAnalyser, settings.sttModel]);
 
   // ── Speak text via streaming TTS ──
   const speak = useCallback(
