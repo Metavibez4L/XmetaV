@@ -5,6 +5,8 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
 
 // ============================================================
 // XmetaV x402 Payment-Gated API
@@ -41,8 +43,80 @@ const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const openaiKey = process.env.OPENAI_API_KEY;
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 
+// ---- $XMETAV Token Tier System ----
+// Holding XMETAV tokens grants tiered discounts on gated endpoints
+
+const XMETAV_TOKEN_ADDRESS = process.env.XMETAV_TOKEN_ADDRESS as `0x${string}` | undefined;
+
+const ERC20_BALANCE_ABI = [
+  {
+    inputs: [{ name: "account", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+interface TokenTier {
+  name: string;
+  minBalance: number;
+  discount: number;
+  dailyLimit: number;
+  color: string;
+}
+
+const TIERS: TokenTier[] = [
+  { name: "None",    minBalance: 0,         discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
+  { name: "Bronze",  minBalance: 1_000,     discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
+  { name: "Silver",  minBalance: 10_000,    discount: 0.20, dailyLimit: 100,  color: "#c0c0c0" },
+  { name: "Gold",    minBalance: 100_000,   discount: 0.35, dailyLimit: 500,  color: "#ffd700" },
+  { name: "Diamond", minBalance: 1_000_000, discount: 0.50, dailyLimit: 2000, color: "#b9f2ff" },
+];
+
+function getTier(balance: number): TokenTier {
+  for (let i = TIERS.length - 1; i >= 0; i--) {
+    if (balance >= TIERS[i].minBalance) return TIERS[i];
+  }
+  return TIERS[0];
+}
+
+const viemClient = XMETAV_TOKEN_ADDRESS
+  ? createPublicClient({ chain: base, transport: http("https://mainnet.base.org") })
+  : null;
+
+async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
+  if (!viemClient || !XMETAV_TOKEN_ADDRESS || !callerAddress) return TIERS[0];
+  try {
+    const raw = await viemClient.readContract({
+      address: XMETAV_TOKEN_ADDRESS,
+      abi: ERC20_BALANCE_ABI,
+      functionName: "balanceOf",
+      args: [callerAddress as `0x${string}`],
+    });
+    const balance = Number(raw / BigInt(10 ** 18));
+    return getTier(balance);
+  } catch {
+    return TIERS[0];
+  }
+}
+
 const app = express();
 app.use(express.json());
+
+// ---- Token tier middleware: adds X-Token-Tier and X-Token-Discount headers ----
+if (XMETAV_TOKEN_ADDRESS) {
+  app.use(async (req, res, next) => {
+    // Extract caller address from x-caller header or payment metadata
+    const caller = req.headers["x-caller-address"] as string | undefined;
+    if (caller) {
+      const tier = await getCallerTier(caller);
+      res.setHeader("X-Token-Tier", tier.name);
+      res.setHeader("X-Token-Discount", `${(tier.discount * 100).toFixed(0)}%`);
+    }
+    next();
+  });
+}
 
 // ---- x402 Payment Middleware ----
 // Gates XmetaV platform endpoints with USDC micro-payments on Base
@@ -459,6 +533,27 @@ if (openai) {
 
 // ---- Free endpoints (no payment required) ----
 
+app.get("/token-info", async (_req, res) => {
+  res.json({
+    token: {
+      name: "XmetaV",
+      symbol: "XMETAV",
+      address: XMETAV_TOKEN_ADDRESS || "not configured",
+      network: "eip155:8453",
+      chainId: 8453,
+    },
+    tiers: TIERS.map((t) => ({
+      name: t.name,
+      minBalance: t.minBalance,
+      discount: `${(t.discount * 100).toFixed(0)}%`,
+      dailyLimit: `$${t.dailyLimit}`,
+      color: t.color,
+    })),
+    enabled: !!XMETAV_TOKEN_ADDRESS,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -468,6 +563,9 @@ app.get("/health", (_req, res) => {
     payTo: evmAddress,
     supabase: supabase ? "connected" : "not configured",
     voice: openai ? "enabled" : "disabled (no OPENAI_API_KEY)",
+    token: XMETAV_TOKEN_ADDRESS
+      ? { address: XMETAV_TOKEN_ADDRESS, tiers: "enabled" }
+      : "disabled (no XMETAV_TOKEN_ADDRESS)",
     endpoints: {
       gated: {
         "POST /agent-task": "$0.01 — dispatch a task to an agent",
@@ -483,6 +581,7 @@ app.get("/health", (_req, res) => {
       },
       free: {
         "GET /health": "this endpoint",
+        "GET /token-info": "XMETAV token info and tier table",
       },
     },
   });
@@ -499,6 +598,7 @@ app.listen(port, () => {
   console.log(`  Supabase:  ${supabase ? "connected" : "not configured"}`);
   console.log(`  Health:    http://localhost:${port}/health`);
   console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
+  console.log(`  Token:     ${XMETAV_TOKEN_ADDRESS ? XMETAV_TOKEN_ADDRESS : "disabled (no XMETAV_TOKEN_ADDRESS)"}`);
   console.log(`\n  Gated endpoints:`);
   console.log(`    POST /agent-task       $0.01   Dispatch task to agent`);
   console.log(`    POST /intent           $0.005  Resolve goal → commands`);

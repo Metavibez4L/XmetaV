@@ -28,27 +28,49 @@ export const VALID_VOICES: VoiceName[] = [
 export type TTSModel = "tts-1" | "tts-1-hd";
 
 export const DEFAULT_VOICE: VoiceName = "nova";
-export const DEFAULT_STT_MODEL = "whisper-1";
+export const DEFAULT_STT_MODEL = "gpt-4o-transcribe";
 export const DEFAULT_TTS_MODEL: TTSModel = "tts-1"; // fast by default; "tts-1-hd" for quality
+
+// Domain-specific prompt to improve transcription accuracy for XmetaV terminology
+const STT_PROMPT = [
+  "XmetaV, XMETAV, $XMETAV, command center, HQ, arena,",
+  "operator, main, briefing, oracle, alchemist, web3dev,",
+  "akua, basedintern, BasedIntern, Akua,",
+  "dispatch, fleet, swarm, bridge, meeting, intel room, dev floor,",
+  "Solidity, Hardhat, Base chain, Base Mainnet, ERC-20, ERC-721, ERC-8004,",
+  "tokenomics, staking, vesting, liquidity, emissions,",
+  "Supabase, OpenClaw, x402, DeFi, DEX, AMM, TVL,",
+  "CoinGecko, Etherscan, BaseScan, DeFiLlama,",
+  "gas, gwei, wei, ETH, USDC, cbETH,",
+  "commit, push, deploy, compile, audit, scaffold,",
+  "SITREP, runbook, cron, daemon, heartbeat,",
+].join(" ");
 
 // ── Speech-to-Text (Whisper) ──
 
 /**
- * Transcribe an audio buffer to text using OpenAI Whisper.
+ * Transcribe an audio buffer to text using OpenAI transcription.
+ * Uses gpt-4o-transcribe for high accuracy with domain context prompt.
  * Accepts wav, mp3, mp4, mpeg, mpga, m4a, ogg, webm.
  */
 export async function transcribeAudio(
   audioBuffer: Buffer,
-  filename = "audio.webm"
+  filename = "audio.webm",
+  model: string = DEFAULT_STT_MODEL
 ): Promise<string> {
   const file = new File([audioBuffer], filename, {
     type: getMimeType(filename),
   });
 
+  const isWhisper = model.startsWith("whisper");
+
   const response = await openai.audio.transcriptions.create({
-    model: DEFAULT_STT_MODEL,
+    model,
     file,
-    language: "en",
+    prompt: STT_PROMPT,
+    temperature: 0,
+    // language param only supported on whisper models
+    ...(isWhisper ? { language: "en" } : {}),
   });
 
   return response.text;

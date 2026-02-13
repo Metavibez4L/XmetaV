@@ -8,6 +8,9 @@ import { useWakeWord } from "@/hooks/useWakeWord";
 import { AgentSelector } from "./AgentSelector";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { VoiceSettingsPanel } from "./VoiceSettings";
+import { ChatHistory } from "./ChatHistory";
+import type { HistoryEntry } from "./ChatHistory";
+import { AgentTerminal } from "./AgentTerminal";
 import {
   Send,
   Loader2,
@@ -19,8 +22,11 @@ import {
   VolumeX,
   Radio,
   Repeat,
+  History,
+  Terminal,
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
+import { cleanAgentOutput } from "@/lib/utils";
 
 // ────────────────────────────────────────────────────
 // Types
@@ -42,7 +48,7 @@ function nextId() {
 }
 
 // ────────────────────────────────────────────────────
-// Memoized message bubble
+// Memoized message bubble (completed / historical messages)
 // ────────────────────────────────────────────────────
 
 const MessageBubble = React.memo(function MessageBubble({
@@ -80,20 +86,6 @@ const MessageBubble = React.memo(function MessageBubble({
             >
               {msg.agentId}
             </span>
-            {msg.status === "running" && (
-              <div className="flex items-center gap-1.5">
-                <Loader2
-                  className="h-3 w-3 animate-spin"
-                  style={{ color: "#00f0ff66" }}
-                />
-                <span
-                  className="text-[8px] font-mono"
-                  style={{ color: "#00f0ff44" }}
-                >
-                  STREAMING
-                </span>
-              </div>
-            )}
             {msg.status === "pending" && (
               <span
                 className="text-[8px] font-mono animate-pulse"
@@ -128,11 +120,69 @@ const MessageBubble = React.memo(function MessageBubble({
                   : "#c8d6e5cc",
           }}
         >
-          {msg.content ||
+          {(msg.role === "agent" ? cleanAgentOutput(msg.content) : msg.content) ||
             (msg.status === "pending" ? "// waiting for bridge..." : "")}
         </pre>
+      </div>
+    </div>
+  );
+});
 
-        {msg.status === "running" && (
+// ────────────────────────────────────────────────────
+// Streaming bubble — renders live text without copying messages array
+// ────────────────────────────────────────────────────
+
+function StreamingBubble({
+  agentId: streamAgentId,
+  fullText: streamText,
+  isComplete: streamDone,
+}: {
+  agentId: string;
+  fullText: string;
+  isComplete: boolean;
+}) {
+  return (
+    <div className="flex justify-start">
+      <div
+        className="max-w-[85%] rounded-lg px-4 py-3 relative"
+        style={{
+          background: "linear-gradient(135deg, #0a0f1a, #0d1525)",
+          border: `1px solid #00f0ff12`,
+        }}
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <span
+            className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{
+              color: "#a855f7",
+              background: "#a855f710",
+              border: "1px solid #a855f720",
+            }}
+          >
+            {streamAgentId}
+          </span>
+          {!streamDone && (
+            <div className="flex items-center gap-1.5">
+              <Loader2
+                className="h-3 w-3 animate-spin"
+                style={{ color: "#00f0ff66" }}
+              />
+              <span
+                className="text-[8px] font-mono"
+                style={{ color: "#00f0ff44" }}
+              >
+                STREAMING
+              </span>
+            </div>
+          )}
+        </div>
+        <pre
+          className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
+          style={{ color: "#c8d6e5cc" }}
+        >
+          {cleanAgentOutput(streamText) || "// waiting for bridge..."}
+        </pre>
+        {!streamDone && (
           <span
             className="inline-block w-2 h-4 ml-0.5 animate-pulse"
             style={{ background: "#00f0ff", boxShadow: "0 0 4px #00f0ff" }}
@@ -141,7 +191,7 @@ const MessageBubble = React.memo(function MessageBubble({
       </div>
     </div>
   );
-});
+}
 
 // ────────────────────────────────────────────────────
 // Auto-resize textarea hook
@@ -169,6 +219,8 @@ export function AgentChat() {
   const [agentId, setAgentId] = useState("main");
   const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -211,6 +263,56 @@ export function AgentChat() {
 
   useAutoResize(inputRef, input);
 
+  // ── Load conversation from history ──
+  const handleLoadConversation = useCallback(
+    (entries: HistoryEntry[]) => {
+      const loaded: ChatMessage[] = [];
+      for (const entry of entries) {
+        // User message
+        loaded.push({
+          id: `hist-user-${entry.id}`,
+          role: "user",
+          content: entry.message,
+          commandId: entry.id,
+          agentId: entry.agentId,
+          timestamp: entry.createdAt,
+        });
+        // Agent response (if any)
+        if (entry.response) {
+          loaded.push({
+            id: `hist-agent-${entry.id}`,
+            role: "agent",
+            content: cleanAgentOutput(entry.response),
+            commandId: entry.id,
+            status: entry.status === "failed" ? "failed" : "completed",
+            agentId: entry.agentId,
+            timestamp: entry.createdAt,
+          });
+        }
+      }
+      setMessages(loaded);
+      setActiveCommandId(null);
+      setSending(false);
+      // Set agent to match the loaded conversation
+      if (entries.length > 0) {
+        setAgentId(entries[entries.length - 1].agentId);
+      }
+      shouldScrollRef.current = true;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+        inputRef.current?.focus();
+      }, 100);
+    },
+    []
+  );
+
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setActiveCommandId(null);
+    setSending(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
   // ── Smart auto-scroll: only if user is near bottom ──
   const checkShouldScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -230,36 +332,44 @@ export function AgentChat() {
     }
   }, []);
 
-  // ── Update streaming message ──
+  // ── Scroll while streaming (fullText changes via throttled hook) ──
   useEffect(() => {
-    if (!activeCommandId || !fullText) return;
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === "agent" && last.commandId === activeCommandId) {
-        return [
-          ...prev.slice(0, -1),
-          {
-            ...last,
-            content: fullText,
-            status: isComplete ? "completed" : "running",
-          },
-        ];
-      }
-      return prev;
-    });
-    scrollToBottom();
-  }, [fullText, isComplete, activeCommandId, scrollToBottom]);
+    if (activeCommandId && fullText) {
+      scrollToBottom();
+    }
+  }, [fullText, activeCommandId, scrollToBottom]);
 
-  // ── Command complete — track which command just finished ──
+  // ── Command complete — merge final text into messages array once ──
   const [lastCompletedCmdId, setLastCompletedCmdId] = useState<string | null>(null);
+  const completedRef = useRef<string | null>(null); // guard against double-merge
+  const lastCompletedTextRef = useRef<string>(""); // final text for auto-speak
+
   useEffect(() => {
-    if (isComplete && activeCommandId) {
-      setLastCompletedCmdId(activeCommandId);
+    if (isComplete && activeCommandId && activeCommandId !== completedRef.current) {
+      // Guard: only merge once per command ID
+      completedRef.current = activeCommandId;
+      const finalText = fullText;
+      const completedId = activeCommandId;
+
+      // Save final text BEFORE clearing activeCommandId (which resets fullText)
+      lastCompletedTextRef.current = finalText;
+
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "agent" && last.commandId === completedId) {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, content: finalText, status: "completed" },
+          ];
+        }
+        return prev;
+      });
+      setLastCompletedCmdId(completedId);
       setActiveCommandId(null);
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isComplete, activeCommandId]);
+  }, [isComplete, activeCommandId, fullText]);
 
   // ── Send message (accepts optional text for voice input) ──
   const sendMessage = useCallback(
@@ -270,6 +380,7 @@ export function AgentChat() {
       setSending(true);
       if (!overrideText) setInput("");
       shouldScrollRef.current = true;
+      completedRef.current = null; // allow completion merge for the new command
 
       const userMsg: ChatMessage = {
         id: nextId(),
@@ -334,7 +445,7 @@ export function AgentChat() {
 
   // ── Auto-speak response when voice mode + autoSpeak is on ──
   // Track by command ID (unique per command) to prevent re-speaking stale responses.
-  // Use a ref for `speak` so callback identity changes don't re-trigger the effect.
+  // Read final text from lastCompletedTextRef (captured before activeCommandId is cleared).
   const lastSpokenCmdRef = useRef<string | null>(null);
   const speakRef = useRef(speak);
   speakRef.current = speak;
@@ -345,13 +456,15 @@ export function AgentChat() {
       settings.autoSpeak &&
       lastCompletedCmdId &&
       lastCompletedCmdId !== lastSpokenCmdRef.current &&
-      fullText &&
       !isSpeaking
     ) {
-      lastSpokenCmdRef.current = lastCompletedCmdId;
-      speakRef.current(fullText);
+      const textToSpeak = cleanAgentOutput(lastCompletedTextRef.current);
+      if (textToSpeak) {
+        lastSpokenCmdRef.current = lastCompletedCmdId;
+        speakRef.current(textToSpeak);
+      }
     }
-  }, [voiceEnabled, settings.autoSpeak, lastCompletedCmdId, fullText, isSpeaking]);
+  }, [voiceEnabled, settings.autoSpeak, lastCompletedCmdId, isSpeaking]);
 
   // ── Continuous conversation: auto-listen after TTS finishes ──
   const wasSpeakingRef = useRef(false);
@@ -477,6 +590,39 @@ export function AgentChat() {
             style={{ background: "#00f0ff15" }}
           />
           <AgentSelector value={agentId} onChange={setAgentId} />
+          <div
+            className="h-4 w-px hidden sm:block"
+            style={{ background: "#00f0ff15" }}
+          />
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+            style={{
+              color: "#4a6a8a",
+              border: "1px solid #00f0ff10",
+            }}
+            title="Chat history"
+          >
+            <History className="h-3.5 w-3.5" />
+            <span className="text-[8px] font-mono uppercase tracking-wider hidden sm:inline">
+              History
+            </span>
+          </button>
+          <button
+            onClick={() => setTerminalOpen(!terminalOpen)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors"
+            style={{
+              color: terminalOpen ? "#39ff14" : "#4a6a8a",
+              background: terminalOpen ? "#39ff1408" : "transparent",
+              border: `1px solid ${terminalOpen ? "#39ff1420" : "#00f0ff10"}`,
+            }}
+            title="Toggle terminal"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span className="text-[8px] font-mono uppercase tracking-wider hidden sm:inline">
+              Terminal
+            </span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Voice toggle */}
@@ -619,9 +765,26 @@ export function AgentChat() {
             </div>
           )}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} />
-          ))}
+          {messages.map((msg) => {
+            // Skip the placeholder agent msg while streaming — StreamingBubble handles it
+            if (
+              activeCommandId &&
+              msg.role === "agent" &&
+              msg.commandId === activeCommandId
+            ) {
+              return null;
+            }
+            return <MessageBubble key={msg.id} msg={msg} />;
+          })}
+
+          {/* Live streaming bubble — rendered separately to avoid messages array copies */}
+          {activeCommandId && (
+            <StreamingBubble
+              agentId={agentId}
+              fullText={fullText}
+              isComplete={isComplete}
+            />
+          )}
         </div>
       </div>
 
@@ -789,6 +952,21 @@ export function AgentChat() {
           </div>
         </div>
       </div>
+
+      {/* Embedded Terminal */}
+      <AgentTerminal
+        open={terminalOpen}
+        onClose={() => setTerminalOpen(false)}
+      />
+
+      {/* Chat History Sidebar */}
+      <ChatHistory
+        agentId={agentId}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onNewChat={handleNewChat}
+        onLoadConversation={handleLoadConversation}
+      />
     </div>
   );
 }

@@ -88,11 +88,14 @@ Set the three environment variables in Vercel project settings.
 | Route | Page | Description |
 |-------|------|-------------|
 | `/` | **Command Center** | Bridge health indicator, fleet summary, recent command history, quick command input |
-| `/agent` | **Agent Chat** | Full-screen streaming chat with agent selector dropdown |
+| `/agent` | **Agent Chat** | Full-screen streaming chat with agent selector, voice commands, chat history sidebar |
 | `/swarms` | **Swarms** | Create, monitor, and review multi-agent swarm runs (3 tabs) |
 | `/fleet` | **Fleet** | Agent status table with enable/disable toggles and send-task dialog |
 | `/payments` | **Payments** | x402 wallet status, daily spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** | ERC-8004 on-chain agent identity, reputation, capabilities, and NFT details |
+| `/token` | **$XMETAV** | ERC-20 token balance, tier status, discount table, holder benefits |
+| `/arena` | **XMETAV HQ** | Isometric office visualization with meeting sync, live agent activity (PixiJS WebGL) |
+| `/logs` | **Live Logs** | Real-time log streaming with severity/agent filters, search, auto-scroll |
 | `/auth/login` | **Login** | Supabase email/password authentication |
 
 ### Swarms Page (Tabs)
@@ -140,8 +143,9 @@ All tables have:
 | `/api/x402/wallet` | GET | Wallet info, spend stats, bridge status |
 | `/api/erc8004/identity` | GET | On-chain agent identity and metadata |
 | `/api/intent` | POST | Intent resolution (agent routing) |
-| `/api/voice/transcribe` | POST | Speech-to-text via Whisper (multipart audio) |
-| `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (returns audio/mpeg) |
+| `/api/voice/transcribe` | POST | Speech-to-text via OpenAI Whisper (multipart audio) |
+| `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (streaming audio/mpeg) |
+| `/api/token` | GET | $XMETAV token info, balance, tier (query `?wallet=0x...`) |
 
 ## Project Structure
 
@@ -156,6 +160,7 @@ dashboard/
         fleet/page.tsx          # Agent Fleet
         payments/page.tsx       # x402 Payments dashboard
         identity/page.tsx       # ERC-8004 Agent Identity
+        token/page.tsx          # $XMETAV Token dashboard
         layout.tsx              # Dashboard layout with Sidebar
       auth/login/page.tsx       # Login page
       api/
@@ -181,8 +186,9 @@ dashboard/
       layout.tsx                # Root layout
     components/
       ui/                       # shadcn/ui primitives (button, input, card)
-      AgentChat.tsx             # Streaming chat interface
+      AgentChat.tsx             # Streaming chat interface with voice + StreamingBubble
       AgentSelector.tsx         # Agent dropdown selector
+      ChatHistory.tsx           # Chat history sidebar (slides from right)
       BridgeControls.tsx        # Bridge start/stop/status controls
       CommandHistory.tsx        # Recent command table
       ErrorBoundary.tsx         # React error boundary
@@ -195,13 +201,25 @@ dashboard/
       SystemHealth.tsx          # Bridge health indicator
       PaymentsDashboard.tsx    # x402 payments UI (wallet, history, endpoints)
       AgentIdentity.tsx        # ERC-8004 identity viewer (NFT, reputation, lookup)
+      LiveLogs.tsx             # Real-time log streaming with filters
+      arena/                   # XMETAV HQ isometric office visualization
+        ArenaCanvas.tsx        # Main PixiJS canvas + DOM HUD overlay
+        agents.ts              # Agent config (rooms, tile coords, colors)
+        useArenaEvents.ts      # Supabase Realtime event subscriptions
+        renderer/
+          iso.ts               # Isometric math (toScreen, drawIsoCube, drawIsoWall)
+          background.ts        # Floor tiles, glass walls, room labels, particles
+          office.ts            # Desks, screens, meeting table, projector, chairs
+          avatars.ts           # Glowing orb agents with ghost silhouettes
+          effects.ts           # Command pulses, streaming particles, dispatch beams
     hooks/
       useAgentControls.ts       # Agent enable/disable state
       useAgentSessions.ts       # Agent session listing
       useBridgeStatus.ts        # Bridge heartbeat monitoring
       useCommandHistory.ts      # Command history fetching
-      useRealtimeMessages.ts    # Streaming agent responses
+      useRealtimeMessages.ts    # Streaming agent responses (ref-based, sync reset)
       useSwarmRuns.ts           # Swarm runs + tasks (Realtime subscriptions)
+      useVoice.ts               # Voice recording, playback, and TTS
     lib/
       bridge-manager.ts         # Server-side bridge process manager
       supabase-browser.ts       # Browser Supabase client
@@ -213,6 +231,11 @@ dashboard/
     index.ts                    # Express server with paymentMiddleware
     package.json                # @x402/express, @x402/core, @x402/evm, express
     .env.example                # EVM_ADDRESS, FACILITATOR_URL, PORT, NETWORK
+  token/                        # $XMETAV ERC-20 Hardhat project
+    contracts/XMETAV.sol        # ERC-20 contract (OpenZeppelin)
+    scripts/deploy.ts           # Deploy to Base Mainnet
+    hardhat.config.ts           # Network config
+    token-config.json           # Deployed contract details
   erc8004/                      # ERC-8004 agent identity
     register.ts                 # Registration script (mints agent NFT)
     registration.json           # Agent metadata (name, capabilities, services)
@@ -292,6 +315,48 @@ npm install
 npx tsx register.ts   # register or re-register the agent
 ```
 
+## XMETAV HQ (Arena)
+
+The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 10+ agents in real-time across a 10x10 isometric grid.
+
+**Office Layout (v14 — reorganized):**
+- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above
+- **MEETING area** (center): Hexagonal glass table with holographic projector and 10 chairs
+- **INTEL room** (bottom-left, glass walls): Briefing, Oracle, Alchemist workstations — blue-tinted floor, room for 2 more agents
+- **DEV FLOOR** (bottom-right, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks — green-tinted grid lines
+
+**Agent Avatars:** Glowing translucent orbs with ghost silhouettes. States: idle (breathing pulse), busy (spinning ring + particles), offline (static flicker).
+
+**Real-Time Effects:**
+- Command pulses (golden energy) travel office pathways from boss desk to target
+- Streaming particles rise like code fragments from active desks
+- Dispatch beams route through meeting table center with traveling neon dots
+- Completion bursts and failure glitch effects per-agent
+- Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
+
+**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (10 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
+
+**Architecture:** `Supabase Realtime + 10s periodic sync -> useArenaEvents hook -> PixiJS imperative API (refs)`
+
+No React re-renders for animations -- the hook calls PixiJS methods directly via refs for maximum performance. Buffered state is replayed after PixiJS async init to handle the race condition between Supabase data arrival and renderer readiness.
+
+**Agent Colors:**
+
+| Agent | Color | Room |
+|-------|-------|------|
+| Main | Cyan `#00f0ff` | COMMAND |
+| Operator | Amber `#f59e0b` | COMMAND |
+| Briefing | Sky `#38bdf8` | INTEL |
+| Oracle | Gold `#fbbf24` | INTEL |
+| Alchemist | Fuchsia `#e879f9` | INTEL |
+| Web3Dev | Orange `#f97316` | DEV FLOOR |
+| Akua | Purple `#a855f7` | DEV FLOOR |
+| Akua_web | Violet `#c084fc` | DEV FLOOR |
+| Basedintern | Green `#39ff14` | DEV FLOOR |
+| Basedintern_web | Emerald `#4ade80` | DEV FLOOR |
+
+---
+
 ## UI Theme
 
 The dashboard uses a **cyberpunk hacker** aesthetic:
@@ -304,6 +369,7 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 
 ## Frontend Optimizations
 
+- **Streaming pipeline**: Buffered streamer (400-byte chunks, 200ms flush, 50ms first-byte), ref-based accumulator in `useRealtimeMessages` (no array/join GC), 80ms render throttle, dedicated `StreamingBubble` component
 - `React.memo` on all major components (SwarmCreate, SwarmActiveRuns, SwarmHistory, FleetTable, etc.)
 - Memoized sub-components (TemplateCard, TaskEditor, ActiveRunCard, HistoryRunRow, TaskRow)
 - `useCallback` / `useMemo` throughout hooks and components
@@ -329,3 +395,10 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | x402 payments not logging | Check `EVM_PRIVATE_KEY` is set in `bridge/.env`; verify `x402_payments` table exists |
 | Identity page empty | Verify `ERC8004_AGENT_ID=16905` in `bridge/.env`; check Base RPC connectivity |
 | x402-server won't start | Check `EVM_ADDRESS` and `FACILITATOR_URL` in `x402-server/.env` |
+| Token tier shows "None" | Verify `XMETAV_TOKEN_ADDRESS` is set in `.env.local`; check wallet holds XMETAV |
+| Arena agents don't move to table | Check browser console for `[arena]` logs; click TEST MEETING button; verify Supabase Realtime is enabled |
+| Voice repeats last response | Clear browser cache; ensure `useRealtimeMessages` sync reset is in place |
+| Chat history behind sidebar | History panel should slide from the right; check `ChatHistory.tsx` uses `right-0` |
+| MetaMask error on Payments/Identity | Safe to ignore -- app uses server-side wallets; error handling shows retry UI |
+| New agent not in arena | Add to `agents.ts` (ARENA_AGENTS, MEETING_SEATS, ARENA_CONNECTIONS), `office.ts` (workstationAgents), `types.ts` (KNOWN_AGENTS), and Supabase `agent_controls` |
+| Intel room agents overlapping | Check tile positions in `agents.ts` — INTEL room uses cols 0–4, rows 6–9 |

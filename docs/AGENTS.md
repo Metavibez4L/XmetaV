@@ -32,6 +32,8 @@ For per-agent runbooks, see `docs/agents/`:
 - **x402 payments**: See `capabilities/x402-payments.md`
 - **Voice commands**: See `capabilities/voice-commands.md`
 - **ERC-8004 identity**: See `capabilities/erc8004-identity.md`
+- **$XMETAV token**: See `capabilities/xmetav-token.md`
+- **Dashboard token page**: http://localhost:3000/token (balance, tiers, discounts)
 
 ## How agent routing works
 
@@ -296,6 +298,17 @@ The **Identity** page (`/identity`) shows ERC-8004 on-chain agent identity:
 - Capabilities and services from metadata
 - Trust model and contract addresses
 - Agent ID lookup for viewing other agents
+- $XMETAV token balance and tier badge
+
+### Dashboard Token
+
+The **$XMETAV** page (`/token`) shows the ERC-20 token status:
+
+- Token overview (name, symbol, supply, contract address with BaseScan link)
+- Agent wallet balance and current tier (None → Bronze → Silver → Gold → Diamond)
+- Tier table with thresholds, discount percentages, and daily spend limits
+- Holder benefits description
+- Contract: `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` on Base Mainnet
 
 ## Swarm Orchestration (CLI + Dashboard)
 

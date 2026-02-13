@@ -14,6 +14,7 @@ flowchart TB
         UI_FLEET["Fleet"]
         UI_PAY["Payments"]
         UI_ID["Identity"]
+        UI_TOK["$XMETAV Token"]
     end
 
     subgraph SUPABASE["Supabase (Cloud Postgres + Realtime)"]
@@ -30,6 +31,7 @@ flowchart TB
         direction LR
         X402["x402 USDC\nPayments"]
         ERC8004["ERC-8004\nIdentity NFT #16905"]
+        XMETAV_TOK["$XMETAV ERC-20\n0x5b56...9a54"]
     end
 
     subgraph LOCAL["Local Machine (WSL2)"]
@@ -91,6 +93,8 @@ flowchart TB
     BRIDGE -->|auto-pay 402| X402
     UI_ID -->|read identity| ERC8004
     UI_PAY -->|payment history| TBL_X402
+    UI_TOK -->|balanceOf / tier| XMETAV_TOK
+    XMETAV_TOK -.->|tier discount| X402
 
     style DASHBOARD fill:#0a0e1a,stroke:#00f0ff,color:#00f0ff
     style SUPABASE fill:#1a1a2e,stroke:#3ecf8e,color:#fff
@@ -115,7 +119,21 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs
+
+### XMETAV HQ — Isometric Office Visualization (PixiJS)
+
+A standalone fullscreen page (`/arena`) rendering an isometric cyberpunk office in real-time using PixiJS (WebGL).
+
+- **Renderer**: PixiJS v8.16.0 with dynamic imports (SSR-safe via `next/dynamic`)
+- **Isometric Engine**: Custom `iso.ts` with 2:1 projection, tile/cube/wall drawing primitives
+- **Office Layout**: Boss office (Main + Operator), meeting area (hex table + projector), 4 agent workstations
+- **Agent Avatars**: Glowing translucent orbs with ghost silhouettes — idle (breathing pulse), busy (spinning ring), offline (static flicker)
+- **Reactive Furniture**: Holo screens on every desk animate based on agent state (scrolling code, red flicker, dim)
+- **Real-Time Effects**: Command pulses travel office pathways, streaming particles rise from desks, dispatch beams route through meeting table, completion bursts, failure glitches
+- **Data Source**: `useArenaEvents` hook subscribes to Supabase Realtime channels (sessions, commands, responses, controls) and drives PixiJS imperatively via refs
+- **HUD**: DOM overlay with title, system status, agent legend, and floating labels computed from isometric coordinates
+- **Location**: `dashboard/src/components/arena/` (ArenaCanvas, agents, useArenaEvents, renderer/)
 
 ### Supabase (Message Bus + Database)
 
@@ -142,8 +160,10 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
 
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
-- **Endpoints**: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02)
-- **Settlement**: USDC on Base (mainnet or Sepolia)
+- **Endpoints**: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02), `/voice/transcribe` ($0.005), `/voice/synthesize` ($0.01)
+- **Token Tiers**: Checks caller's $XMETAV balance on-chain and applies tier discount to pricing
+- **Free endpoints**: `/health`, `/token-info`
+- **Settlement**: USDC on Base Mainnet
 - **Facilitator**: Coinbase x402 facilitator verifies and settles payments
 - **Location**: `dashboard/x402-server/`
 
@@ -157,6 +177,18 @@ On-chain identity for the XmetaV agent using the ERC-8004 standard (ERC-721 NFTs
 - **Registration**: `register.ts` script mints the agent NFT with a metadata URI
 - **Client Library**: `lib/client.ts` reads identity and reputation data via `viem`
 - **Location**: `dashboard/erc8004/`
+
+### $XMETAV Token (ERC-20)
+
+Native utility token on Base Mainnet providing tiered discounts on x402-gated endpoints.
+
+- **Contract**: `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` (ERC-20, OpenZeppelin Ownable)
+- **Supply**: 1,000,000,000 (1B) fixed — all minted to deployer at construction
+- **Tiers**: None → Bronze (10%) → Silver (20%) → Gold (35%) → Diamond (50% discount)
+- **Integration**: x402 server middleware reads `balanceOf()` on-chain to apply tier discount
+- **Dashboard**: `/token` page, balance + tier badge on `/identity` and `/payments`
+- **API**: `/api/token?wallet=0x...` returns balance, tier, discount
+- **Location**: `dashboard/token/` (Hardhat project), `dashboard/src/lib/token-tiers.ts`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`

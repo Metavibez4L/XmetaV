@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-12  
+**Last verified:** 2026-02-13  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v10 (Voice Commands + x402 Payments + ERC-8004 Identity)
+**XmetaV Version:** v14 (Fleet Expansion + Office Reorganization + Specialist Agents)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -49,12 +49,20 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
 | `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
 | `akua_web` | `kimi-k2.5:cloud` | `/home/manifest/akua` | full | Same repo — browser/web only |
+| `briefing` | `kimi-k2.5:cloud` | `/home/manifest/briefing` | coding | **Context Curator** — continuity, health, memory |
+| `oracle` | `kimi-k2.5:cloud` | `/home/manifest/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
+| `alchemist` | `kimi-k2.5:cloud` | `/home/manifest/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
+| `web3dev` | `kimi-k2.5:cloud` | `/home/manifest/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
 
 \* = default agent
 
 Detailed agent runbooks:
 - `docs/agents/main.md`
+- `docs/agents/briefing.md`
+- `docs/agents/oracle.md`
+- `docs/agents/alchemist.md`
+- `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`
 - `docs/agents/dynamic.md`
@@ -307,6 +315,9 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/fleet` | Fleet | Agent table with enable/disable toggles |
 | `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
+| `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
+| `/arena` | XMETAV HQ | Isometric office visualization with live agent activity (PixiJS) |
+| `/logs` | Live Logs | Real-time log streaming with severity/agent filters and search |
 
 ### Dashboard health checks
 
@@ -334,6 +345,8 @@ Required environment variables (in `dashboard/.env.local`):
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS |
+| `XMETAV_TOKEN_ADDRESS` | Deployed $XMETAV ERC-20 contract address |
 
 ### Swarm runs (dashboard)
 
@@ -348,6 +361,40 @@ The dashboard can create, monitor, and cancel swarm runs:
 Swarm modes: **parallel**, **pipeline**, **collaborative**
 
 Templates are loaded from `XmetaV/templates/swarms/*.json`.
+
+---
+
+## $XMETAV Token (v11)
+
+ERC-20 token on Base Mainnet with tiered discounts for x402 endpoints.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Contract | Deployed | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` on Base Mainnet |
+| Token API | Active | `/api/token?wallet=0x...` returns balance, tier, discount |
+| Dashboard Page | Active | `/token` — balance, tier table, holder benefits |
+| x402 Integration | Active | Tier middleware checks `balanceOf()` on-chain |
+| Identity Integration | Active | Token balance + tier badge on `/identity` page |
+| Payments Integration | Active | Token tier card on `/payments` page |
+
+### Tier Table
+
+| Tier | Min Balance | Discount | Daily Limit |
+|------|-------------|----------|-------------|
+| None | 0 | 0% | $5 |
+| Bronze | 1,000 | 10% | $25 |
+| Silver | 10,000 | 20% | $100 |
+| Gold | 100,000 | 35% | $500 |
+| Diamond | 1,000,000 | 50% | $2,000 |
+
+### Environment
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `XMETAV_TOKEN_ADDRESS` | `dashboard/.env.local` | Deployed contract address |
+| `XMETAV_TOKEN_ADDRESS` | `x402-server/.env` | Same for tier checks |
+
+Full reference: `capabilities/xmetav-token.md`
 
 ---
 
@@ -389,6 +436,134 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
+## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14)
+
+Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Arena Page | Active | `/arena` — standalone fullscreen PixiJS canvas |
+| PixiJS (v8.16.0) | Installed | WebGL 2D rendering with BlurFilter, dynamic loading |
+| Isometric Renderer | Active | `renderer/iso.ts` — 2:1 projection, 10x10 grid, tile/cube/wall primitives |
+| Office Background | Active | `renderer/background.ts` — 4 distinct floor zones, glass walls, room labels, particles |
+| Office Furniture | Active | `renderer/office.ts` — boss desk, meeting table, projector, 8 workstation desks |
+| Agent Avatars | Active | `renderer/avatars.ts` — glowing orbs with ghost silhouettes (idle/busy/offline) |
+| Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
+| Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls + 10s periodic sync |
+| HUD Overlay | Active | DOM: title, system status, agent legend, floating labels, TEST MEETING button |
+| Meeting Sync | **Fixed (v13)** | State replay after PixiJS init resolves race condition; periodic sync catches dropped events |
+
+### Office layout (v14 — reorganized)
+
+Grid expanded from 10x8 to 10x10 with four distinct zones:
+
+- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above
+- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 10 chairs for all agents
+- **INTEL room** (bottom-left, rows 6–9, glass walls): Briefing, Oracle, Alchemist — with space for 2 future agents. Blue-tinted floor and `#38bdf8` glass partition walls.
+- **DEV FLOOR** (bottom-right, rows 6–9, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks. Green-tinted grid lines.
+
+### Meeting visualization (v13+)
+
+When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal meeting table. The holographic projector activates, connection lines draw between participants, and a "MEETING IN SESSION" HUD indicator appears.
+
+| Seat | Agent | Angle |
+|------|-------|-------|
+| Top | main | 270 |
+| Upper-right | operator | 330 |
+| Upper-left | briefing | 210 |
+| Lower-left | oracle | 150 |
+| Bottom center | alchemist | 180 |
+| Left | akua | 240 |
+| Lower-right | basedintern | 30 |
+| Bottom-left | akua_web | 120 |
+| Bottom-right | basedintern_web | 60 |
+| Right center | web3dev | 0 |
+
+**TEST MEETING** button in the HUD (top-right) forces a meeting for visual verification.
+
+### Visual effects (real-time)
+
+| Effect | Trigger | Description |
+|--------|---------|-------------|
+| Command Pulse | New command | Golden energy travels boss desk -> partition -> target desk |
+| Streaming Particles | Agent busy | Code-fragment particles rise from desk area |
+| Dispatch Beam | Inter-agent dispatch | Neon beam routed through meeting table center |
+| Completion Burst | Command success | Green ring expands from desk |
+| Failure Glitch | Command failure | Red glitch blocks flicker around desk, screen turns red |
+| Screen Animation | Agent state change | Scrolling code lines (busy), red flicker (fail), dim (offline) |
+| Meeting Hologram | 2+ agents busy | Pulsing ring, vertical beam, floating discs, agent connection lines |
+
+---
+
+## Streaming Optimization (v12)
+
+End-to-end optimization of the agent chat streaming pipeline for lower latency and smoother rendering.
+
+| Component | Change | Impact |
+|-----------|--------|--------|
+| `streamer.ts` | Chunk size 800→400, flush 500ms→200ms, first flush 50ms | Faster time-to-first-byte |
+| `streamer.ts` | Non-blocking flush guards, chained setTimeout | No lost data under load |
+| `useRealtimeMessages` | Ref-based string accumulator (no array/join) | Eliminates GC pressure |
+| `useRealtimeMessages` | 80ms throttle for batched renders | Smoother streaming UI |
+| `AgentChat.tsx` | StreamingBubble component | Independent render from message history |
+
+---
+
+## Agent Skills (v12)
+
+Three new bash skills installed for the main agent:
+
+| Skill | Location | Description |
+|-------|----------|-------------|
+| `dispatch` | `~/.openclaw/workspace/skills/dispatch/` | Inter-agent communication via Supabase PostgREST |
+| `supabase` | `~/.openclaw/workspace/skills/supabase/` | Direct database access with service role key |
+| `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
+
+Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unrestricted shell access.
+
+### Dispatch skill fix (v13)
+
+- Message encoding now pipes through `python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))"` for safe JSON encoding of emojis, newlines, and special characters
+- `status`, `result`, `list` subcommands hardened with `try/except` JSON parsing, `isinstance()` type checks, `.get()` dictionary access
+
+---
+
+## Bug Fixes and Hardening (v13)
+
+### Arena sync race condition
+
+**Problem:** Supabase events arrived before PixiJS finished async initialization. `nodesApiRef.current` was `null` so `startMeeting()` was silently skipped via optional chaining. After PixiJS loaded, nothing re-checked the state.
+
+**Fix:** After PixiJS init completes and API refs are set, replay all buffered agent states from `nodeStatesRef` into the PixiJS layer, then call `checkMeeting()`. Also added a 10-second periodic sync that re-fetches `agent_sessions` from Supabase as a safety net for dropped realtime events.
+
+### Voice response duplicate/stale text
+
+**Problem:** After sending a voice command, the next voice interaction would briefly display the previous response text, and sometimes responses appeared twice. The auto-speak (TTS) feature also stopped working.
+
+**Fix:** Implemented synchronous reset of `fullText` and `isComplete` in `useRealtimeMessages` when `commandId` changes. Added `lastCompletedTextRef` to capture the final response before `activeCommandId` is cleared. Updated auto-speak effect to read from this ref immediately.
+
+### Chat history positioning
+
+**Problem:** The chat history sidebar rendered behind the main navigation sidebar (both used `fixed left-0`), making it invisible.
+
+**Fix:** Changed `ChatHistory.tsx` to slide in from the right (`right-0`, `translateX(100%)`) with left border instead of right.
+
+### Wallet/MetaMask error handling
+
+**Problem:** MetaMask browser extension auto-injection caused "Failed to connect to MetaMask" errors even though the app uses server-side wallets.
+
+**Fix:** Added `error` state with retry UI to `PaymentsDashboard.tsx` and `AgentIdentity.tsx`. Added 10-second RPC timeouts to all wallet API routes (`/api/x402/wallet`, `/api/token`, `/api/erc8004/identity`). Display message: "Wallet data is loaded server-side -- MetaMask is not required."
+
+### Arena visual improvements
+
+- Meeting table: larger size, brighter cyan edges, inner glow ring, semi-transparent glass fill
+- Projector: larger orb, thicker beam, outer glow
+- Chairs: brighter colors with edge glow
+- Ghost silhouettes: increased alpha for idle (0.35) and busy (0.5) states
+- Meeting mode: brighter glow and silhouette when seated
+
+---
+
 ## x402 Payments (Base Mainnet) ✅ PRODUCTION
 
 XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
@@ -416,6 +591,15 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `POST /intent` | $0.005 | Create an intent resolution session |
 | `GET /fleet-status` | $0.001 | Get fleet status summary |
 | `POST /swarm` | $0.02 | Launch a multi-agent swarm |
+| `POST /voice/transcribe` | $0.005 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.01 | Text-to-speech (streaming TTS) |
+
+### Free endpoints (x402-server)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Server status and endpoint listing |
+| `GET /token-info` | $XMETAV token contract address and tier table |
 
 ### Environment variables
 
@@ -425,6 +609,8 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `EVM_ADDRESS` | `x402-server/.env` | Address receiving payments |
 | `FACILITATOR_URL` | `x402-server/.env` | Coinbase x402 facilitator |
 | `X402_BUDGET_LIMIT` | `bridge/.env` | Max payment per request in USD |
+| `XMETAV_TOKEN_ADDRESS` | `x402-server/.env` | $XMETAV contract for tier discounts |
+| `OPENAI_API_KEY` | `x402-server/.env` | OpenAI key for voice endpoints |
 
 ---
 
@@ -456,41 +642,6 @@ Full reference: `capabilities/erc8004-identity.md`
 
 ---
 
-## Voice Commands (OpenAI Whisper + Streaming TTS)
-
-Optimized voice system with streaming TTS, push-to-talk, wake word, continuous conversation, and waveform visualizer.
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Streaming TTS | Ready | `/api/voice/synthesize` streams MP3 chunks via MediaSource API |
-| STT (Whisper) | Ready | `/api/voice/transcribe` — audio in, text out |
-| Push-to-talk | Ready | Hold SPACE to record (enable in voice settings) |
-| Wake word | Ready | "Hey XmetaV" via Web Speech API (Chrome/Edge only) |
-| Continuous mode | Ready | Auto-listen after agent finishes speaking |
-| Waveform visualizer | Ready | Canvas-based frequency bars (recording + playback) |
-| Voice settings panel | Ready | Voice, model, speed, PTT, wake, continuous toggles |
-| x402 voice endpoints | Ready | `POST /voice/transcribe` ($0.005), `POST /voice/synthesize` ($0.01) |
-| CLI voice mode | Ready | `npx tsx scripts/voice-cli.ts` (requires `sox`) |
-
-### Models
-
-| Model | Type | Default | Notes |
-|-------|------|---------|-------|
-| `whisper-1` | STT | Yes | Only Whisper model |
-| `tts-1` | TTS | Yes | Fast, lower latency |
-| `tts-1-hd` | TTS | No | Higher quality, selectable in settings |
-
-### Environment
-
-| Variable | Location | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | `dashboard/.env.local` | OpenAI API key for Whisper + TTS |
-| `OPENAI_API_KEY` | `x402-server/.env` | Same key for x402-gated voice |
-
-Full reference: `capabilities/voice-commands.md`
-
----
-
 ## Browser Automation (OpenClaw-managed browser)
 
 This setup supports OpenClaw’s dedicated browser automation via the `openclaw browser ...` CLI (open tabs, snapshot, click/type).
@@ -519,6 +670,30 @@ npx playwright install chromium
 
 ```bash
 openclaw config set browser.enabled true
+openclaw config set browser.defaultProfile openclaw
+openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+```
+
+### Smoke test (CLI)
+
+```bash
+# Start gateway (if not already running)
+./scripts/start-gateway.sh
+
+openclaw browser start
+openclaw browser open https://example.com
+openclaw browser snapshot
+```
+
+### Known limitation (small local models)
+
+With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
+
+Workarounds:
+- Use the deterministic `openclaw browser ...` CLI for browser automation.
+- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
+
+aw config set browser.enabled true
 openclaw config set browser.defaultProfile openclaw
 openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
 ```

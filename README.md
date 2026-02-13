@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
+Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
 
 ```
  ___   ___                    __           ___   ___
@@ -14,10 +14,11 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  main | basedintern | akua          |
+ |   agents:  11 (main + fleet + intel + dev)    |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
+ |   token:    $XMETAV ERC-20 (Base)             |
  |   dashboard: Next.js + Supabase (cyberpunk)   |
  |   models:  kimi-k2.5:cloud (256k, all agents) |
  |   gateway: ws://127.0.0.1:18789              |
@@ -30,6 +31,8 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
 ## Features
 
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
+- **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table with seat-based agent meetings, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events with periodic sync
+- **Live Log Streaming** — Real-time log viewer with severity filters, agent filters, search, and auto-scroll
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
@@ -37,14 +40,8 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v10
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
-- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating)
-- **ERC-8004 Identity** — On-chain agent identity (NFT #16905) and reputation tracking on Base mainnet
-- **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration
-- **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs with live streaming output
-- **Agent Factory** — Main agent creates agents, scaffolds apps, manages GitHub repos, and orchestrates fleet
-- **Swarm Orchestration** — Parallel, pipeline, and collaborative multi-agent task execution
-- **Fleet Controls** — Enable/disable agents from dashboard with bridge-side enforcement
-- Multi-agent management (`main`, `basedintern`, `akua`, `basedintern_web`, `akua_web`, `dynamic`)
+- **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
+- Multi-agent management (11 agents: main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -83,9 +80,11 @@ XmetaV/
 |   |-- src/
 |   |   |-- app/
 |   |   |   |-- (dashboard)/  # Protected routes (Command Center, Agent Chat, Swarms, Fleet)
+|   |   |   |-- arena/        # XMETAV HQ isometric office visualization (standalone)
 |   |   |   |-- auth/         # Login page
 |   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
 |   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, etc.
+|   |   |   +-- arena/        # PixiJS renderers (iso, background, office, avatars, effects)
 |   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms)
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
@@ -134,7 +133,7 @@ XmetaV/
 |   |-- x402-payments.md      # x402 autonomous payment protocol reference
 |   +-- erc8004-identity.md   # ERC-8004 on-chain agent identity reference
 |
-+-- docs/                     # Documentation & runbooks
+    +-- docs/                     # Documentation & runbooks
     |-- ARCHITECTURE.md       # System architecture overview
     |-- AGENTS.md             # Agent configuration guide
     |-- STATUS.md             # Current known-good settings + checks
@@ -148,7 +147,11 @@ XmetaV/
         |-- main.md           # main agent runbook
         |-- basedintern.md    # basedintern agent runbook
         |-- akua.md           # akua agent runbook
-        +-- dynamic.md        # Dynamic agent runbook
+        |-- dynamic.md        # Dynamic agent runbook
+        |-- briefing.md       # briefing (context curator) runbook
+        |-- oracle.md         # oracle (on-chain intel) runbook
+        |-- alchemist.md      # alchemist (tokenomics) runbook
+        +-- web3dev.md        # web3dev (blockchain dev) runbook
 ```
 
 ---
@@ -216,6 +219,11 @@ openclaw agent --agent main --local --thinking off \
 | **`build-app.sh`** | **Agent Factory** -- scaffold apps | `./scripts/build-app.sh --type node --workspace /path` |
 | **`manage-agents.sh`** | **Agent Factory** -- manage agent fleet | `./scripts/manage-agents.sh list` |
 | **`swarm.sh`** | **Swarm** -- multi-agent orchestration (parallel, pipeline, collab) | `./scripts/swarm.sh --parallel ...` |
+| **`briefing-agent.sh`** | **Briefing Agent** -- health sentinel + auto-fix + distill + sitrep | `./scripts/briefing-agent.sh` |
+| **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
+| **`oracle-agent.sh`** | **Oracle Agent** -- on-chain intel, gas, prices, sentiment, alerts | `./scripts/oracle-agent.sh` |
+| **`alchemist-agent.sh`** | **Alchemist Agent** -- $XMETAV tokenomics, emissions, staking curves | `./scripts/alchemist-agent.sh` |
+| **`web3dev-agent.sh`** | **Web3Dev Agent** -- compile, test, audit, deploy smart contracts | `./scripts/web3dev-agent.sh` |
 
 ---
 
@@ -298,6 +306,97 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 ```bash
 openclaw agent --agent main --local --thinking off --message "Hello!"
 ```
+
+### Agent: `briefing` (context curator)
+
+| Property | Value |
+|----------|-------|
+| ID | `briefing` |
+| Model | `kimi-k2.5:cloud` (256k context) |
+| Workspace | `/home/manifest/briefing` |
+| Tools | `coding` (exec, read, write) |
+| Role | **Context Curator** -- continuity, health sentinel, memory distillation |
+
+The morning person who has the coffee ready. Maintains `SITREP.md` (live situation report) and `MEMORY.md` (long-term memory) so main doesn't waste sessions re-discovering context. Runs on a cron schedule with auto-fix for common health issues.
+
+```bash
+# Run manually
+./scripts/briefing-agent.sh
+
+# Or via cron (every hour):
+# 0 * * * * /home/manifest/XmetaV/scripts/briefing-agent.sh >> /tmp/briefing-agent.log 2>&1
+```
+
+See [docs/agents/briefing.md](docs/agents/briefing.md) for full documentation.
+
+### Agent: `oracle` (on-chain intelligence)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | On-chain intelligence and market sentinel |
+| **Workspace** | `/home/manifest/oracle` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Monitor gas, prices, chain activity, protocol intel, crypto sentiment |
+
+Provides real-time market intelligence via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports and surfaces alerts before anyone has to ask.
+
+```bash
+# Run manually
+./scripts/oracle-agent.sh
+
+# Quick alerts every 15 min, full report every hour:
+# */15 * * * * /home/manifest/XmetaV/scripts/oracle-agent.sh --alerts >> /tmp/oracle-alerts.log 2>&1
+# 0 * * * *   /home/manifest/XmetaV/scripts/oracle-agent.sh --report >> /tmp/oracle-report.log 2>&1
+```
+
+See [docs/agents/oracle.md](docs/agents/oracle.md) for full documentation.
+
+### Agent: `alchemist` (tokenomics)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | $XMETAV tokenomics specialist |
+| **Workspace** | `/home/manifest/alchemist` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Supply tracking, emission modeling, holder analysis, staking curves, liquidity intel |
+
+Reads directly from the $XMETAV contract on Base Mainnet. Models emission schedules, identifies sell pressure windows, and recommends staking parameters. Writes `TOKENOMICS.md` reports.
+
+```bash
+# Run manually
+./scripts/alchemist-agent.sh
+
+# Health check every 6h, full report daily at 8 AM:
+# 0 */6 * * * /home/manifest/XmetaV/scripts/alchemist-agent.sh --health >> /tmp/alchemist.log 2>&1
+# 0 8 * * *   /home/manifest/XmetaV/scripts/alchemist-agent.sh --report >> /tmp/alchemist.log 2>&1
+```
+
+See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
+
+### Agent: `web3dev` (blockchain developer)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Dedicated blockchain developer — compile, test, audit, deploy |
+| **Workspace** | `/home/manifest/web3dev` |
+| **Tools** | `coding` (exec, process, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Smart contract dev, security auditor, deployment engineer, x402 maintainer |
+
+Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Static security audits, gas/size analysis, and production-ready contract scaffolding (ERC-20, staking, vesting, escrow).
+
+```bash
+# Run manually
+./scripts/web3dev-agent.sh
+
+# Status every 12h, weekly audit:
+# 0 */12 * * * /home/manifest/XmetaV/scripts/web3dev-agent.sh --status >> /tmp/web3dev.log 2>&1
+# 0 6 * * 1    /home/manifest/XmetaV/scripts/web3dev-agent.sh --report >> /tmp/web3dev.log 2>&1
+```
+
+See [docs/agents/web3dev.md](docs/agents/web3dev.md) for full documentation.
 
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
@@ -405,6 +504,9 @@ cd dashboard/bridge && npm install && npm start
 | `/fleet` | **Fleet** -- agent status table with enable/disable toggles and task dispatch |
 | `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
+| `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
+| `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
+| `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
@@ -490,11 +592,11 @@ flowchart TB
             end
         end
 
-        subgraph FLEET["Agent Fleet"]
+        subgraph FLEET["Agent Fleet (11)"]
             direction LR
             F_MAIN["main\n(orch.)"]
-            F_BI["basedintern\n+ _web"]
-            F_AKUA["akua\n+ _web"]
+            F_INTEL["briefing\noracle\nalchemist"]
+            F_DEV["web3dev\nakua (+web)\nbasedintern (+web)"]
             F_DYN["dynamic\nagents"]
         end
     end
@@ -613,7 +715,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** — setup, architecture, pages, bridge |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive (includes dashboard) |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration, tool profiles, and customization |
-| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
+| [agents/](docs/agents/) | Per-agent runbooks (main, briefing, oracle, alchemist, web3dev, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions (includes dashboard, x402, voice) |
@@ -654,7 +756,86 @@ The GitHub skill is installed, authenticated, and working with OpenClaw agents.
 
 ---
 
+## On-Chain Contracts (Base Mainnet)
+
+All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
+
+| Contract | Address | Description |
+|----------|---------|-------------|
+| **$XMETAV Token** | [`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`](https://basescan.org/token/0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54) | ERC-20 token (1B fixed supply) — tiered discounts on x402 |
+| **ERC-8004 Identity** | [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) | IdentityRegistry — Agent NFT #16905 |
+| **ERC-8004 Reputation** | [`0x8004b1041543F0eB1f3459E8a2FC4Ab06ceC7251`](https://basescan.org/address/0x8004b1041543F0eB1f3459E8a2FC4Ab06ceC7251) | ReputationRegistry — on-chain trust scores |
+
+| Wallet | Address | Role |
+|--------|---------|------|
+| **Agent / Deployer** | [`0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80`](https://basescan.org/address/0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80) | Owner of ERC-8004 NFT, deployer of $XMETAV, x402 payment receiver |
+
+---
+
 ## Changelog
+
+### 2026-02-13 (v14) — Fleet Expansion + Office Reorganization + Specialist Agents
+- **4 New Specialist Agents** — `oracle` (on-chain intel), `alchemist` (tokenomics), `web3dev` (blockchain dev), `briefing` (context curator) — each with dedicated skills, cron runners, identities, and arena presence
+- **Oracle Agent** — Monitors gas prices, ETH/USDC/cbETH markets, Base chain activity, and crypto news via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports. Commands: `gas`, `prices`, `chain`, `news`, `alerts`, `report`
+- **Alchemist Agent** — $XMETAV tokenomics specialist reading directly from the token contract on Base Mainnet. Emission schedule modeling, sell pressure window detection, staking curve scenarios (APY vs stake ratio), holder concentration analysis. Writes `TOKENOMICS.md`. Commands: `supply`, `holders`, `emissions`, `staking`, `liquidity`, `health`, `report`
+- **Web3Dev Agent** — Dedicated blockchain developer owning all Hardhat projects (Akua 18 contracts, $XMETAV, BasedIntern). Static security audits (reentrancy, tx.origin, selfdestruct, pragma, delegatecall), contract size analysis vs 24KB limit, and production-ready Solidity scaffolding (ERC-20, ERC-721, staking, vesting, escrow). Writes `WEB3DEV.md`. Commands: `compile`, `test`, `audit`, `gas`, `scaffold`, `status`, `report`
+- **Office Reorganization** — Arena grid expanded from 10x8 to 10x10 with four distinct zones:
+  - **COMMAND room** (top, walled) — Main + Operator in the boss office
+  - **MEETING** (center) — hexagonal table expanded to 10 seats
+  - **INTEL room** (bottom-left, glass walls) — Briefing, Oracle, Alchemist with room for 2 more
+  - **DEV FLOOR** (bottom-right, open area) — Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks
+- **Fleet Now 11 Agents** — main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic
+- **New Runner Scripts** — `oracle-agent.sh`, `alchemist-agent.sh`, `web3dev-agent.sh` (all cron-compatible with `--health`/`--report`/`--all` modes)
+- **Agent Runbooks** — `docs/agents/oracle.md`, `docs/agents/alchemist.md`, `docs/agents/web3dev.md` with full documentation, troubleshooting, and cron setup
+- **OpenClaw Config** — All new agents registered in `openclaw.json` with `coding` profile and `kimi-k2.5:cloud` model
+- **Supabase Controls** — All new agents registered in `agent_controls` table
+
+### 2026-02-13 (v13) — Arena Sync + Voice Fix + Wallet Hardening + Chat History
+- **Arena Sync Race Condition Fix** — Replay buffered agent states after PixiJS async init completes; added 10-second periodic sync as safety net for dropped Supabase Realtime events
+- **Meeting Visualization** — Agents move to assigned seats around the hexagonal meeting table when 2+ are busy; holographic projector activates with connection lines and "MEETING IN SESSION" HUD indicator; TEST MEETING button for manual verification
+- **Arena Visual Improvements** — Brighter meeting table with inner glow ring and glass fill, larger projector orb with outer glow, brighter chair edges, increased ghost silhouette alpha for idle/busy states
+- **Voice Response Fix** — Synchronous reset of streaming text on new commands prevents stale/duplicate responses; `lastCompletedTextRef` captures final text before state clears for reliable auto-speak TTS
+- **Chat History Positioning** — History sidebar slides in from the right to avoid overlapping the nav sidebar
+- **Wallet/MetaMask Error Handling** — Graceful degradation when MetaMask is detected but not needed; 10-second RPC timeouts on all wallet API routes; retry UI with clear "MetaMask not required" messaging
+- **Dispatch Skill Hardening** — Safe JSON encoding via Python stdin pipe for emojis/special characters; robust `try/except` parsing with type checks in `status`, `result`, `list` subcommands
+- **Diagnostic Logging** — `[arena-events]` console logs for tracing Supabase event pipeline through to PixiJS
+
+### 2026-02-13 (v12) — XMETAV HQ Arena + Streaming Optimization + Agent Skills
+- **XMETAV HQ Isometric Office** — Full isometric office visualization at `/arena` rendered with PixiJS:
+  - Boss office with Main + Operator, meeting area with hexagonal table + holographic projector, 4 agent workstations
+  - Glowing orb avatars with ghost silhouettes — idle (breathing pulse), busy (spinning ring + particles), offline (static flicker)
+  - Operator orb floats above Main's desk with bobbing animation
+  - Reactive holo screens on every desk: scrolling code lines when busy, red flicker on failure, dim when offline
+  - Real-time command pulses (golden energy) travel through office pathways from boss desk to target workstation
+  - Dispatch beams route through meeting table center with traveling neon dots
+  - Streaming particles rise like code fragments from active desks
+  - Completion bursts (green ring) and failure glitch effects (red blocks) per-agent
+  - Isometric math utilities (`iso.ts`) with 2:1 projection, tile/cube/wall drawing primitives
+  - Glass partition walls with neon cyan edges separating boss office, meeting area, and work wings
+  - Ambient floating particles + scanline sweep for cyberpunk atmosphere
+  - DOM HUD overlay: title, system status (online/active counts), agent legend, floating labels
+  - All driven by live Supabase Realtime events (sessions, commands, responses, controls)
+- **Streaming Response Optimization** — Reduced time-to-first-byte and smoother rendering:
+  - Streamer: chunk size 800→400, flush interval 500ms→200ms, first flush at 50ms, non-blocking flush guards
+  - useRealtimeMessages: ref-based string accumulator (eliminates array/string recreation), 80ms throttle for batched renders
+  - AgentChat: new StreamingBubble component renders live responses independently from message history
+- **Live Log Streaming** — New `/logs` page with real-time Supabase log subscription, severity filters, agent filters, search, and auto-scroll
+- **Agent Skills (main agent)** — Three new bash skills for the main agent:
+  - `dispatch` — Inter-agent communication via Supabase PostgREST
+  - `supabase` — Direct database access with service role key
+  - `web` — HTTP operations with HTML stripping
+- **Agent Tooling** — Full `exec` access for main agent (11 allowlist entries), `tools.profile` set to "full"
+- Updated TOOLS.md with XmetaV project context and skill documentation
+- Sidebar simplified with `/arena` and `/logs` navigation items
+
+### 2026-02-12 (v11) — $XMETAV Token
+- **ERC-20 Token on Base Mainnet** — `$XMETAV` (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with 1B fixed supply
+- **Tier Discount System** — Hold XMETAV for 10–50% off x402 endpoints (Bronze → Diamond)
+- **Token Dashboard** — `/token` page with balance, tier table, holder benefits, contract links
+- **x402 Integration** — On-chain `balanceOf()` checks apply tier discounts to payment-gated endpoints
+- **Identity + Payments Integration** — Token balance and tier badge on `/identity` and `/payments` pages
+- New `/api/token` API route and `lib/token-tiers.ts` shared tier logic
+- Free `/token-info` endpoint on x402 server (port 4021)
 
 ### 2026-02-12 (v10.1) — Voice System Optimization
 - **Streaming TTS** — Stream audio via MediaSource API for ~200ms first-byte playback latency
@@ -778,5 +959,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
 </p>

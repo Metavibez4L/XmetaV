@@ -1,11 +1,23 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
+import { randomUUID } from "crypto";
 
 /** Allowed agent IDs to prevent arbitrary execution */
-const ALLOWED_AGENTS = new Set(["main", "akua", "akua_web", "basedintern", "basedintern_web"]);
+const ALLOWED_AGENTS = new Set([
+  "main",
+  "operator",
+  "briefing",
+  "oracle",
+  "alchemist",
+  "web3dev",
+  "akua",
+  "akua_web",
+  "basedintern",
+  "basedintern_web",
+]);
 
-/** Default timeout for agent calls (seconds) */
-const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "120", 10);
+/** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
+const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "180", 10);
 
 export interface OpenClawOptions {
   agentId: string;
@@ -33,18 +45,25 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   const nodePath = process.env.NODE_PATH || "node";
   const timeout = timeoutSeconds ?? DEFAULT_TIMEOUT_S;
 
+  // Use a unique session ID per command to avoid lock contention
+  const sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+
   const args = [
     "agent",
     "--agent", agentId,
     "--local",
     "--thinking", "off",
+    "--session-id", sessionId,
     "-m", message,
   ];
 
   console.log(`[openclaw] Spawning: ${openclawPath} ${args.join(" ")}${timeout > 0 ? ` (timeout: ${timeout}s)` : ""}`);
 
+  // Run from the XmetaV project root so the agent has direct repo context
+  const projectRoot = process.env.XMETAV_ROOT || resolve(process.env.HOME || "/home/manifest", "XmetaV");
+
   const child = spawn(openclawPath, args, {
-    cwd: resolve(process.env.HOME || "/home/manifest"),
+    cwd: projectRoot,
     env: {
       ...process.env,
       PATH: `${resolve(nodePath, "..")}:${process.env.PATH}`,

@@ -28,7 +28,7 @@ const IDENTITY_ABI = [
 
 const viemClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http("https://mainnet.base.org", { timeout: 10_000 }),
 });
 
 /** GET /api/x402/wallet -- wallet info (from ERC-8004 on-chain) + payment stats */
@@ -67,8 +67,8 @@ export async function GET() {
     ownerAddress = owner as string | null;
     walletAddress = (agentWallet as string | null) || ownerAddress;
     onChainOk = ownerAddress !== null;
-  } catch {
-    // On-chain read failed — wallet info will be null
+  } catch (err) {
+    console.error("[api/x402/wallet] On-chain read failed:", err instanceof Error ? err.message : err);
   }
 
   // ---- Check bridge status ----

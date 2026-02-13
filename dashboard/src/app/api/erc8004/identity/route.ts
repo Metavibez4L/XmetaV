@@ -63,7 +63,7 @@ const REPUTATION_ABI = [
 
 const client = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http("https://mainnet.base.org", { timeout: 10_000 }),
 });
 
 /**

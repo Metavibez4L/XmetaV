@@ -1,18 +1,23 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent system. Coordinates a fleet of specialized agents (akua, basedintern) for smart contract development, TypeScript apps, swarm orchestration, and autonomous x402 payments on Base.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of specialized agents across intel, development, and operations — including on-chain intelligence (oracle), tokenomics analysis (alchemist), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "services": [
     {
       "type": "x402",
       "url": "http://localhost:4021",
-      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints"
+      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints (USDC on Base)"
     },
     {
       "type": "dashboard",
       "url": "http://localhost:3000",
-      "description": "XmetaV Control Plane Dashboard"
+      "description": "XmetaV Command Center — fleet control, arena visualization, agent chat, voice interface"
+    },
+    {
+      "type": "bridge",
+      "url": "http://localhost:18789",
+      "description": "Agent execution bridge — dispatches commands to OpenClaw agents via Supabase"
     }
   ],
   "registrations": [
@@ -22,22 +27,88 @@
     }
   ],
   "supportedTrust": [
-    "reputation"
+    "reputation",
+    "x402-payment-history",
+    "on-chain-identity"
   ],
   "capabilities": [
     "agent-orchestration",
+    "fleet-management",
     "swarm-execution",
     "intent-resolution",
     "x402-payments",
     "smart-contract-deployment",
-    "fleet-management"
+    "solidity-development",
+    "security-auditing",
+    "gas-optimization",
+    "on-chain-intelligence",
+    "market-monitoring",
+    "tokenomics-analysis",
+    "emission-modeling",
+    "session-briefing",
+    "memory-consolidation",
+    "voice-interface",
+    "arena-visualization",
+    "selective-meetings"
   ],
   "fleet": {
     "agents": [
-      "main",
-      "akua",
-      "basedintern"
+      {
+        "id": "main",
+        "role": "Orchestrator & fleet commander",
+        "room": "command"
+      },
+      {
+        "id": "operator",
+        "role": "System overseer & fleet control relay",
+        "room": "command"
+      },
+      {
+        "id": "briefing",
+        "role": "Context curator — SITREP & memory consolidation",
+        "room": "intel"
+      },
+      {
+        "id": "oracle",
+        "role": "On-chain intelligence — gas, prices, chain stats, sentiment",
+        "room": "intel"
+      },
+      {
+        "id": "alchemist",
+        "role": "Tokenomics specialist — $XMETAV supply, emissions, staking",
+        "room": "intel"
+      },
+      {
+        "id": "web3dev",
+        "role": "Blockchain developer — Solidity, Hardhat, Base deployments",
+        "room": "devFloor"
+      }
     ],
-    "model": "ollama/kimi-k2.5:cloud"
+    "model": "ollama/kimi-k2.5:cloud",
+    "meetingCapacity": 7,
+    "rooms": ["command", "meeting", "intel", "devFloor"]
+  },
+  "contracts": {
+    "token": {
+      "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
+      "symbol": "$XMETAV",
+      "network": "eip155:8453",
+      "standard": "ERC-20"
+    },
+    "identity": {
+      "address": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+      "standard": "ERC-8004",
+      "network": "eip155:8453"
+    },
+    "reputation": {
+      "address": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+      "standard": "ERC-8004",
+      "network": "eip155:8453"
+    }
+  },
+  "wallet": {
+    "address": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "network": "eip155:8453",
+    "supports": ["USDC", "ETH", "$XMETAV"]
   }
 }
