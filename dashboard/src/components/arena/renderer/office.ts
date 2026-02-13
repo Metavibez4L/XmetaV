@@ -114,16 +114,19 @@ export function initOffice(
   const mtPos = toScreen(MEETING_TABLE_TILE.col, MEETING_TABLE_TILE.row);
   const table = new Graphics();
 
-  // Glass-top hexagonal table
-  const mtHw = TILE_W * 0.5;
-  const mtHh = TILE_H * 0.5;
+  // Glass-top hexagonal table - INCREASED visibility
+  const mtHw = TILE_W * 0.55;  // Slightly larger
+  const mtHh = TILE_H * 0.55;
+  
+  // Draw table base (darker, more visible)
   drawBox(
     table,
     mtPos.x, mtPos.y,
     mtHw, mtHh, 6,
-    0x0a1825, 0x081420, 0x06101a, 0.85,
+    0x0c1a2a, 0x081420, 0x051018, 0.95,  // Increased alpha
   );
-  // Cyan glass-top edge
+  
+  // Cyan glass-top edge - BRIGHTER
   table
     .poly(
       [
@@ -134,29 +137,72 @@ export function initOffice(
       ],
       true,
     )
+    .stroke({ color: 0x00f0ff, width: 2, alpha: 0.4 });  // Thicker, more visible
+  
+  // Add a second inner glow ring
+  table
+    .poly(
+      [
+        mtPos.x, mtPos.y - mtHh * 0.7 - 6,
+        mtPos.x + mtHw * 0.7, mtPos.y - 6,
+        mtPos.x, mtPos.y + mtHh * 0.7 - 6,
+        mtPos.x - mtHw * 0.7, mtPos.y - 6,
+      ],
+      true,
+    )
     .stroke({ color: 0x00f0ff, width: 1, alpha: 0.2 });
+    
+  // Add table surface fill (semi-transparent glass)
+  table
+    .poly(
+      [
+        mtPos.x, mtPos.y - mtHh - 6,
+        mtPos.x + mtHw, mtPos.y - 6,
+        mtPos.x, mtPos.y + mtHh - 6,
+        mtPos.x - mtHw, mtPos.y - 6,
+      ],
+      true,
+    )
+    .fill({ color: 0x00f0ff, alpha: 0.05 });
+    
   layer.addChild(table);
 
-  // Holographic projector column (center of table)
+  // Holographic projector column (center of table) - BRIGHTER
   const projector = new Graphics();
-  projector.circle(mtPos.x, mtPos.y - 8, 3).fill({
+  projector.circle(mtPos.x, mtPos.y - 8, 4).fill({  // Larger
     color: 0x00f0ff,
-    alpha: 0.5,
+    alpha: 0.7,  // Brighter
   });
-  // Vertical glow beam
+  // Vertical glow beam - THICKER
   projector.moveTo(mtPos.x, mtPos.y - 8);
   projector.lineTo(mtPos.x, mtPos.y - 28);
-  projector.stroke({ color: 0x00f0ff, width: 1.5, alpha: 0.15 });
+  projector.stroke({ color: 0x00f0ff, width: 2.5, alpha: 0.25 });  // Thicker
+  // Add outer glow
+  projector.moveTo(mtPos.x, mtPos.y - 8);
+  projector.lineTo(mtPos.x, mtPos.y - 28);
+  projector.stroke({ color: 0x00f0ff, width: 6, alpha: 0.1 });
   layer.addChild(projector);
 
-  // Low chairs around table (6 small cubes)
+  // Low chairs around table (6 small cubes) - MORE VISIBLE
   const chairAngles = [0, 60, 120, 180, 240, 300];
   for (const deg of chairAngles) {
     const rad = (deg * Math.PI) / 180;
     const cx = mtPos.x + Math.cos(rad) * 32;
     const cy = mtPos.y + Math.sin(rad) * 16;
     const chair = new Graphics();
-    drawBox(chair, cx, cy, 6, 4, 5, 0x141c2a, 0x101826, 0x0c1420, 0.7);
+    drawBox(chair, cx, cy, 7, 5, 6, 0x1a2a3a, 0x142230, 0x101a28, 0.85);  // Brighter colors
+    // Add chair edge glow
+    chair
+      .poly(
+        [
+          cx, cy - 5 - 6,
+          cx + 7, cy - 6,
+          cx, cy + 5 - 6,
+          cx - 7, cy - 6,
+        ],
+        true,
+      )
+      .stroke({ color: 0x00f0ff, width: 0.5, alpha: 0.15 });
     layer.addChild(chair);
   }
 

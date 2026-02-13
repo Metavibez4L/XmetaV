@@ -163,7 +163,8 @@ export function initAvatars(
           entry.container.scale.set(s);
           entry.glow.alpha = 0.35 + Math.sin(time * 1.2 + phase) * 0.12;
           entry.core.alpha = 0.8;
-          entry.silhouette.alpha = entry.inMeeting ? 0.25 : 0.15;
+          // INCREASED: More visible silhouette
+          entry.silhouette.alpha = entry.inMeeting ? 0.5 : 0.35;
           entry.ring.visible = false;
 
           if (entry.config.floating) {
@@ -176,7 +177,8 @@ export function initAvatars(
           entry.container.scale.set(s);
           entry.glow.alpha = 0.7 + Math.sin(time * 4) * 0.2;
           entry.core.alpha = 1;
-          entry.silhouette.alpha = entry.inMeeting ? 0.4 : 0.3;
+          // INCREASED: More visible silhouette when busy
+          entry.silhouette.alpha = entry.inMeeting ? 0.65 : 0.5;
           entry.ring.visible = true;
           entry.ring.rotation = time * 2.5;
 
@@ -197,8 +199,8 @@ export function initAvatars(
 
       // Meeting-specific: brighter glow when seated at table
       if (entry.inMeeting && entry.state !== "offline") {
-        entry.glow.alpha = Math.max(entry.glow.alpha, 0.5);
-        entry.silhouette.alpha = Math.max(entry.silhouette.alpha, 0.3);
+        entry.glow.alpha = Math.max(entry.glow.alpha, 0.6);
+        entry.silhouette.alpha = Math.max(entry.silhouette.alpha, 0.5);
       }
 
       entry.container.position.set(entry.currentX, entry.currentY + bobY);
@@ -210,7 +212,10 @@ export function initAvatars(
   return {
     setState(agentId, state) {
       const a = avatars.get(agentId);
-      if (a) a.state = state;
+      if (a) {
+        a.state = state;
+        console.log("[arena] setState:", agentId, "->", state);
+      }
     },
 
     getPosition(agentId) {
@@ -219,20 +224,33 @@ export function initAvatars(
     },
 
     startMeeting(agentIds) {
+      console.log("[arena] startMeeting called with:", agentIds);
       meetingActive = true;
       for (const id of agentIds) {
         const entry = avatars.get(id);
-        if (!entry || entry.state === "offline") continue;
+        if (!entry) {
+          console.log("[arena]   - skipping", id, ": not found");
+          continue;
+        }
+        if (entry.state === "offline") {
+          console.log("[arena]   - skipping", id, ": offline");
+          continue;
+        }
 
         const seat = MEETING_SEATS.find((s) => s.agentId === id);
-        if (!seat) continue;
+        if (!seat) {
+          console.log("[arena]   - skipping", id, ": no seat assignment");
+          continue;
+        }
 
         entry.inMeeting = true;
         entry.meetingTarget = getSeatPosition(seat.angle);
+        console.log("[arena]   -", id, "moving to seat at angle", seat.angle, "->", entry.meetingTarget);
       }
     },
 
     endMeeting() {
+      console.log("[arena] endMeeting called");
       meetingActive = false;
       for (const entry of avatars.values()) {
         entry.inMeeting = false;

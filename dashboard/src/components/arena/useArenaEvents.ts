@@ -31,35 +31,79 @@ export function useArenaEvents(
 ) {
   const supabase = useMemo(() => createClient(), []);
   const cmdAgentMap = useRef(new Map<string, string>());
+  const initialFetchDone = useRef(false);
 
   useEffect(() => {
     // -- Initial fetch ------------------------------------------------
     (async () => {
-      const { data: sessions } = await supabase
-        .from("agent_sessions")
-        .select("*");
-      if (sessions) {
-        const HEARTBEAT_TIMEOUT = 60_000;
-        for (const s of sessions as AgentSession[]) {
-          const stale =
-            Date.now() - new Date(s.last_heartbeat).getTime() >
-            HEARTBEAT_TIMEOUT;
-          const status = stale
-            ? "offline"
-            : ((s.status as "idle" | "busy" | "offline") ?? "offline");
-          handlersRef.current?.onStatus(s.agent_id, status);
-        }
-      }
-
+      // Fetch all configured agents from agent_controls (source of truth)
       const { data: controls } = await supabase
         .from("agent_controls")
         .select("*");
-      if (controls) {
-        for (const c of controls as AgentControl[]) {
-          handlersRef.current?.onControl(c.agent_id, !!c.enabled);
+      
+      // Get session data for online/busy status
+      const { data: sessions } = await supabase
+        .from("agent_sessions")
+        .select("*");
+      
+      // Build a map of agent_id -> session status
+      const sessionMap = new Map<string, AgentSession>();
+      if (sessions) {
+        for (const s of sessions as AgentSession[]) {
+          sessionMap.set(s.agent_id, s);
         }
       }
 
+      // Process each configured agent
+      if (controls) {
+        for (const c of controls as AgentControl[]) {
+          const agentId = c.agent_id;
+          const enabled = !!c.enabled;
+          
+          // Check if agent has a recent session
+          const session = sessionMap.get(agentId);
+          let status: "idle" | "busy" | "offline" = "idle";
+          
+          if (!enabled) {
+            status = "offline";
+          } else if (session) {
+            const HEARTBEAT_TIMEOUT = 60_000;
+            const stale =
+              Date.now() - new Date(session.last_heartbeat).getTime() >
+              HEARTBEAT_TIMEOUT;
+            
+            if (!stale) {
+              status = (session.status as "idle" | "busy" | "offline") ?? "idle";
+            } else {
+              // Stale but enabled - show as idle (agent might be reconnecting)
+              status = "idle";
+            }
+          }
+          
+          // Always set initial status so agents appear
+          handlersRef.current?.onStatus(agentId, status);
+          handlersRef.current?.onControl(agentId, enabled);
+        }
+      }
+
+      // Also process any sessions for agents not in controls
+      if (sessions) {
+        for (const s of sessions as AgentSession[]) {
+          const agentId = s.agent_id;
+          const HEARTBEAT_TIMEOUT = 60_000;
+          const stale =
+            Date.now() - new Date(s.last_heartbeat).getTime() >
+            HEARTBEAT_TIMEOUT;
+          
+          // If we haven't already set status via controls
+          const status = stale ? "idle" : ((s.status as "idle" | "busy" | "offline") ?? "idle");
+          handlersRef.current?.onStatus(agentId, status);
+        }
+      }
+
+      initialFetchDone.current = true;
+
+      // Pre-populate command-agent mapping for active commands
       const { data: commands } = await supabase
         .from("agent_commands")
         .select("id, agent_id")
@@ -84,7 +128,7 @@ export function useArenaEvents(
           if (row?.agent_id) {
             handlersRef.current?.onStatus(
               row.agent_id,
-              (row.status as "idle" | "busy" | "offline") ?? "offline",
+              (row.status as "idle" | "busy" | "offline") ?? "idle",
             );
           }
         },
