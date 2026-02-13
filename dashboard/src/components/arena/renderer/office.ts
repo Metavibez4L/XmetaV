@@ -206,8 +206,8 @@ export function initOffice(
     layer.addChild(chair);
   }
 
-  // -- Workstations (4 agent desks) -----------------------------------
-  const workstationAgents = ["akua", "akua_web", "basedintern", "basedintern_web"];
+  // -- Workstations (5 agent desks) -----------------------------------
+  const workstationAgents = ["akua", "akua_web", "basedintern", "basedintern_web", "briefing"];
   for (const agentId of workstationAgents) {
     const cfg = ARENA_AGENTS.find((a) => a.id === agentId);
     if (!cfg) continue;

@@ -246,6 +246,13 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     name: "BasedIntern (Repo)",
     workspace: "/home/manifest/basedintern",
     tools: "coding",
-    model: "ollama/qwen2.5:7b-instruct",
+    model: "ollama/kimi-k2.5:cloud",
+  },
+  {
+    id: "briefing",
+    name: "Briefing (Context Curator)",
+    workspace: "/home/manifest/briefing",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
   },
 ];

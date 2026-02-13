@@ -1,4 +1,4 @@
-export type Room = "bossOffice" | "meeting" | "leftWing" | "rightWing";
+export type Room = "bossOffice" | "meeting" | "leftWing" | "rightWing" | "support";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -71,6 +71,15 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     tile: { col: 7.5, row: 6 },
     size: 26,
   },
+  {
+    id: "briefing",
+    label: "BRIEFING",
+    color: 0x38bdf8,
+    colorHex: "#38bdf8",
+    room: "support",
+    tile: { col: 4.5, row: 7 },
+    size: 26,
+  },
 ];
 
 /** Meeting table center tile (for dispatch beam routing) */
@@ -85,6 +94,7 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "basedintern", angle: 30 },      // lower-right
   { agentId: "akua_web", angle: 150 },        // lower-left
   { agentId: "basedintern_web", angle: 90 },  // bottom
+  { agentId: "briefing", angle: 120 },         // bottom-left (between bottom and lower-left)
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -95,4 +105,5 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["main", "basedintern"],
   ["akua", "akua_web"],
   ["basedintern", "basedintern_web"],
+  ["main", "briefing"],
 ];

@@ -105,6 +105,13 @@ export function initBackground(
   meetLabel.alpha = 0.2;
   scene.addChild(meetLabel);
 
+  const supportLabel = new Text({ text: "SUPPORT", style: labelStyle });
+  const supportPos = toScreen(4.5, 7);
+  supportLabel.anchor.set(0.5, 0.5);
+  supportLabel.position.set(supportPos.x, supportPos.y + 12);
+  supportLabel.alpha = 0.2;
+  scene.addChild(supportLabel);
+
   // -- Ambient particles (in scene, around office area) ---------------
   const particles: { g: Graphics; vx: number; vy: number }[] = [];
   // Get bounding box of the iso grid for particle spawn
