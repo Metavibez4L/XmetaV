@@ -7,6 +7,7 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 ## Static Agents
 
 - [`main`](./main.md) — **orchestrator** (agent factory + swarm + command center)
+- [`briefing`](./briefing.md) — **context curator** (continuity, health sentinel, memory distillation)
 - [`basedintern`](./basedintern.md) — repo agent (coding tools, lean) pinned to `/home/manifest/basedintern`
 - [`basedintern_web`](./basedintern.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
 - [`akua`](./akua.md) — repo agent (coding tools, lean) pinned to `/home/manifest/akua`

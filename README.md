@@ -215,6 +215,8 @@ openclaw agent --agent main --local --thinking off \
 | **`build-app.sh`** | **Agent Factory** -- scaffold apps | `./scripts/build-app.sh --type node --workspace /path` |
 | **`manage-agents.sh`** | **Agent Factory** -- manage agent fleet | `./scripts/manage-agents.sh list` |
 | **`swarm.sh`** | **Swarm** -- multi-agent orchestration (parallel, pipeline, collab) | `./scripts/swarm.sh --parallel ...` |
+| **`briefing-agent.sh`** | **Briefing Agent** -- health sentinel + auto-fix + distill + sitrep | `./scripts/briefing-agent.sh` |
+| **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
 
 ---
 
@@ -297,6 +299,28 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 ```bash
 openclaw agent --agent main --local --thinking off --message "Hello!"
 ```
+
+### Agent: `briefing` (context curator)
+
+| Property | Value |
+|----------|-------|
+| ID | `briefing` |
+| Model | `kimi-k2.5:cloud` (256k context) |
+| Workspace | `/home/manifest/briefing` |
+| Tools | `coding` (exec, read, write) |
+| Role | **Context Curator** -- continuity, health sentinel, memory distillation |
+
+The morning person who has the coffee ready. Maintains `SITREP.md` (live situation report) and `MEMORY.md` (long-term memory) so main doesn't waste sessions re-discovering context. Runs on a cron schedule with auto-fix for common health issues.
+
+```bash
+# Run manually
+./scripts/briefing-agent.sh
+
+# Or via cron (every hour):
+# 0 * * * * /home/manifest/XmetaV/scripts/briefing-agent.sh >> /tmp/briefing-agent.log 2>&1
+```
+
+See [docs/agents/briefing.md](docs/agents/briefing.md) for full documentation.
 
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
