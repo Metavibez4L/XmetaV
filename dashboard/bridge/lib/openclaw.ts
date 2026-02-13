@@ -45,8 +45,13 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   const nodePath = process.env.NODE_PATH || "node";
   const timeout = timeoutSeconds ?? DEFAULT_TIMEOUT_S;
 
-  // Use a unique session ID per command to avoid lock contention
-  const sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+  // Session strategy:
+  // - "main" gets a daily persistent session so it retains conversation context
+  // - All other agents get unique session IDs to avoid lock contention
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const sessionId = agentId === "main"
+    ? `dash_main_${today}`
+    : `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
 
   const args = [
     "agent",
