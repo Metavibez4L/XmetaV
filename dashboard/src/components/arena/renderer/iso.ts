@@ -5,7 +5,7 @@ import { Graphics } from "pixi.js";
 export const TILE_W = 80;
 export const TILE_H = 40;
 export const GRID_COLS = 10;
-export const GRID_ROWS = 8;
+export const GRID_ROWS = 10;
 
 // -- Coordinate conversion --------------------------------------------
 

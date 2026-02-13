@@ -12,8 +12,11 @@ import {
  * Draw the isometric office floor, glass partition walls, room labels,
  * ambient particles, and scanline sweep.
  *
- * Floor/walls are added to `scene` (iso coords).
- * Scanline is added to `app.stage` behind the scene.
+ * Layout (10×10 grid):
+ *   Rows 0–2  COMMAND room  (cols 2–6, walled)
+ *   Rows 3–5  MEETING area  (cols 3–6, open center)
+ *   Rows 6–9  left:  INTEL room    (cols 0–4, glass walls)
+ *             right: DEV FLOOR     (cols 5–9, open — no walls)
  */
 export function initBackground(
   app: Application,
@@ -31,7 +34,7 @@ export function initBackground(
   // -- Floor tiles ----------------------------------------------------
   const floor = new Graphics();
 
-  // Boss office floor (cols 2-6, rows 0-2) — slightly brighter
+  // Command room floor (cols 2–6, rows 0–2) — brighter
   for (let c = 2; c <= 6; c++) {
     for (let r = 0; r <= 2; r++) {
       drawIsoTile(floor, c, r, 0x0c1220, 0.85);
@@ -39,11 +42,27 @@ export function initBackground(
     }
   }
 
-  // Meeting area floor (cols 3-6, rows 3-5) — subtle tint
+  // Meeting area floor (cols 3–6, rows 3–5) — subtle tint
   for (let c = 3; c <= 6; c++) {
     for (let r = 3; r <= 5; r++) {
       drawIsoTile(floor, c, r, 0x0a0f1c, 0.85);
       strokeIsoTile(floor, c, r, 0x00f0ff, 0.04, 0.5);
+    }
+  }
+
+  // Intel room floor (cols 0–4, rows 6–9) — slightly blue-tinted
+  for (let c = 0; c <= 4; c++) {
+    for (let r = 6; r <= 9; r++) {
+      drawIsoTile(floor, c, r, 0x0a1020, 0.8);
+      strokeIsoTile(floor, c, r, 0x38bdf8, 0.04, 0.5);
+    }
+  }
+
+  // Dev floor (cols 5–9, rows 6–9) — standard open floor
+  for (let c = 5; c <= 9; c++) {
+    for (let r = 6; r <= 9; r++) {
+      drawIsoTile(floor, c, r, 0x080d18, 0.7);
+      strokeIsoTile(floor, c, r, 0x39ff14, 0.02, 0.5);
     }
   }
 
@@ -53,6 +72,8 @@ export function initBackground(
       // Skip already-drawn areas
       if (c >= 2 && c <= 6 && r >= 0 && r <= 2) continue;
       if (c >= 3 && c <= 6 && r >= 3 && r <= 5) continue;
+      if (c >= 0 && c <= 4 && r >= 6 && r <= 9) continue;
+      if (c >= 5 && c <= 9 && r >= 6 && r <= 9) continue;
       drawIsoTile(floor, c, r, 0x080d18, 0.7);
       strokeIsoTile(floor, c, r, 0x00f0ff, 0.03, 0.5);
     }
@@ -65,18 +86,26 @@ export function initBackground(
   const WALL_H = 45;
   const PART_H = 28;
 
-  // Boss office back wall (row 0, col 2 to col 7)
+  // ── Command room walls ─────────────────────────────────────────
+  // Back wall (row 0, cols 2–7)
   drawIsoWall(walls, 2, 0, 7, 0, WALL_H, 0x0c1425, 0x00f0ff, 0.12);
-
-  // Boss office left wall (col 2, row 0 to row 3)
+  // Left wall (col 2, rows 0–3)
   drawIsoWall(walls, 2, 0, 2, 3, WALL_H, 0x0c1425, 0x00f0ff, 0.08);
-
-  // Boss office right wall (col 7, row 0 to row 3) — very transparent
+  // Right wall (col 7, rows 0–3) — very transparent
   drawIsoWall(walls, 7, 0, 7, 3, WALL_H, 0x0c1425, 0x00f0ff, 0.05);
-
-  // Partition walls (lower, glass)
+  // Glass partitions at bottom of command room
   drawIsoWall(walls, 2, 3, 4, 3, PART_H, 0x0c1425, 0x00f0ff, 0.08);
   drawIsoWall(walls, 5, 3, 7, 3, PART_H, 0x0c1425, 0x00f0ff, 0.08);
+
+  // ── Intel room walls (glass enclosed) ──────────────────────────
+  // Back wall (row 6, cols 0–4.5)
+  drawIsoWall(walls, 0, 6, 4.5, 6, PART_H, 0x0c1425, 0x38bdf8, 0.10);
+  // Left wall (col 0, rows 6–10)
+  drawIsoWall(walls, 0, 6, 0, 10, PART_H, 0x0c1425, 0x38bdf8, 0.06);
+  // Right wall (col 4.5, rows 6–10) — glass partition
+  drawIsoWall(walls, 4.5, 6, 4.5, 10, PART_H, 0x0c1425, 0x38bdf8, 0.08);
+  // Front wall (row 10, cols 0–4.5) — lower glass
+  drawIsoWall(walls, 0, 10, 4.5, 10, PART_H * 0.6, 0x0c1425, 0x38bdf8, 0.06);
 
   scene.addChild(walls);
 
@@ -88,16 +117,18 @@ export function initBackground(
     letterSpacing: 2,
   };
 
-  const bossLabel = new Text({
-    text: "BOSS OFFICE",
+  // COMMAND label
+  const cmdLabel = new Text({
+    text: "COMMAND",
     style: { ...labelStyle, fontSize: 9 },
   });
-  const bossPos = toScreen(4.5, 0.3);
-  bossLabel.anchor.set(0.5, 0.5);
-  bossLabel.position.set(bossPos.x, bossPos.y - 55);
-  bossLabel.alpha = 0.25;
-  scene.addChild(bossLabel);
+  const cmdPos = toScreen(4.5, 0.3);
+  cmdLabel.anchor.set(0.5, 0.5);
+  cmdLabel.position.set(cmdPos.x, cmdPos.y - 55);
+  cmdLabel.alpha = 0.25;
+  scene.addChild(cmdLabel);
 
+  // MEETING label
   const meetLabel = new Text({ text: "MEETING", style: labelStyle });
   const meetPos = toScreen(4.5, 3.5);
   meetLabel.anchor.set(0.5, 0.5);
@@ -105,16 +136,30 @@ export function initBackground(
   meetLabel.alpha = 0.2;
   scene.addChild(meetLabel);
 
-  const supportLabel = new Text({ text: "SUPPORT", style: labelStyle });
-  const supportPos = toScreen(4.5, 7);
-  supportLabel.anchor.set(0.5, 0.5);
-  supportLabel.position.set(supportPos.x, supportPos.y + 12);
-  supportLabel.alpha = 0.2;
-  scene.addChild(supportLabel);
+  // INTEL label (inside intel room)
+  const intelLabel = new Text({
+    text: "INTEL",
+    style: { ...labelStyle, fill: "#38bdf8" },
+  });
+  const intelPos = toScreen(2, 6.3);
+  intelLabel.anchor.set(0.5, 0.5);
+  intelLabel.position.set(intelPos.x, intelPos.y - 10);
+  intelLabel.alpha = 0.25;
+  scene.addChild(intelLabel);
+
+  // DEV FLOOR label (open area, right side)
+  const devLabel = new Text({
+    text: "DEV FLOOR",
+    style: { ...labelStyle, fill: "#39ff14" },
+  });
+  const devPos = toScreen(7, 6.3);
+  devLabel.anchor.set(0.5, 0.5);
+  devLabel.position.set(devPos.x, devPos.y - 10);
+  devLabel.alpha = 0.2;
+  scene.addChild(devLabel);
 
   // -- Ambient particles (in scene, around office area) ---------------
   const particles: { g: Graphics; vx: number; vy: number }[] = [];
-  // Get bounding box of the iso grid for particle spawn
   const topLeft = toScreen(0, 0);
   const bottomRight = toScreen(GRID_COLS, GRID_ROWS);
   const pMinX = topLeft.x - 100;
@@ -124,7 +169,7 @@ export function initBackground(
   const pW = pMaxX - pMinX;
   const pH = pMaxY - pMinY;
 
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 50; i++) {
     const p = new Graphics();
     const r = Math.random() * 1.5 + 0.5;
     p.circle(0, 0, r).fill({
@@ -168,6 +213,5 @@ export function initBackground(
   return () => {
     app.ticker.remove(tick);
     scanline.destroy();
-    // Floor, walls, labels, particles are children of scene — destroyed with scene
   };
 }

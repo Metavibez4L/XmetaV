@@ -13,6 +13,7 @@ interface HudStats {
   lastEvent: string;
   meetingActive: boolean;
   meetingAgents: string[];
+  meetingType: "auto" | "manual" | null;
 }
 
 export default function ArenaCanvas() {
@@ -31,7 +32,11 @@ export default function ArenaCanvas() {
     lastEvent: "Initializing...",
     meetingActive: false,
     meetingAgents: [],
+    meetingType: null,
   });
+  const [meetingPanelOpen, setMeetingPanelOpen] = useState(false);
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set(["main"]));
+  const manualMeetingRef = useRef(false);
 
   const [labelPositions, setLabelPositions] = useState<
     { id: string; label: string; colorHex: string; x: number; y: number }[]
@@ -40,13 +45,16 @@ export default function ArenaCanvas() {
   // -- Meeting detection (stable callback via refs) ---------------------
   const checkMeetingRef = useRef<() => void>(() => {});
   const checkMeeting = useCallback(() => {
+    // Don't auto-manage meetings while a manual meeting is active
+    if (manualMeetingRef.current) return;
+
     const busyCount = busyAgentsRef.current.size;
     const busyIds = Array.from(busyAgentsRef.current);
 
     console.log("[arena] checkMeeting:", busyCount, "busy →", busyIds, "meetingActive:", meetingActiveRef.current);
 
     if (busyCount >= 2 && !meetingActiveRef.current) {
-      console.log("[arena] >>> STARTING MEETING", busyIds);
+      console.log("[arena] >>> STARTING AUTO MEETING", busyIds);
       meetingActiveRef.current = true;
       nodesApiRef.current?.startMeeting(busyIds);
       effectsApiRef.current?.meetingStart(busyIds);
@@ -55,10 +63,10 @@ export default function ArenaCanvas() {
         ...s,
         meetingActive: true,
         meetingAgents: busyIds,
+        meetingType: "auto",
         lastEvent: `MEETING: ${busyIds.length} agents at table`,
       }));
     } else if (busyCount >= 2 && meetingActiveRef.current) {
-      // Update meeting agents (new agent joined)
       nodesApiRef.current?.startMeeting(busyIds);
       effectsApiRef.current?.meetingStart(busyIds);
       setHudStats((s) => ({
@@ -66,7 +74,7 @@ export default function ArenaCanvas() {
         meetingAgents: busyIds,
       }));
     } else if (busyCount < 2 && meetingActiveRef.current) {
-      console.log("[arena] >>> ENDING MEETING");
+      console.log("[arena] >>> ENDING AUTO MEETING");
       meetingActiveRef.current = false;
       nodesApiRef.current?.endMeeting();
       effectsApiRef.current?.meetingEnd();
@@ -75,9 +83,53 @@ export default function ArenaCanvas() {
         ...s,
         meetingActive: false,
         meetingAgents: [],
+        meetingType: null,
         lastEvent: "Meeting ended",
       }));
     }
+  }, []);
+
+  // -- Call a specific meeting with chosen agents ----------------------
+  const callMeeting = useCallback((agentIds: string[]) => {
+    if (agentIds.length < 2) return;
+    console.log("[arena] >>> CALLING MANUAL MEETING:", agentIds);
+    manualMeetingRef.current = true;
+    meetingActiveRef.current = true;
+
+    // Visually set called agents to "busy" for the meeting
+    for (const id of agentIds) {
+      nodesApiRef.current?.setState(id, "busy");
+      officeApiRef.current?.setScreenState(id, "busy");
+    }
+
+    nodesApiRef.current?.startMeeting(agentIds);
+    effectsApiRef.current?.meetingStart(agentIds);
+    officeApiRef.current?.setMeetingMode(true);
+    setHudStats((s) => ({
+      ...s,
+      meetingActive: true,
+      meetingAgents: agentIds,
+      meetingType: "manual",
+      lastEvent: `MEETING CALLED: ${agentIds.join(", ")}`,
+    }));
+    setMeetingPanelOpen(false);
+  }, []);
+
+  // -- Dismiss current meeting -----------------------------------------
+  const dismissMeeting = useCallback(() => {
+    console.log("[arena] >>> DISMISSING MEETING");
+    manualMeetingRef.current = false;
+    meetingActiveRef.current = false;
+    nodesApiRef.current?.endMeeting();
+    effectsApiRef.current?.meetingEnd();
+    officeApiRef.current?.setMeetingMode(false);
+    setHudStats((s) => ({
+      ...s,
+      meetingActive: false,
+      meetingAgents: [],
+      meetingType: null,
+      lastEvent: "Meeting dismissed",
+    }));
   }, []);
 
   // Keep checkMeeting ref current for use in the async PixiJS init
@@ -319,7 +371,7 @@ export default function ArenaCanvas() {
 
       {/* -- HUD: Meeting indicator (top-center) ---------------------- */}
       {hudStats.meetingActive && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none select-none">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 select-none">
           <div
             className="px-4 py-2 rounded font-mono text-xs tracking-widest text-center animate-pulse"
             style={{
@@ -332,36 +384,40 @@ export default function ArenaCanvas() {
           >
             <div className="text-[10px] mb-0.5" style={{ color: "#00f0ff88" }}>
               MEETING IN SESSION
+              {hudStats.meetingType === "manual" && (
+                <span style={{ color: "#f59e0b88" }}> (CALLED)</span>
+              )}
             </div>
             <div className="text-[8px]" style={{ color: "#00f0ff55" }}>
               {hudStats.meetingAgents.join(" / ")}
             </div>
+            <button
+              onClick={dismissMeeting}
+              className="mt-1.5 px-2 py-0.5 rounded text-[9px] font-mono transition-all hover:border-[#ff444488]"
+              style={{
+                color: "#ff444488",
+                border: "1px solid #ff444422",
+                background: "#05080fcc",
+              }}
+            >
+              DISMISS
+            </button>
           </div>
         </div>
       )}
 
-      {/* -- HUD: Back button + Debug (top-right) -------------------- */}
+      {/* -- HUD: Meeting controls + back button (top-right) --------- */}
       <div className="absolute top-4 right-6 z-10 flex gap-2">
         <button
-          onClick={() => {
-            // Force-trigger a meeting with all available agents for testing
-            const testIds = ["main", "akua", "basedintern"];
-            console.log("[arena] MANUAL MEETING TRIGGER:", testIds);
-            for (const id of testIds) {
-              busyAgentsRef.current.add(id);
-              nodesApiRef.current?.setState(id, "busy");
-              officeApiRef.current?.setScreenState(id, "busy");
-            }
-            checkMeeting();
-          }}
+          onClick={() => setMeetingPanelOpen(!meetingPanelOpen)}
           className="px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#f59e0b55]"
           style={{
-            color: "#f59e0b88",
-            border: "1px solid #f59e0b22",
+            color: meetingPanelOpen ? "#f59e0b" : "#f59e0b88",
+            border: `1px solid ${meetingPanelOpen ? "#f59e0b55" : "#f59e0b22"}`,
             background: "#05080fcc",
           }}
         >
-          TEST MEETING
+          CALL MEETING
         </button>
         <a
           href="/agent"
@@ -375,6 +431,126 @@ export default function ArenaCanvas() {
           &larr; DASHBOARD
         </a>
       </div>
+
+      {/* -- Meeting panel (agent picker) ----------------------------- */}
+      {meetingPanelOpen && (
+        <div
+          className="absolute top-14 right-6 z-20 p-4 rounded font-mono"
+          style={{
+            background: "#0a0e1af0",
+            border: "1px solid #f59e0b33",
+            backdropFilter: "blur(12px)",
+            minWidth: "220px",
+          }}
+        >
+          <div
+            className="text-[9px] uppercase tracking-wider mb-3"
+            style={{ color: "#f59e0b88" }}
+          >
+            SELECT AGENTS FOR MEETING
+          </div>
+
+          {/* Agent checkboxes */}
+          <div className="space-y-1.5 mb-3">
+            {ARENA_AGENTS.map((a) => {
+              const checked = selectedAgents.has(a.id);
+              return (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-2 cursor-pointer text-[11px]"
+                  style={{ color: checked ? a.colorHex : "#4a6a8a" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedAgents((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(a.id)) {
+                          // Don't let them remove "main" — main always attends
+                          if (a.id === "main") return next;
+                          next.delete(a.id);
+                        } else {
+                          next.add(a.id);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="accent-[#f59e0b]"
+                    style={{ width: 12, height: 12 }}
+                  />
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{
+                      background: a.colorHex,
+                      boxShadow: checked ? `0 0 6px ${a.colorHex}` : "none",
+                      opacity: checked ? 1 : 0.3,
+                    }}
+                  />
+                  {a.label}
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Quick presets */}
+          <div
+            className="text-[9px] uppercase tracking-wider mb-2"
+            style={{ color: "#4a6a8a" }}
+          >
+            QUICK PRESETS
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {[
+              { label: "Intel", ids: ["main", "briefing", "oracle", "alchemist"] },
+              { label: "Dev", ids: ["main", "web3dev", "akua", "basedintern"] },
+              { label: "Token", ids: ["main", "alchemist", "oracle", "web3dev"] },
+              { label: "All", ids: ARENA_AGENTS.map((a) => a.id) },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => setSelectedAgents(new Set(preset.ids))}
+                className="px-2 py-0.5 rounded text-[9px] transition-all hover:border-[#f59e0b55]"
+                style={{
+                  color: "#f59e0b88",
+                  border: "1px solid #f59e0b22",
+                  background: "#05080fcc",
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Call / Cancel buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => callMeeting(Array.from(selectedAgents))}
+              disabled={selectedAgents.size < 2}
+              className="flex-1 px-3 py-1.5 rounded text-xs font-bold transition-all"
+              style={{
+                color: selectedAgents.size < 2 ? "#4a6a8a" : "#05080f",
+                background: selectedAgents.size < 2 ? "#1a2538" : "#f59e0b",
+                border: "1px solid #f59e0b44",
+                cursor: selectedAgents.size < 2 ? "not-allowed" : "pointer",
+              }}
+            >
+              CALL ({selectedAgents.size})
+            </button>
+            <button
+              onClick={() => setMeetingPanelOpen(false)}
+              className="px-3 py-1.5 rounded text-xs transition-all hover:border-[#ff444444]"
+              style={{
+                color: "#ff444488",
+                border: "1px solid #ff444422",
+                background: "#05080fcc",
+              }}
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* -- HUD: Stats (bottom-left) -------------------------------- */}
       <div

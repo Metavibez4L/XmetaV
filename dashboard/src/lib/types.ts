@@ -262,4 +262,18 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
   },
+  {
+    id: "alchemist",
+    name: "Alchemist (Tokenomics)",
+    workspace: "/home/manifest/alchemist",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+  },
+  {
+    id: "web3dev",
+    name: "Web3Dev (Blockchain)",
+    workspace: "/home/manifest/web3dev",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+  },
 ];

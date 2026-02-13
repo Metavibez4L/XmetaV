@@ -317,13 +317,13 @@ npx tsx register.ts   # register or re-register the agent
 
 ## XMETAV HQ (Arena)
 
-The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 6 agents in real-time.
+The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 10+ agents in real-time across a 10x10 isometric grid.
 
-**Office Layout:**
-- **Boss Office** (back): Main agent at large desk with 3 holo screens, Operator orb floating above
-- **Meeting Area** (center): Hexagonal glass table with holographic projector and 6 chairs
-- **Left Wing**: Akua + Akua_web workstations with reactive holo screens
-- **Right Wing**: Basedintern + Basedintern_web workstations with reactive holo screens
+**Office Layout (v14 — reorganized):**
+- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above
+- **MEETING area** (center): Hexagonal glass table with holographic projector and 10 chairs
+- **INTEL room** (bottom-left, glass walls): Briefing, Oracle, Alchemist workstations — blue-tinted floor, room for 2 more agents
+- **DEV FLOOR** (bottom-right, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks — green-tinted grid lines
 
 **Agent Avatars:** Glowing translucent orbs with ghost silhouettes. States: idle (breathing pulse), busy (spinning ring + particles), offline (static flicker).
 
@@ -334,11 +334,26 @@ The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (
 - Completion bursts and failure glitch effects per-agent
 - Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
 
-**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table. The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
+**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (10 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
 
 **Architecture:** `Supabase Realtime + 10s periodic sync -> useArenaEvents hook -> PixiJS imperative API (refs)`
 
 No React re-renders for animations -- the hook calls PixiJS methods directly via refs for maximum performance. Buffered state is replayed after PixiJS async init to handle the race condition between Supabase data arrival and renderer readiness.
+
+**Agent Colors:**
+
+| Agent | Color | Room |
+|-------|-------|------|
+| Main | Cyan `#00f0ff` | COMMAND |
+| Operator | Amber `#f59e0b` | COMMAND |
+| Briefing | Sky `#38bdf8` | INTEL |
+| Oracle | Gold `#fbbf24` | INTEL |
+| Alchemist | Fuchsia `#e879f9` | INTEL |
+| Web3Dev | Orange `#f97316` | DEV FLOOR |
+| Akua | Purple `#a855f7` | DEV FLOOR |
+| Akua_web | Violet `#c084fc` | DEV FLOOR |
+| Basedintern | Green `#39ff14` | DEV FLOOR |
+| Basedintern_web | Emerald `#4ade80` | DEV FLOOR |
 
 ---
 
@@ -385,3 +400,5 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | Voice repeats last response | Clear browser cache; ensure `useRealtimeMessages` sync reset is in place |
 | Chat history behind sidebar | History panel should slide from the right; check `ChatHistory.tsx` uses `right-0` |
 | MetaMask error on Payments/Identity | Safe to ignore -- app uses server-side wallets; error handling shows retry UI |
+| New agent not in arena | Add to `agents.ts` (ARENA_AGENTS, MEETING_SEATS, ARENA_CONNECTIONS), `office.ts` (workstationAgents), `types.ts` (KNOWN_AGENTS), and Supabase `agent_controls` |
+| Intel room agents overlapping | Check tile positions in `agents.ts` — INTEL room uses cols 0–4, rows 6–9 |

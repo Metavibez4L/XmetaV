@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-13  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v13 (Arena Sync + Voice Fix + Wallet Hardening + Chat History + Dispatch Fix)
+**XmetaV Version:** v14 (Fleet Expansion + Office Reorganization + Specialist Agents)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -51,12 +51,18 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | `akua_web` | `kimi-k2.5:cloud` | `/home/manifest/akua` | full | Same repo — browser/web only |
 | `briefing` | `kimi-k2.5:cloud` | `/home/manifest/briefing` | coding | **Context Curator** — continuity, health, memory |
 | `oracle` | `kimi-k2.5:cloud` | `/home/manifest/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
+| `alchemist` | `kimi-k2.5:cloud` | `/home/manifest/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
+| `web3dev` | `kimi-k2.5:cloud` | `/home/manifest/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
 
 \* = default agent
 
 Detailed agent runbooks:
 - `docs/agents/main.md`
+- `docs/agents/briefing.md`
+- `docs/agents/oracle.md`
+- `docs/agents/alchemist.md`
+- `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`
 - `docs/agents/dynamic.md`
@@ -430,7 +436,7 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
-## XMETAV HQ — Isometric Office Arena (v12, fixed v13)
+## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14)
 
 Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
 
@@ -438,23 +444,25 @@ Full isometric office visualization rendered with PixiJS at `/arena`, driven by 
 |-----------|--------|-------|
 | Arena Page | Active | `/arena` — standalone fullscreen PixiJS canvas |
 | PixiJS (v8.16.0) | Installed | WebGL 2D rendering with BlurFilter, dynamic loading |
-| Isometric Renderer | Active | `renderer/iso.ts` — 2:1 projection, tile/cube/wall primitives |
-| Office Background | Active | `renderer/background.ts` — floor grid, glass walls, room labels, particles |
-| Office Furniture | Active | `renderer/office.ts` — boss desk, meeting table, projector, 4 workstations |
+| Isometric Renderer | Active | `renderer/iso.ts` — 2:1 projection, 10x10 grid, tile/cube/wall primitives |
+| Office Background | Active | `renderer/background.ts` — 4 distinct floor zones, glass walls, room labels, particles |
+| Office Furniture | Active | `renderer/office.ts` — boss desk, meeting table, projector, 8 workstation desks |
 | Agent Avatars | Active | `renderer/avatars.ts` — glowing orbs with ghost silhouettes (idle/busy/offline) |
 | Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
 | Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls + 10s periodic sync |
 | HUD Overlay | Active | DOM: title, system status, agent legend, floating labels, TEST MEETING button |
 | Meeting Sync | **Fixed (v13)** | State replay after PixiJS init resolves race condition; periodic sync catches dropped events |
 
-### Office layout
+### Office layout (v14 — reorganized)
 
-- **Boss Office** (back): Main agent desk with 3 holo screens + Operator orb floating above
-- **Meeting Area** (center): Hexagonal glass table with holographic projector column, 6 chairs
-- **Left Wing**: Akua + Akua_web workstations with reactive holo screens
-- **Right Wing**: Basedintern + Basedintern_web workstations with reactive holo screens
+Grid expanded from 10x8 to 10x10 with four distinct zones:
 
-### Meeting visualization (v13)
+- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above
+- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 10 chairs for all agents
+- **INTEL room** (bottom-left, rows 6–9, glass walls): Briefing, Oracle, Alchemist — with space for 2 future agents. Blue-tinted floor and `#38bdf8` glass partition walls.
+- **DEV FLOOR** (bottom-right, rows 6–9, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks. Green-tinted grid lines.
+
+### Meeting visualization (v13+)
 
 When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal meeting table. The holographic projector activates, connection lines draw between participants, and a "MEETING IN SESSION" HUD indicator appears.
 
@@ -462,12 +470,16 @@ When 2+ agents are "busy," avatars smoothly interpolate from their desks to assi
 |------|-------|-------|
 | Top | main | 270 |
 | Upper-right | operator | 330 |
-| Upper-left | akua | 210 |
+| Upper-left | briefing | 210 |
+| Lower-left | oracle | 150 |
+| Bottom center | alchemist | 180 |
+| Left | akua | 240 |
 | Lower-right | basedintern | 30 |
-| Lower-left | akua_web | 150 |
-| Bottom | basedintern_web | 90 |
+| Bottom-left | akua_web | 120 |
+| Bottom-right | basedintern_web | 60 |
+| Right center | web3dev | 0 |
 
-**TEST MEETING** button in the HUD (top-right) forces a meeting with main, akua, and basedintern for visual verification.
+**TEST MEETING** button in the HUD (top-right) forces a meeting for visual verification.
 
 ### Visual effects (real-time)
 

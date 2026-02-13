@@ -69,10 +69,10 @@ export function initOffice(
 
   const screens = new Map<string, ScreenEntry>();
 
-  // -- Boss office desk -----------------------------------------------
+  // ── COMMAND ROOM — Boss desk + operator ────────────────────────
   const bossDesk = new Graphics();
   const bdPos = toScreen(4.5, 1.5);
-  // L-shaped desk: main slab + return
+  // L-shaped desk: main slab
   drawBox(
     bossDesk,
     bdPos.x, bdPos.y,
@@ -101,32 +101,30 @@ export function initOffice(
     const sy = bdPos.y - 30 - i * 3;
     const screen = createScreen(sx, sy, 16, 14, 0x00f0ff);
     layer.addChild(screen.container);
-    // Associate center screen with "main" agent
     if (i === 1) screens.set("main", screen);
   }
 
-  // Operator screen (associate with the first boss screen)
+  // Operator screen (floating near boss desk)
   const opScreen = createScreen(bdPos.x + 20, bdPos.y - 36, 14, 12, 0xf59e0b);
   layer.addChild(opScreen.container);
   screens.set("operator", opScreen);
 
-  // -- Meeting table --------------------------------------------------
+  // ── MEETING TABLE (center) ─────────────────────────────────────
   const mtPos = toScreen(MEETING_TABLE_TILE.col, MEETING_TABLE_TILE.row);
   const table = new Graphics();
 
-  // Glass-top hexagonal table - INCREASED visibility
-  const mtHw = TILE_W * 0.55;  // Slightly larger
+  const mtHw = TILE_W * 0.55;
   const mtHh = TILE_H * 0.55;
-  
-  // Draw table base (darker, more visible)
+
+  // Table base
   drawBox(
     table,
     mtPos.x, mtPos.y,
     mtHw, mtHh, 6,
-    0x0c1a2a, 0x081420, 0x051018, 0.95,  // Increased alpha
+    0x0c1a2a, 0x081420, 0x051018, 0.95,
   );
-  
-  // Cyan glass-top edge - BRIGHTER
+
+  // Cyan glass-top edge
   table
     .poly(
       [
@@ -137,9 +135,9 @@ export function initOffice(
       ],
       true,
     )
-    .stroke({ color: 0x00f0ff, width: 2, alpha: 0.4 });  // Thicker, more visible
-  
-  // Add a second inner glow ring
+    .stroke({ color: 0x00f0ff, width: 2, alpha: 0.4 });
+
+  // Inner glow ring
   table
     .poly(
       [
@@ -151,8 +149,8 @@ export function initOffice(
       true,
     )
     .stroke({ color: 0x00f0ff, width: 1, alpha: 0.2 });
-    
-  // Add table surface fill (semi-transparent glass)
+
+  // Surface fill
   table
     .poly(
       [
@@ -164,34 +162,31 @@ export function initOffice(
       true,
     )
     .fill({ color: 0x00f0ff, alpha: 0.05 });
-    
+
   layer.addChild(table);
 
-  // Holographic projector column (center of table) - BRIGHTER
+  // Holographic projector column
   const projector = new Graphics();
-  projector.circle(mtPos.x, mtPos.y - 8, 4).fill({  // Larger
+  projector.circle(mtPos.x, mtPos.y - 8, 4).fill({
     color: 0x00f0ff,
-    alpha: 0.7,  // Brighter
+    alpha: 0.7,
   });
-  // Vertical glow beam - THICKER
   projector.moveTo(mtPos.x, mtPos.y - 8);
   projector.lineTo(mtPos.x, mtPos.y - 28);
-  projector.stroke({ color: 0x00f0ff, width: 2.5, alpha: 0.25 });  // Thicker
-  // Add outer glow
+  projector.stroke({ color: 0x00f0ff, width: 2.5, alpha: 0.25 });
   projector.moveTo(mtPos.x, mtPos.y - 8);
   projector.lineTo(mtPos.x, mtPos.y - 28);
   projector.stroke({ color: 0x00f0ff, width: 6, alpha: 0.1 });
   layer.addChild(projector);
 
-  // Low chairs around table (6 small cubes) - MORE VISIBLE
-  const chairAngles = [0, 60, 120, 180, 240, 300];
+  // Chairs around table (9 seats)
+  const chairAngles = [0, 40, 80, 120, 160, 200, 240, 280, 320];
   for (const deg of chairAngles) {
     const rad = (deg * Math.PI) / 180;
     const cx = mtPos.x + Math.cos(rad) * 32;
     const cy = mtPos.y + Math.sin(rad) * 16;
     const chair = new Graphics();
-    drawBox(chair, cx, cy, 7, 5, 6, 0x1a2a3a, 0x142230, 0x101a28, 0.85);  // Brighter colors
-    // Add chair edge glow
+    drawBox(chair, cx, cy, 7, 5, 6, 0x1a2a3a, 0x142230, 0x101a28, 0.85);
     chair
       .poly(
         [
@@ -206,8 +201,11 @@ export function initOffice(
     layer.addChild(chair);
   }
 
-  // -- Workstations (5 agent desks) -----------------------------------
-  const workstationAgents = ["akua", "akua_web", "basedintern", "basedintern_web", "briefing", "oracle"];
+  // ── WORKSTATION DESKS — Intel + Dev Floor agents ───────────────
+  const workstationAgents = [
+    "briefing", "oracle", "alchemist",                                  // Intel room
+    "web3dev", "akua", "akua_web", "basedintern", "basedintern_web",  // Dev floor
+  ];
   for (const agentId of workstationAgents) {
     const cfg = ARENA_AGENTS.find((a) => a.id === agentId);
     if (!cfg) continue;
@@ -222,7 +220,6 @@ export function initOffice(
       TILE_W * 0.3, TILE_H * 0.25, 8,
       0x1a2538, 0x141c2e, 0x101828, 0.85,
     );
-    // Desk edge glow
     const dHw = TILE_W * 0.3;
     const dHh = TILE_H * 0.25;
     desk
@@ -254,7 +251,7 @@ export function initOffice(
     screens.set(agentId, screen);
   }
 
-  // -- Animation ticker -----------------------------------------------
+  // ── Animation ticker ──────────────────────────────────────────
   let time = 0;
   let meetingMode = false;
   const tick = (ticker: { deltaMS: number }) => {
@@ -263,7 +260,6 @@ export function initOffice(
     // Animate screens
     for (const [, screen] of screens) {
       if (screen.state === "busy") {
-        // Scrolling code lines
         for (let i = 0; i < screen.lines.length; i++) {
           screen.lines[i].visible = true;
           screen.lines[i].position.y =
@@ -274,7 +270,6 @@ export function initOffice(
         screen.bg.tint = 0x112233;
         screen.border.tint = 0xffffff;
       } else if (screen.state === "fail") {
-        // Red flicker
         for (const line of screen.lines) line.visible = false;
         screen.bg.tint = Math.random() > 0.7 ? 0x331111 : 0x220808;
         screen.border.tint = 0xff4444;
@@ -283,14 +278,13 @@ export function initOffice(
         screen.bg.tint = 0x0a0a0a;
         screen.border.tint = 0x333333;
       } else {
-        // Idle
         for (const line of screen.lines) line.visible = false;
         screen.bg.tint = 0xffffff;
         screen.border.tint = 0xffffff;
       }
     }
 
-    // Projector pulse (brighter during meetings)
+    // Projector pulse
     if (meetingMode) {
       projector.alpha = 0.9 + Math.sin(time * 3) * 0.1;
       projector.scale.set(1 + Math.sin(time * 2) * 0.15);
@@ -301,7 +295,7 @@ export function initOffice(
   };
   app.ticker.add(tick);
 
-  // -- API ------------------------------------------------------------
+  // ── API ───────────────────────────────────────────────────────
   return {
     setScreenState(agentId, state) {
       const s = screens.get(agentId);

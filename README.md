@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v13
+Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,7 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v13
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  main | basedintern | akua          |
+ |   agents:  11 (main + fleet + intel + dev)    |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
@@ -41,7 +41,7 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v13
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
-- Multi-agent management (`main`, `basedintern`, `akua`, `basedintern_web`, `akua_web`, `dynamic`)
+- Multi-agent management (11 agents: main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -133,7 +133,7 @@ XmetaV/
 |   |-- x402-payments.md      # x402 autonomous payment protocol reference
 |   +-- erc8004-identity.md   # ERC-8004 on-chain agent identity reference
 |
-+-- docs/                     # Documentation & runbooks
+    +-- docs/                     # Documentation & runbooks
     |-- ARCHITECTURE.md       # System architecture overview
     |-- AGENTS.md             # Agent configuration guide
     |-- STATUS.md             # Current known-good settings + checks
@@ -147,7 +147,11 @@ XmetaV/
         |-- main.md           # main agent runbook
         |-- basedintern.md    # basedintern agent runbook
         |-- akua.md           # akua agent runbook
-        +-- dynamic.md        # Dynamic agent runbook
+        |-- dynamic.md        # Dynamic agent runbook
+        |-- briefing.md       # briefing (context curator) runbook
+        |-- oracle.md         # oracle (on-chain intel) runbook
+        |-- alchemist.md      # alchemist (tokenomics) runbook
+        +-- web3dev.md        # web3dev (blockchain dev) runbook
 ```
 
 ---
@@ -218,6 +222,8 @@ openclaw agent --agent main --local --thinking off \
 | **`briefing-agent.sh`** | **Briefing Agent** -- health sentinel + auto-fix + distill + sitrep | `./scripts/briefing-agent.sh` |
 | **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
 | **`oracle-agent.sh`** | **Oracle Agent** -- on-chain intel, gas, prices, sentiment, alerts | `./scripts/oracle-agent.sh` |
+| **`alchemist-agent.sh`** | **Alchemist Agent** -- $XMETAV tokenomics, emissions, staking curves | `./scripts/alchemist-agent.sh` |
+| **`web3dev-agent.sh`** | **Web3Dev Agent** -- compile, test, audit, deploy smart contracts | `./scripts/web3dev-agent.sh` |
 
 ---
 
@@ -345,6 +351,52 @@ Provides real-time market intelligence via public APIs (CoinGecko, Etherscan, De
 ```
 
 See [docs/agents/oracle.md](docs/agents/oracle.md) for full documentation.
+
+### Agent: `alchemist` (tokenomics)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | $XMETAV tokenomics specialist |
+| **Workspace** | `/home/manifest/alchemist` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Supply tracking, emission modeling, holder analysis, staking curves, liquidity intel |
+
+Reads directly from the $XMETAV contract on Base Mainnet. Models emission schedules, identifies sell pressure windows, and recommends staking parameters. Writes `TOKENOMICS.md` reports.
+
+```bash
+# Run manually
+./scripts/alchemist-agent.sh
+
+# Health check every 6h, full report daily at 8 AM:
+# 0 */6 * * * /home/manifest/XmetaV/scripts/alchemist-agent.sh --health >> /tmp/alchemist.log 2>&1
+# 0 8 * * *   /home/manifest/XmetaV/scripts/alchemist-agent.sh --report >> /tmp/alchemist.log 2>&1
+```
+
+See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
+
+### Agent: `web3dev` (blockchain developer)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Dedicated blockchain developer — compile, test, audit, deploy |
+| **Workspace** | `/home/manifest/web3dev` |
+| **Tools** | `coding` (exec, process, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Smart contract dev, security auditor, deployment engineer, x402 maintainer |
+
+Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Static security audits, gas/size analysis, and production-ready contract scaffolding (ERC-20, staking, vesting, escrow).
+
+```bash
+# Run manually
+./scripts/web3dev-agent.sh
+
+# Status every 12h, weekly audit:
+# 0 */12 * * * /home/manifest/XmetaV/scripts/web3dev-agent.sh --status >> /tmp/web3dev.log 2>&1
+# 0 6 * * 1    /home/manifest/XmetaV/scripts/web3dev-agent.sh --report >> /tmp/web3dev.log 2>&1
+```
+
+See [docs/agents/web3dev.md](docs/agents/web3dev.md) for full documentation.
 
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
@@ -540,11 +592,11 @@ flowchart TB
             end
         end
 
-        subgraph FLEET["Agent Fleet"]
+        subgraph FLEET["Agent Fleet (11)"]
             direction LR
             F_MAIN["main\n(orch.)"]
-            F_BI["basedintern\n+ _web"]
-            F_AKUA["akua\n+ _web"]
+            F_INTEL["briefing\noracle\nalchemist"]
+            F_DEV["web3dev\nakua (+web)\nbasedintern (+web)"]
             F_DYN["dynamic\nagents"]
         end
     end
@@ -663,7 +715,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [dashboard/README.md](dashboard/README.md) | **Control Plane Dashboard** — setup, architecture, pages, bridge |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture deep-dive (includes dashboard) |
 | [AGENTS.md](docs/AGENTS.md) | Agent configuration, tool profiles, and customization |
-| [agents/](docs/agents/) | Per-agent runbooks (main, basedintern, akua, dynamic) |
+| [agents/](docs/agents/) | Per-agent runbooks (main, briefing, oracle, alchemist, web3dev, basedintern, akua, dynamic) |
 | [STATUS.md](docs/STATUS.md) | Current known-good settings + verification commands |
 | [SWARM.md](docs/SWARM.md) | Multi-agent swarm orchestration reference |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues & solutions (includes dashboard, x402, voice) |
@@ -721,6 +773,22 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-13 (v14) — Fleet Expansion + Office Reorganization + Specialist Agents
+- **4 New Specialist Agents** — `oracle` (on-chain intel), `alchemist` (tokenomics), `web3dev` (blockchain dev), `briefing` (context curator) — each with dedicated skills, cron runners, identities, and arena presence
+- **Oracle Agent** — Monitors gas prices, ETH/USDC/cbETH markets, Base chain activity, and crypto news via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports. Commands: `gas`, `prices`, `chain`, `news`, `alerts`, `report`
+- **Alchemist Agent** — $XMETAV tokenomics specialist reading directly from the token contract on Base Mainnet. Emission schedule modeling, sell pressure window detection, staking curve scenarios (APY vs stake ratio), holder concentration analysis. Writes `TOKENOMICS.md`. Commands: `supply`, `holders`, `emissions`, `staking`, `liquidity`, `health`, `report`
+- **Web3Dev Agent** — Dedicated blockchain developer owning all Hardhat projects (Akua 18 contracts, $XMETAV, BasedIntern). Static security audits (reentrancy, tx.origin, selfdestruct, pragma, delegatecall), contract size analysis vs 24KB limit, and production-ready Solidity scaffolding (ERC-20, ERC-721, staking, vesting, escrow). Writes `WEB3DEV.md`. Commands: `compile`, `test`, `audit`, `gas`, `scaffold`, `status`, `report`
+- **Office Reorganization** — Arena grid expanded from 10x8 to 10x10 with four distinct zones:
+  - **COMMAND room** (top, walled) — Main + Operator in the boss office
+  - **MEETING** (center) — hexagonal table expanded to 10 seats
+  - **INTEL room** (bottom-left, glass walls) — Briefing, Oracle, Alchemist with room for 2 more
+  - **DEV FLOOR** (bottom-right, open area) — Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks
+- **Fleet Now 11 Agents** — main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic
+- **New Runner Scripts** — `oracle-agent.sh`, `alchemist-agent.sh`, `web3dev-agent.sh` (all cron-compatible with `--health`/`--report`/`--all` modes)
+- **Agent Runbooks** — `docs/agents/oracle.md`, `docs/agents/alchemist.md`, `docs/agents/web3dev.md` with full documentation, troubleshooting, and cron setup
+- **OpenClaw Config** — All new agents registered in `openclaw.json` with `coding` profile and `kimi-k2.5:cloud` model
+- **Supabase Controls** — All new agents registered in `agent_controls` table
 
 ### 2026-02-13 (v13) — Arena Sync + Voice Fix + Wallet Hardening + Chat History
 - **Arena Sync Race Condition Fix** — Replay buffered agent states after PixiJS async init completes; added 10-second periodic sync as safety net for dropped Supabase Realtime events
