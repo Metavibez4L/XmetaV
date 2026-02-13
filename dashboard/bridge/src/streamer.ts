@@ -90,12 +90,12 @@ export function createStreamer(commandId: string) {
         .insert({ command_id: commandId, content, is_final: false });
     }
 
-    // Write final marker
+    // Write final marker (content is empty — is_final flag signals completion)
     const { error } = await supabase
       .from("agent_responses")
       .insert({
         command_id: commandId,
-        content: `\n[exit code: ${exitCode ?? "unknown"}]`,
+        content: "",
         is_final: true,
       });
 

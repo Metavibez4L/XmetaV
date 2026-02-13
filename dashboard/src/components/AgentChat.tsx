@@ -26,6 +26,7 @@ import {
   Terminal,
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
+import { cleanAgentOutput } from "@/lib/utils";
 
 // ────────────────────────────────────────────────────
 // Types
@@ -119,7 +120,7 @@ const MessageBubble = React.memo(function MessageBubble({
                   : "#c8d6e5cc",
           }}
         >
-          {msg.content ||
+          {(msg.role === "agent" ? cleanAgentOutput(msg.content) : msg.content) ||
             (msg.status === "pending" ? "// waiting for bridge..." : "")}
         </pre>
       </div>
@@ -179,7 +180,7 @@ function StreamingBubble({
           className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
           style={{ color: "#c8d6e5cc" }}
         >
-          {streamText || "// waiting for bridge..."}
+          {cleanAgentOutput(streamText) || "// waiting for bridge..."}
         </pre>
         {!streamDone && (
           <span
@@ -281,7 +282,7 @@ export function AgentChat() {
           loaded.push({
             id: `hist-agent-${entry.id}`,
             role: "agent",
-            content: entry.response,
+            content: cleanAgentOutput(entry.response),
             commandId: entry.id,
             status: entry.status === "failed" ? "failed" : "completed",
             agentId: entry.agentId,
@@ -457,7 +458,7 @@ export function AgentChat() {
       lastCompletedCmdId !== lastSpokenCmdRef.current &&
       !isSpeaking
     ) {
-      const textToSpeak = lastCompletedTextRef.current;
+      const textToSpeak = cleanAgentOutput(lastCompletedTextRef.current);
       if (textToSpeak) {
         lastSpokenCmdRef.current = lastCompletedCmdId;
         speakRef.current(textToSpeak);

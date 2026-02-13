@@ -3,7 +3,18 @@ import { resolve } from "path";
 import { randomUUID } from "crypto";
 
 /** Allowed agent IDs to prevent arbitrary execution */
-const ALLOWED_AGENTS = new Set(["main", "akua", "akua_web", "basedintern", "basedintern_web"]);
+const ALLOWED_AGENTS = new Set([
+  "main",
+  "operator",
+  "briefing",
+  "oracle",
+  "alchemist",
+  "web3dev",
+  "akua",
+  "akua_web",
+  "basedintern",
+  "basedintern_web",
+]);
 
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
 const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "180", 10);

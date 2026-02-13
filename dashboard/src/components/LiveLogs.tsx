@@ -26,6 +26,7 @@ import {
   Search,
   Filter,
 } from "lucide-react";
+import { cleanAgentOutput } from "@/lib/utils";
 
 interface LogEntry {
   id: string;
@@ -77,7 +78,7 @@ export function LiveLogs() {
           timestamp: r.created_at,
           agent: r.agent || "unknown",
           level: r.error ? "error" : "info",
-          message: r.output?.slice(0, 500) || "No output",
+          message: cleanAgentOutput(r.output?.slice(0, 500) || "No output"),
           metadata: { session_id: r.session_id },
         }));
         setLogs(initialLogs.reverse());
@@ -105,7 +106,7 @@ export function LiveLogs() {
             timestamp: payload.new.created_at,
             agent: payload.new.agent || "unknown",
             level: payload.new.error ? "error" : "info",
-            message: payload.new.output?.slice(0, 500) || "No output",
+            message: cleanAgentOutput(payload.new.output?.slice(0, 500) || "No output"),
             metadata: { session_id: payload.new.session_id },
           };
           setLogs((prev) => [...prev.slice(-999), newLog]);

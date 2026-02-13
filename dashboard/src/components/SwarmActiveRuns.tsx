@@ -12,6 +12,7 @@ import {
   Activity,
 } from "lucide-react";
 import type { SwarmRun, SwarmTask, SwarmMode } from "@/lib/types";
+import { cleanAgentOutput } from "@/lib/utils";
 
 const modeIcons: Record<SwarmMode, React.ReactNode> = {
   parallel: <Zap className="h-3.5 w-3.5" />,
@@ -392,7 +393,7 @@ const TaskRow = React.memo(function TaskRow({
             className="p-3 rounded text-[10px] font-mono leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap"
             style={{ background: "#05080f", color: "#4a6a8a", border: "1px solid #00f0ff08" }}
           >
-            {task.output || (task.status === "running" ? "Waiting for output..." : "(no output)")}
+            {cleanAgentOutput(task.output || "") || (task.status === "running" ? "Waiting for output..." : "(no output)")}
           </pre>
           {task.exit_code !== null && task.exit_code !== undefined && (
             <div className="mt-1 text-[8px] font-mono" style={{ color: "#4a6a8a" }}>

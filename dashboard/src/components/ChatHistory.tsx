@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   X,
 } from "lucide-react";
+import { cleanAgentOutput } from "@/lib/utils";
 
 // ── Types ──
 
@@ -287,7 +288,7 @@ export function ChatHistory({
                           className="text-[9px] font-mono mt-0.5 truncate"
                           style={{ color: "#4a6a8a88" }}
                         >
-                          {truncate(entry.response, 80)}
+                          {truncate(cleanAgentOutput(entry.response), 80)}
                         </p>
                       )}
                     </div>
