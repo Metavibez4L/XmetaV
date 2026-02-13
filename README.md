@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
+Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v15
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,7 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  11 (main + fleet + intel + dev)    |
+ |   agents:  10 (main + sentinel + intel + dev)  |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
@@ -40,8 +40,9 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
+- **Agent Memory** — Main agent retains conversation context via persistent daily sessions with lock-contention fallback
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
-- Multi-agent management (11 agents: main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
+- Multi-agent management (10 agents: main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -151,7 +152,8 @@ XmetaV/
         |-- briefing.md       # briefing (context curator) runbook
         |-- oracle.md         # oracle (on-chain intel) runbook
         |-- alchemist.md      # alchemist (tokenomics) runbook
-        +-- web3dev.md        # web3dev (blockchain dev) runbook
+        |-- web3dev.md        # web3dev (blockchain dev) runbook
+        |-- sentinel.md      # sentinel (fleet ops) runbook
 ```
 
 ---
@@ -398,6 +400,20 @@ Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Stati
 
 See [docs/agents/web3dev.md](docs/agents/web3dev.md) for full documentation.
 
+### Agent: `sentinel` (fleet lifecycle)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Agent lifecycle manager — spawn coordination, fleet health |
+| **Workspace** | `/home/manifest/sentinel` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Spawn coordinators, resource managers, inter-agent communication, fleet health monitoring |
+
+Manages agent lifecycles and fleet health. Coordinates agent spawning, monitors resource usage, handles inter-agent communication routing, and maintains fleet health dashboards. Commands: `status`, `health`, `spawn`, `queue`, `errors`.
+
+See [docs/agents/sentinel.md](docs/agents/sentinel.md) for full documentation.
+
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
 | Property | `basedintern` | `basedintern_web` |
@@ -592,10 +608,10 @@ flowchart TB
             end
         end
 
-        subgraph FLEET["Agent Fleet (11)"]
+        subgraph FLEET["Agent Fleet (10+)"]
             direction LR
             F_MAIN["main\n(orch.)"]
-            F_INTEL["briefing\noracle\nalchemist"]
+            F_INTEL["sentinel\nbriefing\noracle\nalchemist"]
             F_DEV["web3dev\nakua (+web)\nbasedintern (+web)"]
             F_DYN["dynamic\nagents"]
         end
@@ -773,6 +789,16 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-13 (v15) — Sentinel Agent + Agent Memory + Identity System + Noise Filter
+- **Sentinel Agent** — New fleet lifecycle manager (`sentinel`): spawn coordination, resource management, inter-agent communication, fleet health monitoring. Room: COMMAND. Color: Red (`#ef4444`). Commands: `status`, `health`, `spawn`, `queue`, `errors`
+- **Agent Identity System** — Created `IDENTITY.md` + `SOUL.md` for all sub-agents (web3dev, oracle, briefing, alchemist, sentinel). Agents now have full self-awareness: who they are, what commands they have, their team, operating principles, and communication style
+- **Main Agent Memory** — Persistent daily session (`dash_main_YYYYMMDD`) gives main conversation context across commands within a day. Falls back to unique session ID when lock is held (concurrent commands don't deadlock)
+- **Noise Filter v3** — Added `[diagnostic]`, `[heartbeat]`, `[bridge]`, `[swarm]`, `[intent-tracker]`, `[voice/...]`, and session-lock errors to output filter. Agent responses now show only actual content
+- **Voice STT Overhaul** — Chrome's built-in Web Speech API (`SpeechRecognition`) as default STT, bypassing WSL2 audio degradation. Whisper-1 fallback with `language: "en"`. Removed prompt/temperature that caused hallucination loops
+- **Operator Cleanup** — Removed `operator` from agent tables, spawn list, and ERC-8004 registration (operator is the human user, not an agent)
+- **Web3 Lab** — Dedicated cubicle for web3dev with orange floor tint and glass partitions (cols 7-9, rows 2-5)
+- **Fleet Count** — 10 autonomous agents (main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web) + dynamic
 
 ### 2026-02-13 (v14) — Fleet Expansion + Office Reorganization + Specialist Agents
 - **4 New Specialist Agents** — `oracle` (on-chain intel), `alchemist` (tokenomics), `web3dev` (blockchain dev), `briefing` (context curator) — each with dedicated skills, cron runners, identities, and arena presence

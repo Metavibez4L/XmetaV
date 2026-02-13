@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-13  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v14 (Fleet Expansion + Office Reorganization + Specialist Agents)
+**XmetaV Version:** v15 (Sentinel + Agent Memory + Identity System)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -45,6 +45,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | Agent | Model | Workspace | Tools | Role |
 |-------|-------|-----------|-------|------|
 | `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
+| `sentinel` | `kimi-k2.5:cloud` | `/home/manifest/sentinel` | coding | **Fleet Ops** — lifecycle, spawn coordination, health |
 | `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
 | `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
@@ -59,6 +60,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 
 Detailed agent runbooks:
 - `docs/agents/main.md`
+- `docs/agents/sentinel.md`
 - `docs/agents/briefing.md`
 - `docs/agents/oracle.md`
 - `docs/agents/alchemist.md`
@@ -561,6 +563,86 @@ Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unre
 - Chairs: brighter colors with edge glow
 - Ghost silhouettes: increased alpha for idle (0.35) and busy (0.5) states
 - Meeting mode: brighter glow and silhouette when seated
+
+---
+
+## Sentinel Agent (v15)
+
+Fleet lifecycle manager providing spawn coordination, resource management, and inter-agent communication.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| IDENTITY.md | Active | `~/.openclaw/agents/sentinel/agent/IDENTITY.md` |
+| SOUL.md | Active | `~/.openclaw/agents/sentinel/agent/SOUL.md` |
+| models.json | Active | kimi-k2.5:cloud (256k context) |
+| Arena Presence | Active | Room: COMMAND, Color: Red (#ef4444) |
+| Bridge | Active | Listed in ALLOWED_AGENTS |
+| Supabase | Active | Registered in agent_controls |
+
+Commands: `status`, `health`, `spawn`, `queue`, `errors`
+
+---
+
+## Agent Identity System (v15)
+
+All sub-agents now have proper IDENTITY.md and SOUL.md files defining their self-awareness.
+
+| Agent | IDENTITY.md | SOUL.md | Status |
+|-------|-------------|---------|--------|
+| main | `~/.openclaw/workspace/IDENTITY.md` | `~/.openclaw/workspace/SOUL.md` | Active |
+| sentinel | `~/.openclaw/agents/sentinel/agent/` | Same | Active |
+| briefing | `~/.openclaw/agents/briefing/agent/` | Same | Active |
+| oracle | `~/.openclaw/agents/oracle/agent/` | Same | Active |
+| alchemist | `~/.openclaw/agents/alchemist/agent/` | Same | Active |
+| web3dev | `~/.openclaw/agents/web3dev/agent/` | Same | Active |
+
+Each agent's identity includes: purpose, commands, data sources, team awareness, operating principles, communication style, and arena info.
+
+---
+
+## Agent Session Persistence (v15)
+
+Main agent uses a persistent daily session for conversation context.
+
+| Feature | Value |
+|---------|-------|
+| Session ID format | `dash_main_YYYYMMDD` |
+| Scope | Per-day (resets at midnight) |
+| Lock fallback | Unique ID when persistent session is locked |
+| Other agents | Always use unique session IDs |
+
+**How it works:** When main is invoked, the bridge checks if the daily session lock file exists. If unlocked, main reuses the same session, preserving full conversation history within the day. If locked (concurrent command), it falls back to a unique session ID so the command isn't blocked.
+
+---
+
+## Output Noise Filter (v15)
+
+Expanded to catch all bridge/diagnostic noise in agent responses.
+
+| Pattern | Description |
+|---------|-------------|
+| `[diagnostic]` | Lane task errors from OpenClaw runtime |
+| `[heartbeat]` | Bridge heartbeat messages |
+| `[bridge]` | Bridge daemon internals |
+| `[swarm]` | Swarm executor messages |
+| `[intent-tracker]` | Intent tracking messages |
+| `[voice/...]` | Voice transcription debug |
+| `session file locked` | Session lock timeout errors |
+
+Located in: `dashboard/src/lib/utils.ts` → `cleanAgentOutput()`
+
+---
+
+## Voice STT Changes (v15)
+
+| Change | Before | After |
+|--------|--------|-------|
+| Default STT | `gpt-4o-transcribe` | Browser `SpeechRecognition` |
+| Fallback | — | `whisper-1` with `language: "en"` |
+| Prompt | Full example sentences | Removed entirely |
+| Temperature | `0` | Removed |
+
+Browser SpeechRecognition bypasses WSL2 audio degradation by processing audio directly in Chrome, avoiding WebM encoding and network roundtrip.
 
 ---
 

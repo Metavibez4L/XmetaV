@@ -72,6 +72,7 @@ The bridge daemon will:
 - Orchestrate swarm tasks (parallel, pipeline, collaborative)
 - Stream output back to the dashboard in real-time
 - Enforce agent enable/disable controls
+- Use persistent daily sessions for main agent (with lock-contention fallback)
 - Send periodic heartbeats
 
 ### 6. Deploy to Vercel
@@ -253,7 +254,7 @@ dashboard/
       heartbeat.ts              # Periodic bridge heartbeat
     lib/
       supabase.ts               # Supabase client for bridge
-      openclaw.ts               # OpenClaw CLI wrapper (spawn child processes)
+      openclaw.ts               # OpenClaw CLI wrapper (spawn, persistent sessions, lock fallback)
       x402-client.ts            # x402 fetch wrapper (auto-pays 402 responses)
     .gitignore                  # Ignores bridge PID file
   scripts/
@@ -346,6 +347,7 @@ No React re-renders for animations -- the hook calls PixiJS methods directly via
 |-------|-------|------|
 | Main | Cyan `#00f0ff` | COMMAND |
 | Operator | Amber `#f59e0b` | COMMAND |
+| Sentinel | Red `#ef4444` | COMMAND |
 | Briefing | Sky `#38bdf8` | INTEL |
 | Oracle | Gold `#fbbf24` | INTEL |
 | Alchemist | Fuchsia `#e879f9` | INTEL |
@@ -402,3 +404,6 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | MetaMask error on Payments/Identity | Safe to ignore -- app uses server-side wallets; error handling shows retry UI |
 | New agent not in arena | Add to `agents.ts` (ARENA_AGENTS, MEETING_SEATS, ARENA_CONNECTIONS), `office.ts` (workstationAgents), `types.ts` (KNOWN_AGENTS), and Supabase `agent_controls` |
 | Intel room agents overlapping | Check tile positions in `agents.ts` — INTEL room uses cols 0–4, rows 6–9 |
+| Verbose debug text in responses | Check `cleanAgentOutput()` in `src/lib/utils.ts` covers the pattern; add new regex to NOISE_PATTERNS |
+| Main agent has no memory | Verify bridge uses persistent session (`dash_main_YYYYMMDD`); check `bridge/lib/openclaw.ts` |
+| Session lock errors | Stale lock files: `find ~/.openclaw -name "*.lock" -delete`; bridge auto-falls back to unique session |
