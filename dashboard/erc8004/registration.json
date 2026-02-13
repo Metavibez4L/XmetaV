@@ -49,13 +49,21 @@
     "memory-consolidation",
     "voice-interface",
     "arena-visualization",
-    "selective-meetings"
+    "selective-meetings",
+    "agent-lifecycle-management",
+    "fleet-health-monitoring",
+    "spawn-coordination"
   ],
   "fleet": {
     "agents": [
       {
         "id": "main",
         "role": "Orchestrator & fleet commander",
+        "room": "command"
+      },
+      {
+        "id": "sentinel",
+        "role": "Agent lifecycle manager — spawn coordination, fleet health, inter-agent dispatch",
         "room": "command"
       },
       {
@@ -80,7 +88,7 @@
       }
     ],
     "model": "ollama/kimi-k2.5:cloud",
-    "meetingCapacity": 6,
+    "meetingCapacity": 7,
     "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor"]
   },
   "contracts": {

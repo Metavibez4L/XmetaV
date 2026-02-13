@@ -1,4 +1,4 @@
-export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor";
+export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -35,6 +35,15 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     room: "command",
     tile: { col: 4, row: 1.5 },
     size: 38,
+  },
+  {
+    id: "sentinel",
+    label: "SENTINEL",
+    color: 0xef4444,
+    colorHex: "#ef4444",
+    room: "command",
+    tile: { col: 2.5, row: 1.5 },
+    size: 28,
   },
 
   // ── INTEL ROOM (bottom-left, glass enclosed) ────────────────────
@@ -132,12 +141,15 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "akua_web", angle: 120 },        // bottom-left
   { agentId: "basedintern_web", angle: 60 },  // bottom-right
   { agentId: "web3dev", angle: 0 },           // right center
+  { agentId: "sentinel", angle: 300 },        // upper-right (near operator)
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
 export const ARENA_CONNECTIONS: [string, string][] = [
   // Command room
   ["operator", "main"],
+  ["main", "sentinel"],
+  ["sentinel", "briefing"],
   // Main -> intel agents
   ["main", "briefing"],
   ["main", "oracle"],

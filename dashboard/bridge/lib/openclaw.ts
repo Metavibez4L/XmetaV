@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set([
   "main",
+  "sentinel",
   "briefing",
   "oracle",
   "alchemist",
