@@ -1,4 +1,4 @@
-export type Room = "command" | "meeting" | "intel" | "devFloor";
+export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -66,23 +66,25 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     size: 26,
   },
 
-  // ── DEV FLOOR (bottom-right, open area — no walls) ─────────────
+  // ── WEB3 LAB (private cubicle, right of meeting area) ─────────
   {
     id: "web3dev",
     label: "WEB3DEV",
     color: 0xf97316,
     colorHex: "#f97316",
-    room: "devFloor",
-    tile: { col: 5.5, row: 7 },
+    room: "web3Lab",
+    tile: { col: 8, row: 3.5 },
     size: 30,
   },
+
+  // ── DEV FLOOR (bottom-right, open area — no walls) ─────────────
   {
     id: "akua",
     label: "AKUA",
     color: 0xa855f7,
     colorHex: "#a855f7",
     room: "devFloor",
-    tile: { col: 7.5, row: 7 },
+    tile: { col: 6, row: 7 },
     size: 30,
   },
   {
@@ -91,7 +93,7 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     color: 0xc084fc,
     colorHex: "#c084fc",
     room: "devFloor",
-    tile: { col: 5.5, row: 9 },
+    tile: { col: 6, row: 9 },
     size: 26,
   },
   {
@@ -100,7 +102,7 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     color: 0x39ff14,
     colorHex: "#39ff14",
     room: "devFloor",
-    tile: { col: 9, row: 7 },
+    tile: { col: 8.5, row: 7 },
     size: 30,
   },
   {
@@ -109,7 +111,7 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     color: 0x4ade80,
     colorHex: "#4ade80",
     room: "devFloor",
-    tile: { col: 7.5, row: 9 },
+    tile: { col: 8.5, row: 9 },
     size: 26,
   },
 ];
@@ -143,14 +145,12 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   // Intel internal
   ["oracle", "briefing"],
   ["oracle", "alchemist"],
-  // Main -> dev agents
+  // Main -> web3dev (web3 lab)
+  ["main", "web3dev"],
+  ["web3dev", "alchemist"],
+  // Main -> dev agents (dev floor)
   ["main", "akua"],
   ["main", "basedintern"],
-  // Main -> web3dev
-  ["main", "web3dev"],
-  // Dev pairs
-  ["web3dev", "akua"],
-  ["web3dev", "basedintern"],
   ["akua", "akua_web"],
   ["basedintern", "basedintern_web"],
 ];

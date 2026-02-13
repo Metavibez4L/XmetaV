@@ -58,6 +58,14 @@ export function initBackground(
     }
   }
 
+  // Web3 Lab cubicle (cols 7–9, rows 2–5) — orange-tinted private office
+  for (let c = 7; c <= 9; c++) {
+    for (let r = 2; r <= 5; r++) {
+      drawIsoTile(floor, c, r, 0x0f0d18, 0.8);
+      strokeIsoTile(floor, c, r, 0xf97316, 0.04, 0.5);
+    }
+  }
+
   // Dev floor (cols 5–9, rows 6–9) — standard open floor
   for (let c = 5; c <= 9; c++) {
     for (let r = 6; r <= 9; r++) {
@@ -72,6 +80,7 @@ export function initBackground(
       // Skip already-drawn areas
       if (c >= 2 && c <= 6 && r >= 0 && r <= 2) continue;
       if (c >= 3 && c <= 6 && r >= 3 && r <= 5) continue;
+      if (c >= 7 && c <= 9 && r >= 2 && r <= 5) continue;  // Web3 Lab
       if (c >= 0 && c <= 4 && r >= 6 && r <= 9) continue;
       if (c >= 5 && c <= 9 && r >= 6 && r <= 9) continue;
       drawIsoTile(floor, c, r, 0x080d18, 0.7);
@@ -106,6 +115,17 @@ export function initBackground(
   drawIsoWall(walls, 4.5, 6, 4.5, 10, PART_H, 0x0c1425, 0x38bdf8, 0.08);
   // Front wall (row 10, cols 0–4.5) — lower glass
   drawIsoWall(walls, 0, 10, 4.5, 10, PART_H * 0.6, 0x0c1425, 0x38bdf8, 0.06);
+
+  // ── Web3 Lab cubicle (private office, right side) ─────────────
+  // Back wall (row 2, cols 7–10)
+  drawIsoWall(walls, 7, 2, 10, 2, PART_H, 0x0c1425, 0xf97316, 0.10);
+  // Left wall (col 7, rows 2–5.5) — glass partition
+  drawIsoWall(walls, 7, 2, 7, 5.5, PART_H, 0x0c1425, 0xf97316, 0.08);
+  // Right wall (col 10, rows 2–5.5)
+  drawIsoWall(walls, 10, 2, 10, 5.5, PART_H, 0x0c1425, 0xf97316, 0.06);
+  // Front wall (row 5.5, cols 7–10) — lower glass with gap for entry
+  drawIsoWall(walls, 7, 5.5, 8, 5.5, PART_H * 0.6, 0x0c1425, 0xf97316, 0.06);
+  drawIsoWall(walls, 9, 5.5, 10, 5.5, PART_H * 0.6, 0x0c1425, 0xf97316, 0.06);
 
   scene.addChild(walls);
 
@@ -146,6 +166,17 @@ export function initBackground(
   intelLabel.position.set(intelPos.x, intelPos.y - 10);
   intelLabel.alpha = 0.25;
   scene.addChild(intelLabel);
+
+  // WEB3 LAB label (private cubicle, right side)
+  const labLabel = new Text({
+    text: "WEB3 LAB",
+    style: { ...labelStyle, fill: "#f97316" },
+  });
+  const labPos = toScreen(8.5, 2.3);
+  labLabel.anchor.set(0.5, 0.5);
+  labLabel.position.set(labPos.x, labPos.y - 10);
+  labLabel.alpha = 0.25;
+  scene.addChild(labLabel);
 
   // DEV FLOOR label (open area, right side)
   const devLabel = new Text({
