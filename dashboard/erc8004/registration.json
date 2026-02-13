@@ -59,11 +59,6 @@
         "room": "command"
       },
       {
-        "id": "operator",
-        "role": "System overseer & fleet control relay",
-        "room": "command"
-      },
-      {
         "id": "briefing",
         "role": "Context curator — SITREP & memory consolidation",
         "room": "intel"
@@ -81,12 +76,12 @@
       {
         "id": "web3dev",
         "role": "Blockchain developer — Solidity, Hardhat, Base deployments",
-        "room": "devFloor"
+        "room": "web3Lab"
       }
     ],
     "model": "ollama/kimi-k2.5:cloud",
-    "meetingCapacity": 7,
-    "rooms": ["command", "meeting", "intel", "devFloor"]
+    "meetingCapacity": 6,
+    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor"]
   },
   "contracts": {
     "token": {
