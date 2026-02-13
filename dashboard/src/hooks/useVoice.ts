@@ -2,6 +2,46 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
+// ── Web Speech API types (Chrome) ──
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: Event & { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
+
 // ── Types ──
 
 export interface VoiceSettings {
@@ -59,7 +99,7 @@ const SILENCE_DURATION_MS = 2_000; // 2s of silence → auto-stop (continuous mo
 const DEFAULT_SETTINGS: VoiceSettings = {
   voice: "nova",
   model: "tts-1",
-  sttModel: "gpt-4o-transcribe",
+  sttModel: "browser",
   speed: 1.0,
   autoSpeak: true,
   pushToTalk: false,
@@ -67,10 +107,30 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   continuous: false,
 };
 
+/** Check if the browser supports the Web Speech API */
+function hasBrowserSTT(): boolean {
+  return typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
 function loadSettings(): VoiceSettings {
   try {
     const raw = localStorage.getItem(VOICE_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const stored = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      // Migration: force browser STT as default — OpenAI models don't work
+      // well with WSL2 audio quality
+      if (stored.sttModel !== "browser" && stored.sttModel !== "whisper-1" &&
+          stored.sttModel !== "gpt-4o-transcribe" && stored.sttModel !== "gpt-4o-mini-transcribe") {
+        stored.sttModel = "browser";
+      }
+      // If previously set to an OpenAI model, migrate to browser
+      if (stored.sttModel !== "browser") {
+        stored.sttModel = "browser";
+        localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(stored));
+      }
+      return stored;
+    }
   } catch {
     // ignore
   }
@@ -110,6 +170,8 @@ export function useVoice(): UseVoiceReturn {
   const silenceRafRef = useRef<number | null>(null);
   const mediaSourceConnectedRef = useRef<Set<HTMLAudioElement>>(new Set());
   const settingsRef = useRef<VoiceSettings>(DEFAULT_SETTINGS);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const browserTranscriptRef = useRef<string>("");
 
   // Load persisted preferences on mount
   useEffect(() => {
@@ -232,6 +294,10 @@ export function useVoice(): UseVoiceReturn {
   // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -254,14 +320,15 @@ export function useVoice(): UseVoiceReturn {
     setError(null);
     setTranscript(null);
 
+    const useBrowser = settingsRef.current.sttModel === "browser" && hasBrowserSTT();
+
     try {
+      // Always get mic stream for waveform visualization
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 48000,       // higher sample rate for better fidelity
-          channelCount: 1,          // mono — cleaner for speech
         },
       });
       streamRef.current = stream;
@@ -270,44 +337,95 @@ export function useVoice(): UseVoiceReturn {
       const ctx = getAudioContext();
       const micSource = ctx.createMediaStreamSource(stream);
       sourceRef.current = micSource;
-      const analyser = setupAnalyser(micSource);
+      setupAnalyser(micSource);
 
-      // Start silence detection in continuous mode
-      if (settings.continuous) {
-        startSilenceDetection(() => {
-          // Auto-stop after silence
+      if (useBrowser) {
+        // ── Browser Speech Recognition (Chrome) ──
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) throw new Error("Speech recognition not supported");
+
+        const recognition = new SpeechRec();
+        recognition.lang = "en-US";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        browserTranscriptRef.current = "";
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let final = "";
+          let interim = "";
+          for (let i = 0; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              final += result[0].transcript;
+            } else {
+              interim += result[0].transcript;
+            }
+          }
+          browserTranscriptRef.current = final || interim;
+          // Show interim results in real-time
+          setTranscript(browserTranscriptRef.current);
+        };
+
+        recognition.onerror = (event) => {
+          // "no-speech" is not a real error — user just didn't speak yet
+          if (event.error !== "no-speech" && event.error !== "aborted") {
+            console.error("[useVoice] browser STT error:", event.error);
+            setError(`Speech recognition: ${event.error}`);
+          }
+        };
+
+        recognition.onend = () => {
+          // Browser STT can auto-stop; we handle this in stopListening
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsListening(true);
+
+        // Auto-stop after max duration
+        timeoutRef.current = setTimeout(() => {
+          if (recognitionRef.current) {
+            recognitionRef.current.stop();
+          }
+        }, MAX_RECORDING_MS);
+      } else {
+        // ── MediaRecorder + OpenAI API fallback ──
+        if (settings.continuous) {
+          startSilenceDetection(() => {
+            if (mediaRecorderRef.current?.state === "recording") {
+              mediaRecorderRef.current.stop();
+            }
+          });
+        }
+
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm";
+
+        const recorder = new MediaRecorder(stream, {
+          mimeType,
+          audioBitsPerSecond: 128_000,
+        });
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.start(250);
+        setIsListening(true);
+
+        timeoutRef.current = setTimeout(() => {
           if (mediaRecorderRef.current?.state === "recording") {
             mediaRecorderRef.current.stop();
           }
-        });
+        }, MAX_RECORDING_MS);
       }
-
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 128_000, // 128kbps for clear speech
-      });
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.start(250); // 250ms chunks — less fragmentation, better quality
-      setIsListening(true);
-
-      // Auto-stop after max duration
-      timeoutRef.current = setTimeout(() => {
-        if (mediaRecorderRef.current?.state === "recording") {
-          mediaRecorderRef.current.stop();
-        }
-      }, MAX_RECORDING_MS);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Microphone access denied";
@@ -324,6 +442,30 @@ export function useVoice(): UseVoiceReturn {
     }
     stopSilenceDetection();
 
+    // ── Browser Speech Recognition path ──
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+      cleanupAnalyser();
+
+      // Stop mic tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+
+      const text = browserTranscriptRef.current.trim();
+      browserTranscriptRef.current = "";
+      if (!text) {
+        setError("No speech detected");
+        return null;
+      }
+      setTranscript(text);
+      return text;
+    }
+
+    // ── MediaRecorder + OpenAI API path ──
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state !== "recording") {
@@ -347,18 +489,17 @@ export function useVoice(): UseVoiceReturn {
         audioChunksRef.current = [];
 
         if (blob.size < 1000) {
-          // Too short — probably silence
           setError("Recording too short");
           resolve(null);
           return;
         }
 
-        // Transcribe
+        // Transcribe via OpenAI API
         setIsTranscribing(true);
         try {
           const formData = new FormData();
           formData.append("audio", blob, "recording.webm");
-          formData.append("sttModel", settingsRef.current.sttModel || "gpt-4o-transcribe");
+          formData.append("sttModel", settingsRef.current.sttModel || "whisper-1");
 
           const res = await fetch("/api/voice/transcribe", {
             method: "POST",

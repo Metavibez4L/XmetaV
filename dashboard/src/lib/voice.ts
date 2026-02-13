@@ -28,21 +28,12 @@ export const VALID_VOICES: VoiceName[] = [
 export type TTSModel = "tts-1" | "tts-1-hd";
 
 export const DEFAULT_VOICE: VoiceName = "nova";
-export const DEFAULT_STT_MODEL = "gpt-4o-transcribe";
+export const DEFAULT_STT_MODEL = "whisper-1";
 export const DEFAULT_TTS_MODEL: TTSModel = "tts-1"; // fast by default; "tts-1-hd" for quality
 
-// Domain-specific vocabulary to improve transcription accuracy.
-// IMPORTANT: Only list proper nouns and technical terms — NOT full sentences.
-// Full sentences cause the model to hallucinate those exact phrases.
-const STT_PROMPT = [
-  "XmetaV, XMETAV, $XMETAV,",
-  "sentinel, briefing, oracle, alchemist, web3dev,",
-  "akua, basedintern, BasedIntern, Akua,",
-  "Solidity, Hardhat, Supabase, OpenClaw,",
-  "ERC-20, ERC-721, ERC-8004, x402,",
-  "SITREP, tokenomics, DeFi, DEX, gwei, ETH, USDC, cbETH,",
-  "CoinGecko, Etherscan, BaseScan, DeFiLlama,",
-].join(" ");
+// NOTE: STT prompt removed — it causes hallucination loops on noisy audio.
+// Whisper repeats the prompt vocabulary endlessly when it can't hear clearly.
+// gpt-4o-transcribe misdetects language entirely on WSL2 audio quality.
 
 // ── Speech-to-Text (Whisper) ──
 
@@ -65,9 +56,7 @@ export async function transcribeAudio(
   const response = await openai.audio.transcriptions.create({
     model,
     file,
-    prompt: STT_PROMPT,
-    // temperature: only set for whisper (gpt-4o-transcribe doesn't support it)
-    ...(isWhisper ? { language: "en", temperature: 0 } : {}),
+    ...(isWhisper ? { language: "en" } : {}),
   });
 
   return response.text;

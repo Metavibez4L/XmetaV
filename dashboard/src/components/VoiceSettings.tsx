@@ -140,24 +140,24 @@ export function VoiceSettingsPanel({
 
             {/* STT Model */}
             <SettingsSection icon={Mic} label="Transcription">
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 flex-wrap">
                 <ModelButton
-                  active={settings.sttModel === "gpt-4o-transcribe"}
-                  onClick={() => onUpdate({ sttModel: "gpt-4o-transcribe" })}
-                  label="Accurate"
-                  sub="gpt-4o"
-                />
-                <ModelButton
-                  active={settings.sttModel === "gpt-4o-mini-transcribe"}
-                  onClick={() => onUpdate({ sttModel: "gpt-4o-mini-transcribe" })}
-                  label="Fast"
-                  sub="4o-mini"
+                  active={settings.sttModel === "browser"}
+                  onClick={() => onUpdate({ sttModel: "browser" })}
+                  label="Browser"
+                  sub="Chrome STT"
                 />
                 <ModelButton
                   active={settings.sttModel === "whisper-1"}
                   onClick={() => onUpdate({ sttModel: "whisper-1" })}
-                  label="Legacy"
-                  sub="whisper"
+                  label="Whisper"
+                  sub="OpenAI"
+                />
+                <ModelButton
+                  active={settings.sttModel === "gpt-4o-transcribe"}
+                  onClick={() => onUpdate({ sttModel: "gpt-4o-transcribe" })}
+                  label="GPT-4o"
+                  sub="OpenAI"
                 />
               </div>
             </SettingsSection>

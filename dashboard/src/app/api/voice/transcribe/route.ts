@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get("audio");
-    const sttModel = (formData.get("sttModel") as string) || "gpt-4o-transcribe";
+    const sttModel = (formData.get("sttModel") as string) || "whisper-1";
 
     if (!audioFile || !(audioFile instanceof Blob)) {
       return NextResponse.json(
