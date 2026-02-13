@@ -2,35 +2,148 @@
 
 ## Purpose
 
-`main` is the **orchestrator and primary command-center agent** for this machine. Use it for:
+`main` is the **orchestrator and fleet commander** of the XmetaV multi-agent command center. Registered on-chain as **ERC-8004 Agent #16905** on Base Mainnet.
 
-- **Agent Factory** — creating new agents, scaffolding apps, creating GitHub repos, managing the fleet
+- **Fleet Commander** — delegates to 4 core specialist agents, coordinates multi-agent operations
+- **Agent Factory** — creating new agents, scaffolding apps, creating GitHub repos
 - **Swarm** — multi-agent orchestration (parallel, pipeline, collaborative)
 - OpenClaw configuration and operations (gateway, models, tools)
 - Local system automation via tools (`exec`, `read`, `write`, `process`)
 - "Glue" tasks: quick diagnostics, log inspection, scripted fixes, doc updates
-- Delegating specialized work to purpose-built agents
 
 ```mermaid
 flowchart LR
-    MAIN["main\n(orchestrator)"]
+    MAIN["main\n(fleet commander)"]
 
+    MAIN --> CORE["Core Agents"]
     MAIN --> FAC["Agent Factory\ncreate · build · manage"]
     MAIN --> SWM["Swarm Engine\nparallel · pipeline · collab"]
     MAIN --> SYS["System Ops\nexec · read · write"]
 
-    FAC --> FLEET["Agent Fleet"]
-    FAC -.->|--github| GH["GitHub"]
-    SWM --> FLEET
-    FLEET --> BI["basedintern"] & AK["akua"] & DYN["dynamic agents"]
+    CORE --> BR["briefing\n🧊 context curator"]
+    CORE --> OR["oracle\n🌙 chain intel"]
+    CORE --> AL["alchemist\n⚗️ tokenomics"]
+    CORE --> W3["web3dev\n🔧 blockchain dev"]
 
-    style MAIN fill:#1a1a2e,stroke:#e94560,color:#fff
+    FAC --> REPO["Repo Agents"]
+    SWM --> CORE & REPO
+    REPO --> BI["basedintern"] & AK["akua"]
+
+    style MAIN fill:#1a1a2e,stroke:#00f0ff,color:#fff
+    style CORE fill:#0f3460,stroke:#00f0ff,color:#fff
+    style BR fill:#0a1020,stroke:#38bdf8,color:#fff
+    style OR fill:#0a1020,stroke:#fbbf24,color:#fff
+    style AL fill:#0a1020,stroke:#e879f9,color:#fff
+    style W3 fill:#0a1020,stroke:#f97316,color:#fff
     style FAC fill:#0f3460,stroke:#16c79a,color:#fff
     style SWM fill:#0f3460,stroke:#f7b731,color:#fff
     style SYS fill:#0f3460,stroke:#a29bfe,color:#fff
-    style FLEET fill:#1a1a3e,stroke:#888,color:#fff
-    style GH fill:#161b22,stroke:#58a6ff,color:#fff
+    style REPO fill:#1a1a3e,stroke:#888,color:#fff
 ```
+
+## Core Agents
+
+These are the XmetaV core team — specialists that report directly to main. **Delegate to them first** before doing tasks yourself.
+
+### 🧊 Briefing (`briefing`)
+**Context Curator & Memory Keeper** — Intel Room
+
+Generates situation reports, consolidates memory, tracks system health. Main's "external hard drive."
+
+| Command | What it does |
+|---------|-------------|
+| `briefing sitrep` | Full situation report → SITREP.md |
+| `briefing quick` | Compact summary (stdout only) |
+| `briefing health` | System health check (git, dashboard, ollama, gateway) |
+| `briefing distill` | Consolidate recent activity → MEMORY.md |
+| `briefing commits [hours]` | Recent commits across all repos |
+
+**Use when:** Start of session, end of session, project status checks.
+
+### 🌙 Oracle (`oracle`)
+**On-Chain Intelligence & Market Sentinel** — Intel Room
+
+Monitors gas, prices, chain stats, crypto news. Main's "eyes on the market."
+
+| Command | What it does |
+|---------|-------------|
+| `oracle report` | Full market & chain report → ORACLE.md |
+| `oracle gas` | ETH + Base gas prices |
+| `oracle prices` | ETH, USDC, cbETH with 24h change |
+| `oracle chain` | Base TVL, agent wallet balance, contract links |
+| `oracle news` | Top crypto headlines with relevance tagging |
+| `oracle alerts` | Notable events summary |
+
+**Use when:** Before on-chain decisions, checking market conditions, gas timing.
+
+### ⚗️ Alchemist (`alchemist`)
+**Tokenomics Specialist for $XMETAV** — Intel Room
+
+Analyzes supply, holders, emissions, staking scenarios, liquidity. Main's "tokenomics brain."
+
+| Command | What it does |
+|---------|-------------|
+| `alchemist report` | Full tokenomics report → TOKENOMICS.md |
+| `alchemist supply` | Total/circulating supply, key holdings |
+| `alchemist holders` | Top holders, concentration risk |
+| `alchemist emissions` | 12-month projected supply curve |
+| `alchemist staking` | APY vs stake ratio scenarios |
+| `alchemist liquidity` | DEX links, ETH balance, health checklist |
+| `alchemist health` | Quick token health check |
+
+**Use when:** Token strategy, emission planning, holder analysis, staking design.
+
+### 🔧 Web3Dev (`web3dev`)
+**Blockchain Developer** — Web3 Lab (private cubicle)
+
+Compiles, tests, audits, and scaffolds smart contracts. Main's "blockchain builder."
+
+| Command | What it does |
+|---------|-------------|
+| `web3dev compile [project]` | Hardhat compile (all or specific project) |
+| `web3dev test [project]` | Hardhat test suite |
+| `web3dev audit [project]` | Static security analysis |
+| `web3dev gas [project]` | Contract bytecode size vs EIP-170 limit |
+| `web3dev scaffold <type>` | Generate contract template (erc20, erc721, staking, vesting, escrow) |
+| `web3dev status [project]` | Project health check |
+| `web3dev report` | Full status + audit + gas report → WEB3DEV.md |
+
+**Use when:** Any Solidity work, contract deployment, security review, gas optimization.
+
+## Delegation Patterns
+
+**Don't do what your agents can do.** Before starting a task, ask: does one of my core agents handle this?
+
+| Task | Delegate To |
+|------|------------|
+| "What's the gas situation?" | `oracle gas` |
+| "How's the token doing?" | `alchemist health` |
+| "Audit the contracts" | `web3dev audit all` |
+| "What happened since last session?" | `briefing sitrep` |
+| "Build a staking contract" | `web3dev scaffold staking` |
+| "Model the emission curve" | `alchemist emissions` |
+| "Check market sentiment" | `oracle news` |
+| "Summarize what we did today" | `briefing distill` |
+
+**Multi-agent coordination:**
+
+| Operation | Agents |
+|-----------|--------|
+| Token launch | `alchemist` (economics) + `web3dev` (contracts) + `oracle` (market timing) |
+| Security review | `web3dev audit` + `oracle chain` (on-chain state) |
+| Morning standup | `briefing sitrep` + `oracle report` + `alchemist health` |
+| Treasury planning | `alchemist supply` + `oracle prices` + `web3dev status` |
+
+## Repo Agents (External — Project-Specific)
+
+These agents work on specific repositories. They're part of the fleet but NOT core XmetaV agents. Dispatch for repo-specific work only.
+
+| Agent | Repo | Purpose |
+|-------|------|---------|
+| `akua` | /home/manifest/akua | Autonomous code agent — TypeScript, full-stack |
+| `akua_web` | /home/manifest/akua | Web research & browser automation for akua |
+| `basedintern` | /home/manifest/basedintern | Crypto research & DeFi analysis |
+| `basedintern_web` | /home/manifest/basedintern | Web research & browser automation for basedintern |
 
 ## Identity and workspace
 
