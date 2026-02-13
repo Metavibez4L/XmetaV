@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-12  
+**Last verified:** 2026-02-13  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v11 ($XMETAV Token + Voice Commands + x402 Payments + ERC-8004 Identity)
+**XmetaV Version:** v12 (XMETAV HQ Arena + Streaming Optimization + Agent Skills + $XMETAV Token + Voice + x402 + ERC-8004)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -308,6 +308,8 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 | `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
+| `/arena` | XMETAV HQ | Isometric office visualization with live agent activity (PixiJS) |
+| `/logs` | Live Logs | Real-time log streaming with severity/agent filters and search |
 
 ### Dashboard health checks
 
@@ -423,6 +425,70 @@ npx tsx scripts/voice-cli.ts
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Dashboard `.env.local` | Required for Whisper + TTS |
 | `X402_BUDGET_LIMIT` | (in voice mode) | Must be >= $0.01 for TTS payments |
+
+---
+
+## XMETAV HQ — Isometric Office Arena (v12)
+
+Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Arena Page | Active | `/arena` — standalone fullscreen PixiJS canvas |
+| PixiJS (v8.16.0) | Installed | WebGL 2D rendering with BlurFilter, dynamic loading |
+| Isometric Renderer | Active | `renderer/iso.ts` — 2:1 projection, tile/cube/wall primitives |
+| Office Background | Active | `renderer/background.ts` — floor grid, glass walls, room labels, particles |
+| Office Furniture | Active | `renderer/office.ts` — boss desk, meeting table, projector, 4 workstations |
+| Agent Avatars | Active | `renderer/avatars.ts` — glowing orbs with ghost silhouettes (idle/busy/offline) |
+| Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
+| Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls |
+| HUD Overlay | Active | DOM: title, system status, agent legend, floating labels |
+
+### Office layout
+
+- **Boss Office** (back): Main agent desk with 3 holo screens + Operator orb floating above
+- **Meeting Area** (center): Hexagonal glass table with holographic projector column, 6 chairs
+- **Left Wing**: Akua + Akua_web workstations with reactive holo screens
+- **Right Wing**: Basedintern + Basedintern_web workstations with reactive holo screens
+
+### Visual effects (real-time)
+
+| Effect | Trigger | Description |
+|--------|---------|-------------|
+| Command Pulse | New command | Golden energy travels boss desk → partition → target desk |
+| Streaming Particles | Agent busy | Code-fragment particles rise from desk area |
+| Dispatch Beam | Inter-agent dispatch | Neon beam routed through meeting table center |
+| Completion Burst | Command success | Green ring expands from desk |
+| Failure Glitch | Command failure | Red glitch blocks flicker around desk, screen turns red |
+| Screen Animation | Agent state change | Scrolling code lines (busy), red flicker (fail), dim (offline) |
+
+---
+
+## Streaming Optimization (v12)
+
+End-to-end optimization of the agent chat streaming pipeline for lower latency and smoother rendering.
+
+| Component | Change | Impact |
+|-----------|--------|--------|
+| `streamer.ts` | Chunk size 800→400, flush 500ms→200ms, first flush 50ms | Faster time-to-first-byte |
+| `streamer.ts` | Non-blocking flush guards, chained setTimeout | No lost data under load |
+| `useRealtimeMessages` | Ref-based string accumulator (no array/join) | Eliminates GC pressure |
+| `useRealtimeMessages` | 80ms throttle for batched renders | Smoother streaming UI |
+| `AgentChat.tsx` | StreamingBubble component | Independent render from message history |
+
+---
+
+## Agent Skills (v12)
+
+Three new bash skills installed for the main agent:
+
+| Skill | Location | Description |
+|-------|----------|-------------|
+| `dispatch` | `~/.openclaw/workspace/skills/dispatch/` | Inter-agent communication via Supabase PostgREST |
+| `supabase` | `~/.openclaw/workspace/skills/supabase/` | Direct database access with service role key |
+| `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
+
+Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unrestricted shell access.
 
 ---
 

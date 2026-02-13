@@ -93,6 +93,8 @@ Set the three environment variables in Vercel project settings.
 | `/fleet` | **Fleet** | Agent status table with enable/disable toggles and send-task dialog |
 | `/payments` | **Payments** | x402 wallet status, daily spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** | ERC-8004 on-chain agent identity, reputation, capabilities, and NFT details |
+| `/arena` | **XMETAV HQ** | Isometric office visualization with live agent activity (PixiJS WebGL) |
+| `/logs` | **Live Logs** | Real-time log streaming with severity/agent filters, search, auto-scroll |
 | `/auth/login` | **Login** | Supabase email/password authentication |
 
 ### Swarms Page (Tabs)
@@ -196,6 +198,17 @@ dashboard/
       SystemHealth.tsx          # Bridge health indicator
       PaymentsDashboard.tsx    # x402 payments UI (wallet, history, endpoints)
       AgentIdentity.tsx        # ERC-8004 identity viewer (NFT, reputation, lookup)
+      LiveLogs.tsx             # Real-time log streaming with filters
+      arena/                   # XMETAV HQ isometric office visualization
+        ArenaCanvas.tsx        # Main PixiJS canvas + DOM HUD overlay
+        agents.ts              # Agent config (rooms, tile coords, colors)
+        useArenaEvents.ts      # Supabase Realtime event subscriptions
+        renderer/
+          iso.ts               # Isometric math (toScreen, drawIsoCube, drawIsoWall)
+          background.ts        # Floor tiles, glass walls, room labels, particles
+          office.ts            # Desks, screens, meeting table, projector, chairs
+          avatars.ts           # Glowing orb agents with ghost silhouettes
+          effects.ts           # Command pulses, streaming particles, dispatch beams
     hooks/
       useAgentControls.ts       # Agent enable/disable state
       useAgentSessions.ts       # Agent session listing
@@ -298,6 +311,31 @@ npm install
 npx tsx register.ts   # register or re-register the agent
 ```
 
+## XMETAV HQ (Arena)
+
+The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 6 agents in real-time.
+
+**Office Layout:**
+- **Boss Office** (back): Main agent at large desk with 3 holo screens, Operator orb floating above
+- **Meeting Area** (center): Hexagonal glass table with holographic projector and 6 chairs
+- **Left Wing**: Akua + Akua_web workstations with reactive holo screens
+- **Right Wing**: Basedintern + Basedintern_web workstations with reactive holo screens
+
+**Agent Avatars:** Glowing translucent orbs with ghost silhouettes. States: idle (breathing pulse), busy (spinning ring + particles), offline (static flicker).
+
+**Real-Time Effects:**
+- Command pulses (golden energy) travel office pathways from boss desk to target
+- Streaming particles rise like code fragments from active desks
+- Dispatch beams route through meeting table center with traveling neon dots
+- Completion bursts and failure glitch effects per-agent
+- Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
+
+**Architecture:** `Supabase Realtime → useArenaEvents hook → PixiJS imperative API (refs)`
+
+No React re-renders for animations — the hook calls PixiJS methods directly via refs for maximum performance.
+
+---
+
 ## UI Theme
 
 The dashboard uses a **cyberpunk hacker** aesthetic:
@@ -310,6 +348,7 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 
 ## Frontend Optimizations
 
+- **Streaming pipeline**: Buffered streamer (400-byte chunks, 200ms flush, 50ms first-byte), ref-based accumulator in `useRealtimeMessages` (no array/join GC), 80ms render throttle, dedicated `StreamingBubble` component
 - `React.memo` on all major components (SwarmCreate, SwarmActiveRuns, SwarmHistory, FleetTable, etc.)
 - Memoized sub-components (TemplateCard, TaskEditor, ActiveRunCard, HistoryRunRow, TaskRow)
 - `useCallback` / `useMemo` throughout hooks and components

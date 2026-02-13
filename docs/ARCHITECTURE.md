@@ -119,7 +119,21 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs
+
+### XMETAV HQ — Isometric Office Visualization (PixiJS)
+
+A standalone fullscreen page (`/arena`) rendering an isometric cyberpunk office in real-time using PixiJS (WebGL).
+
+- **Renderer**: PixiJS v8.16.0 with dynamic imports (SSR-safe via `next/dynamic`)
+- **Isometric Engine**: Custom `iso.ts` with 2:1 projection, tile/cube/wall drawing primitives
+- **Office Layout**: Boss office (Main + Operator), meeting area (hex table + projector), 4 agent workstations
+- **Agent Avatars**: Glowing translucent orbs with ghost silhouettes — idle (breathing pulse), busy (spinning ring), offline (static flicker)
+- **Reactive Furniture**: Holo screens on every desk animate based on agent state (scrolling code, red flicker, dim)
+- **Real-Time Effects**: Command pulses travel office pathways, streaming particles rise from desks, dispatch beams route through meeting table, completion bursts, failure glitches
+- **Data Source**: `useArenaEvents` hook subscribes to Supabase Realtime channels (sessions, commands, responses, controls) and drives PixiJS imperatively via refs
+- **HUD**: DOM overlay with title, system status, agent legend, and floating labels computed from isometric coordinates
+- **Location**: `dashboard/src/components/arena/` (ArenaCanvas, agents, useArenaEvents, renderer/)
 
 ### Supabase (Message Bus + Database)
 

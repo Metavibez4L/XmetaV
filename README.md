@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v11
+Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v12
 
 ```
  ___   ___                    __           ___   ___
@@ -31,6 +31,8 @@ Last updated: **2026-02-12** | OpenClaw 2026.2.1 | XmetaV Command Center v11
 ## Features
 
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
+- **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events
+- **Live Log Streaming** — Real-time log viewer with severity filters, agent filters, search, and auto-scroll
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
@@ -78,9 +80,11 @@ XmetaV/
 |   |-- src/
 |   |   |-- app/
 |   |   |   |-- (dashboard)/  # Protected routes (Command Center, Agent Chat, Swarms, Fleet)
+|   |   |   |-- arena/        # XMETAV HQ isometric office visualization (standalone)
 |   |   |   |-- auth/         # Login page
 |   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
 |   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, etc.
+|   |   |   +-- arena/        # PixiJS renderers (iso, background, office, avatars, effects)
 |   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms)
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
@@ -401,6 +405,8 @@ cd dashboard/bridge && npm install && npm start
 | `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
 | `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
+| `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
+| `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
@@ -668,6 +674,34 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
+### 2026-02-13 (v12) — XMETAV HQ Arena + Streaming Optimization + Agent Skills
+- **XMETAV HQ Isometric Office** — Full isometric office visualization at `/arena` rendered with PixiJS:
+  - Boss office with Main + Operator, meeting area with hexagonal table + holographic projector, 4 agent workstations
+  - Glowing orb avatars with ghost silhouettes — idle (breathing pulse), busy (spinning ring + particles), offline (static flicker)
+  - Operator orb floats above Main's desk with bobbing animation
+  - Reactive holo screens on every desk: scrolling code lines when busy, red flicker on failure, dim when offline
+  - Real-time command pulses (golden energy) travel through office pathways from boss desk to target workstation
+  - Dispatch beams route through meeting table center with traveling neon dots
+  - Streaming particles rise like code fragments from active desks
+  - Completion bursts (green ring) and failure glitch effects (red blocks) per-agent
+  - Isometric math utilities (`iso.ts`) with 2:1 projection, tile/cube/wall drawing primitives
+  - Glass partition walls with neon cyan edges separating boss office, meeting area, and work wings
+  - Ambient floating particles + scanline sweep for cyberpunk atmosphere
+  - DOM HUD overlay: title, system status (online/active counts), agent legend, floating labels
+  - All driven by live Supabase Realtime events (sessions, commands, responses, controls)
+- **Streaming Response Optimization** — Reduced time-to-first-byte and smoother rendering:
+  - Streamer: chunk size 800→400, flush interval 500ms→200ms, first flush at 50ms, non-blocking flush guards
+  - useRealtimeMessages: ref-based string accumulator (eliminates array/string recreation), 80ms throttle for batched renders
+  - AgentChat: new StreamingBubble component renders live responses independently from message history
+- **Live Log Streaming** — New `/logs` page with real-time Supabase log subscription, severity filters, agent filters, search, and auto-scroll
+- **Agent Skills (main agent)** — Three new bash skills for the main agent:
+  - `dispatch` — Inter-agent communication via Supabase PostgREST
+  - `supabase` — Direct database access with service role key
+  - `web` — HTTP operations with HTML stripping
+- **Agent Tooling** — Full `exec` access for main agent (11 allowlist entries), `tools.profile` set to "full"
+- Updated TOOLS.md with XmetaV project context and skill documentation
+- Sidebar simplified with `/arena` and `/logs` navigation items
+
 ### 2026-02-12 (v11) — $XMETAV Token
 - **ERC-20 Token on Base Mainnet** — `$XMETAV` (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with 1B fixed supply
 - **Tier Discount System** — Hold XMETAV for 10–50% off x402 endpoints (Bronze → Diamond)
@@ -799,5 +833,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
 </p>
