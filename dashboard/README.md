@@ -88,12 +88,13 @@ Set the three environment variables in Vercel project settings.
 | Route | Page | Description |
 |-------|------|-------------|
 | `/` | **Command Center** | Bridge health indicator, fleet summary, recent command history, quick command input |
-| `/agent` | **Agent Chat** | Full-screen streaming chat with agent selector dropdown |
+| `/agent` | **Agent Chat** | Full-screen streaming chat with agent selector, voice commands, chat history sidebar |
 | `/swarms` | **Swarms** | Create, monitor, and review multi-agent swarm runs (3 tabs) |
 | `/fleet` | **Fleet** | Agent status table with enable/disable toggles and send-task dialog |
 | `/payments` | **Payments** | x402 wallet status, daily spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** | ERC-8004 on-chain agent identity, reputation, capabilities, and NFT details |
-| `/arena` | **XMETAV HQ** | Isometric office visualization with live agent activity (PixiJS WebGL) |
+| `/token` | **$XMETAV** | ERC-20 token balance, tier status, discount table, holder benefits |
+| `/arena` | **XMETAV HQ** | Isometric office visualization with meeting sync, live agent activity (PixiJS WebGL) |
 | `/logs` | **Live Logs** | Real-time log streaming with severity/agent filters, search, auto-scroll |
 | `/auth/login` | **Login** | Supabase email/password authentication |
 
@@ -142,8 +143,8 @@ All tables have:
 | `/api/x402/wallet` | GET | Wallet info, spend stats, bridge status |
 | `/api/erc8004/identity` | GET | On-chain agent identity and metadata |
 | `/api/intent` | POST | Intent resolution (agent routing) |
-| `/api/voice/transcribe` | POST | Speech-to-text via Whisper (multipart audio) |
-| `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (returns audio/mpeg) |
+| `/api/voice/transcribe` | POST | Speech-to-text via OpenAI Whisper (multipart audio) |
+| `/api/voice/synthesize` | POST | Text-to-speech via OpenAI TTS (streaming audio/mpeg) |
 | `/api/token` | GET | $XMETAV token info, balance, tier (query `?wallet=0x...`) |
 
 ## Project Structure
@@ -159,6 +160,7 @@ dashboard/
         fleet/page.tsx          # Agent Fleet
         payments/page.tsx       # x402 Payments dashboard
         identity/page.tsx       # ERC-8004 Agent Identity
+        token/page.tsx          # $XMETAV Token dashboard
         layout.tsx              # Dashboard layout with Sidebar
       auth/login/page.tsx       # Login page
       api/
@@ -184,8 +186,9 @@ dashboard/
       layout.tsx                # Root layout
     components/
       ui/                       # shadcn/ui primitives (button, input, card)
-      AgentChat.tsx             # Streaming chat interface
+      AgentChat.tsx             # Streaming chat interface with voice + StreamingBubble
       AgentSelector.tsx         # Agent dropdown selector
+      ChatHistory.tsx           # Chat history sidebar (slides from right)
       BridgeControls.tsx        # Bridge start/stop/status controls
       CommandHistory.tsx        # Recent command table
       ErrorBoundary.tsx         # React error boundary
@@ -214,8 +217,9 @@ dashboard/
       useAgentSessions.ts       # Agent session listing
       useBridgeStatus.ts        # Bridge heartbeat monitoring
       useCommandHistory.ts      # Command history fetching
-      useRealtimeMessages.ts    # Streaming agent responses
+      useRealtimeMessages.ts    # Streaming agent responses (ref-based, sync reset)
       useSwarmRuns.ts           # Swarm runs + tasks (Realtime subscriptions)
+      useVoice.ts               # Voice recording, playback, and TTS
     lib/
       bridge-manager.ts         # Server-side bridge process manager
       supabase-browser.ts       # Browser Supabase client
@@ -330,9 +334,11 @@ The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (
 - Completion bursts and failure glitch effects per-agent
 - Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
 
-**Architecture:** `Supabase Realtime → useArenaEvents hook → PixiJS imperative API (refs)`
+**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table. The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
 
-No React re-renders for animations — the hook calls PixiJS methods directly via refs for maximum performance.
+**Architecture:** `Supabase Realtime + 10s periodic sync -> useArenaEvents hook -> PixiJS imperative API (refs)`
+
+No React re-renders for animations -- the hook calls PixiJS methods directly via refs for maximum performance. Buffered state is replayed after PixiJS async init to handle the race condition between Supabase data arrival and renderer readiness.
 
 ---
 
@@ -375,3 +381,7 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | Identity page empty | Verify `ERC8004_AGENT_ID=16905` in `bridge/.env`; check Base RPC connectivity |
 | x402-server won't start | Check `EVM_ADDRESS` and `FACILITATOR_URL` in `x402-server/.env` |
 | Token tier shows "None" | Verify `XMETAV_TOKEN_ADDRESS` is set in `.env.local`; check wallet holds XMETAV |
+| Arena agents don't move to table | Check browser console for `[arena]` logs; click TEST MEETING button; verify Supabase Realtime is enabled |
+| Voice repeats last response | Clear browser cache; ensure `useRealtimeMessages` sync reset is in place |
+| Chat history behind sidebar | History panel should slide from the right; check `ChatHistory.tsx` uses `right-0` |
+| MetaMask error on Payments/Identity | Safe to ignore -- app uses server-side wallets; error handling shows retry UI |

@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v12
+Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v13
 
 ```
  ___   ___                    __           ___   ___
@@ -31,7 +31,7 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v12
 ## Features
 
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
-- **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events
+- **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table with seat-based agent meetings, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events with periodic sync
 - **Live Log Streaming** — Real-time log viewer with severity filters, agent filters, search, and auto-scroll
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
@@ -673,6 +673,16 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-13 (v13) — Arena Sync + Voice Fix + Wallet Hardening + Chat History
+- **Arena Sync Race Condition Fix** — Replay buffered agent states after PixiJS async init completes; added 10-second periodic sync as safety net for dropped Supabase Realtime events
+- **Meeting Visualization** — Agents move to assigned seats around the hexagonal meeting table when 2+ are busy; holographic projector activates with connection lines and "MEETING IN SESSION" HUD indicator; TEST MEETING button for manual verification
+- **Arena Visual Improvements** — Brighter meeting table with inner glow ring and glass fill, larger projector orb with outer glow, brighter chair edges, increased ghost silhouette alpha for idle/busy states
+- **Voice Response Fix** — Synchronous reset of streaming text on new commands prevents stale/duplicate responses; `lastCompletedTextRef` captures final text before state clears for reliable auto-speak TTS
+- **Chat History Positioning** — History sidebar slides in from the right to avoid overlapping the nav sidebar
+- **Wallet/MetaMask Error Handling** — Graceful degradation when MetaMask is detected but not needed; 10-second RPC timeouts on all wallet API routes; retry UI with clear "MetaMask not required" messaging
+- **Dispatch Skill Hardening** — Safe JSON encoding via Python stdin pipe for emojis/special characters; robust `try/except` parsing with type checks in `status`, `result`, `list` subcommands
+- **Diagnostic Logging** — `[arena-events]` console logs for tracing Supabase event pipeline through to PixiJS
 
 ### 2026-02-13 (v12) — XMETAV HQ Arena + Streaming Optimization + Agent Skills
 - **XMETAV HQ Isometric Office** — Full isometric office visualization at `/arena` rendered with PixiJS:

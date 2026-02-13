@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-13  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v12 (XMETAV HQ Arena + Streaming Optimization + Agent Skills + $XMETAV Token + Voice + x402 + ERC-8004)
+**XmetaV Version:** v13 (Arena Sync + Voice Fix + Wallet Hardening + Chat History + Dispatch Fix)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -428,7 +428,7 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
-## XMETAV HQ — Isometric Office Arena (v12)
+## XMETAV HQ — Isometric Office Arena (v12, fixed v13)
 
 Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
 
@@ -441,8 +441,9 @@ Full isometric office visualization rendered with PixiJS at `/arena`, driven by 
 | Office Furniture | Active | `renderer/office.ts` — boss desk, meeting table, projector, 4 workstations |
 | Agent Avatars | Active | `renderer/avatars.ts` — glowing orbs with ghost silhouettes (idle/busy/offline) |
 | Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
-| Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls |
-| HUD Overlay | Active | DOM: title, system status, agent legend, floating labels |
+| Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls + 10s periodic sync |
+| HUD Overlay | Active | DOM: title, system status, agent legend, floating labels, TEST MEETING button |
+| Meeting Sync | **Fixed (v13)** | State replay after PixiJS init resolves race condition; periodic sync catches dropped events |
 
 ### Office layout
 
@@ -451,16 +452,32 @@ Full isometric office visualization rendered with PixiJS at `/arena`, driven by 
 - **Left Wing**: Akua + Akua_web workstations with reactive holo screens
 - **Right Wing**: Basedintern + Basedintern_web workstations with reactive holo screens
 
+### Meeting visualization (v13)
+
+When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal meeting table. The holographic projector activates, connection lines draw between participants, and a "MEETING IN SESSION" HUD indicator appears.
+
+| Seat | Agent | Angle |
+|------|-------|-------|
+| Top | main | 270 |
+| Upper-right | operator | 330 |
+| Upper-left | akua | 210 |
+| Lower-right | basedintern | 30 |
+| Lower-left | akua_web | 150 |
+| Bottom | basedintern_web | 90 |
+
+**TEST MEETING** button in the HUD (top-right) forces a meeting with main, akua, and basedintern for visual verification.
+
 ### Visual effects (real-time)
 
 | Effect | Trigger | Description |
 |--------|---------|-------------|
-| Command Pulse | New command | Golden energy travels boss desk → partition → target desk |
+| Command Pulse | New command | Golden energy travels boss desk -> partition -> target desk |
 | Streaming Particles | Agent busy | Code-fragment particles rise from desk area |
 | Dispatch Beam | Inter-agent dispatch | Neon beam routed through meeting table center |
 | Completion Burst | Command success | Green ring expands from desk |
 | Failure Glitch | Command failure | Red glitch blocks flicker around desk, screen turns red |
 | Screen Animation | Agent state change | Scrolling code lines (busy), red flicker (fail), dim (offline) |
+| Meeting Hologram | 2+ agents busy | Pulsing ring, vertical beam, floating discs, agent connection lines |
 
 ---
 
@@ -489,6 +506,47 @@ Three new bash skills installed for the main agent:
 | `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
 
 Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unrestricted shell access.
+
+### Dispatch skill fix (v13)
+
+- Message encoding now pipes through `python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))"` for safe JSON encoding of emojis, newlines, and special characters
+- `status`, `result`, `list` subcommands hardened with `try/except` JSON parsing, `isinstance()` type checks, `.get()` dictionary access
+
+---
+
+## Bug Fixes and Hardening (v13)
+
+### Arena sync race condition
+
+**Problem:** Supabase events arrived before PixiJS finished async initialization. `nodesApiRef.current` was `null` so `startMeeting()` was silently skipped via optional chaining. After PixiJS loaded, nothing re-checked the state.
+
+**Fix:** After PixiJS init completes and API refs are set, replay all buffered agent states from `nodeStatesRef` into the PixiJS layer, then call `checkMeeting()`. Also added a 10-second periodic sync that re-fetches `agent_sessions` from Supabase as a safety net for dropped realtime events.
+
+### Voice response duplicate/stale text
+
+**Problem:** After sending a voice command, the next voice interaction would briefly display the previous response text, and sometimes responses appeared twice. The auto-speak (TTS) feature also stopped working.
+
+**Fix:** Implemented synchronous reset of `fullText` and `isComplete` in `useRealtimeMessages` when `commandId` changes. Added `lastCompletedTextRef` to capture the final response before `activeCommandId` is cleared. Updated auto-speak effect to read from this ref immediately.
+
+### Chat history positioning
+
+**Problem:** The chat history sidebar rendered behind the main navigation sidebar (both used `fixed left-0`), making it invisible.
+
+**Fix:** Changed `ChatHistory.tsx` to slide in from the right (`right-0`, `translateX(100%)`) with left border instead of right.
+
+### Wallet/MetaMask error handling
+
+**Problem:** MetaMask browser extension auto-injection caused "Failed to connect to MetaMask" errors even though the app uses server-side wallets.
+
+**Fix:** Added `error` state with retry UI to `PaymentsDashboard.tsx` and `AgentIdentity.tsx`. Added 10-second RPC timeouts to all wallet API routes (`/api/x402/wallet`, `/api/token`, `/api/erc8004/identity`). Display message: "Wallet data is loaded server-side -- MetaMask is not required."
+
+### Arena visual improvements
+
+- Meeting table: larger size, brighter cyan edges, inner glow ring, semi-transparent glass fill
+- Projector: larger orb, thicker beam, outer glow
+- Chairs: brighter colors with edge glow
+- Ghost silhouettes: increased alpha for idle (0.35) and busy (0.5) states
+- Meeting mode: brighter glow and silhouette when seated
 
 ---
 
@@ -598,6 +656,30 @@ npx playwright install chromium
 
 ```bash
 openclaw config set browser.enabled true
+openclaw config set browser.defaultProfile openclaw
+openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+```
+
+### Smoke test (CLI)
+
+```bash
+# Start gateway (if not already running)
+./scripts/start-gateway.sh
+
+openclaw browser start
+openclaw browser open https://example.com
+openclaw browser snapshot
+```
+
+### Known limitation (small local models)
+
+With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
+
+Workarounds:
+- Use the deterministic `openclaw browser ...` CLI for browser automation.
+- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
+
+aw config set browser.enabled true
 openclaw config set browser.defaultProfile openclaw
 openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
 ```
