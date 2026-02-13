@@ -1,76 +1,82 @@
-/** Agent node configuration for the Arena visualization */
+export type Room = "bossOffice" | "meeting" | "leftWing" | "rightWing";
+
+/** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
   id: string;
   label: string;
-  shape: "hexagon" | "circle" | "diamond" | "eye";
-  /** Color as 0xRRGGBB */
   color: number;
-  /** Color as "#RRGGBB" for CSS */
   colorHex: string;
-  /** Normalized position (0-1) relative to viewport */
-  position: { x: number; y: number };
-  /** Base radius in pixels */
+  room: Room;
+  /** Isometric tile position (col, row) in the office grid */
+  tile: { col: number; row: number };
+  /** Orb radius in pixels */
   size: number;
+  /** True for operator (floats above, no desk) */
+  floating?: boolean;
 }
 
 export const ARENA_AGENTS: AgentNodeConfig[] = [
   {
     id: "operator",
     label: "OPERATOR",
-    shape: "eye",
     color: 0xf59e0b,
     colorHex: "#f59e0b",
-    position: { x: 0.5, y: 0.15 },
-    size: 40,
+    room: "bossOffice",
+    tile: { col: 5, row: 1.5 },
+    size: 30,
+    floating: true,
   },
   {
     id: "main",
     label: "MAIN",
-    shape: "hexagon",
     color: 0x00f0ff,
     colorHex: "#00f0ff",
-    position: { x: 0.5, y: 0.5 },
-    size: 48,
+    room: "bossOffice",
+    tile: { col: 4, row: 1.5 },
+    size: 38,
   },
   {
     id: "akua",
     label: "AKUA",
-    shape: "circle",
     color: 0xa855f7,
     colorHex: "#a855f7",
-    position: { x: 0.25, y: 0.45 },
-    size: 36,
+    room: "leftWing",
+    tile: { col: 1.5, row: 4 },
+    size: 30,
   },
   {
     id: "akua_web",
     label: "AKUA_WEB",
-    shape: "circle",
     color: 0xc084fc,
     colorHex: "#c084fc",
-    position: { x: 0.18, y: 0.72 },
-    size: 30,
+    room: "leftWing",
+    tile: { col: 1.5, row: 6 },
+    size: 26,
   },
   {
     id: "basedintern",
     label: "BASEDINTERN",
-    shape: "diamond",
     color: 0x39ff14,
     colorHex: "#39ff14",
-    position: { x: 0.75, y: 0.45 },
-    size: 36,
+    room: "rightWing",
+    tile: { col: 7.5, row: 4 },
+    size: 30,
   },
   {
     id: "basedintern_web",
     label: "BASEDINTERN_WEB",
-    shape: "diamond",
     color: 0x4ade80,
     colorHex: "#4ade80",
-    position: { x: 0.82, y: 0.72 },
-    size: 30,
+    room: "rightWing",
+    tile: { col: 7.5, row: 6 },
+    size: 26,
   },
 ];
 
-/** Static topology connections drawn as dim lines */
+/** Meeting table center tile (for dispatch beam routing) */
+export const MEETING_TABLE_TILE = { col: 4.5, row: 4.5 };
+
+/** Static topology connections (kept for dispatch beam logic) */
 export const ARENA_CONNECTIONS: [string, string][] = [
   ["operator", "main"],
   ["operator", "akua"],

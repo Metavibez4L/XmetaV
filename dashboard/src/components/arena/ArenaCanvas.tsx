@@ -3,8 +3,9 @@
 import { useRef, useEffect, useState } from "react";
 import { ARENA_AGENTS } from "./agents";
 import { useArenaEvents, type ArenaHandlers } from "./useArenaEvents";
-import type { NodesApi } from "./renderer/nodes";
+import type { NodesApi } from "./renderer/avatars";
 import type { EffectsApi } from "./renderer/effects";
+import type { OfficeApi } from "./renderer/office";
 
 interface HudStats {
   online: number;
@@ -16,6 +17,7 @@ export default function ArenaCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesApiRef = useRef<NodesApi | null>(null);
   const effectsApiRef = useRef<EffectsApi | null>(null);
+  const officeApiRef = useRef<OfficeApi | null>(null);
   const activeCommandsRef = useRef(new Set<string>());
   const nodeStatesRef = useRef(new Map<string, string>());
 
@@ -33,6 +35,11 @@ export default function ArenaCanvas() {
   const handlersRef = useRef<ArenaHandlers>({
     onStatus(agentId, status) {
       nodesApiRef.current?.setState(agentId, status);
+      // Update screen state
+      const screenState =
+        status === "busy" ? "busy" : status === "offline" ? "off" : "idle";
+      officeApiRef.current?.setScreenState(agentId, screenState);
+
       nodeStatesRef.current.set(agentId, status);
       const online = Array.from(nodeStatesRef.current.values()).filter(
         (s) => s !== "offline",
@@ -46,6 +53,7 @@ export default function ArenaCanvas() {
     onCommand(commandId, agentId, message) {
       activeCommandsRef.current.add(commandId);
       nodesApiRef.current?.setState(agentId, "busy");
+      officeApiRef.current?.setScreenState(agentId, "busy");
       effectsApiRef.current?.commandPulse(agentId);
       effectsApiRef.current?.streamStart(agentId);
       setHudStats((s) => ({
@@ -63,9 +71,15 @@ export default function ArenaCanvas() {
       if (status === "completed") {
         effectsApiRef.current?.completionBurst(agentId);
         nodesApiRef.current?.setState(agentId, "idle");
+        officeApiRef.current?.setScreenState(agentId, "idle");
       } else {
         effectsApiRef.current?.failureGlitch(agentId);
+        officeApiRef.current?.setScreenState(agentId, "fail");
         nodesApiRef.current?.setState(agentId, "idle");
+        // Reset screen after 2s
+        setTimeout(() => {
+          officeApiRef.current?.setScreenState(agentId, "idle");
+        }, 2000);
       }
       setHudStats((s) => ({
         ...s,
@@ -76,6 +90,7 @@ export default function ArenaCanvas() {
     onControl(agentId, enabled) {
       if (!enabled) {
         nodesApiRef.current?.setState(agentId, "offline");
+        officeApiRef.current?.setScreenState(agentId, "off");
       }
       setHudStats((s) => ({
         ...s,
@@ -94,7 +109,7 @@ export default function ArenaCanvas() {
     let cleanupBg: (() => void) | null = null;
 
     (async () => {
-      const { Application } = await import("pixi.js");
+      const { Application, Container } = await import("pixi.js");
       if (destroyed) return;
 
       const app = new Application();
@@ -114,52 +129,66 @@ export default function ArenaCanvas() {
 
       el.appendChild(app.canvas as HTMLCanvasElement);
 
-      // Init renderers (dynamic import keeps pixi.js out of SSR bundle)
+      // Import iso utilities and renderers
+      const { getSceneOffset, toScreen } = await import("./renderer/iso");
       const { initBackground } = await import("./renderer/background");
-      const { initNodes } = await import("./renderer/nodes");
+      const { initOffice } = await import("./renderer/office");
+      const { initAvatars } = await import("./renderer/avatars");
       const { initEffects } = await import("./renderer/effects");
       if (destroyed) {
         app.destroy();
         return;
       }
 
-      cleanupBg = initBackground(app);
-      const nodesApi = initNodes(app);
-      const effectsApi = initEffects(app, nodesApi);
+      // Create scene container centered on viewport
+      const scene = new Container();
+      const offset = getSceneOffset(
+        app.screen.width,
+        app.screen.height,
+      );
+      scene.position.set(offset.x, offset.y);
+      app.stage.addChild(scene);
+
+      // Init renderers (order = z-order)
+      cleanupBg = initBackground(app, scene);
+      const officeApi = initOffice(app, scene);
+      const nodesApi = initAvatars(app, scene);
+      const effectsApi = initEffects(app, scene, nodesApi, officeApi);
 
       nodesApiRef.current = nodesApi;
       effectsApiRef.current = effectsApi;
+      officeApiRef.current = officeApi;
 
-      // Compute initial label positions
-      setLabelPositions(
-        ARENA_AGENTS.map((cfg) => ({
-          id: cfg.id,
-          label: cfg.label,
-          colorHex: cfg.colorHex,
-          x: cfg.position.x * app.screen.width,
-          y: cfg.position.y * app.screen.height,
-        })),
-      );
+      // Compute label positions (iso coords + scene offset = screen coords)
+      function updateLabels() {
+        const off = scene.position;
+        setLabelPositions(
+          ARENA_AGENTS.map((cfg) => {
+            const iso = toScreen(cfg.tile.col, cfg.tile.row);
+            return {
+              id: cfg.id,
+              label: cfg.label,
+              colorHex: cfg.colorHex,
+              x: iso.x + off.x,
+              y: iso.y + off.y,
+            };
+          }),
+        );
+      }
+      updateLabels();
 
       // Resize handler
       const ro = new ResizeObserver(() => {
         if (destroyed) return;
-        const w = app.screen.width;
-        const h = app.screen.height;
-        nodesApi.resize(w, h);
-        setLabelPositions(
-          ARENA_AGENTS.map((cfg) => ({
-            id: cfg.id,
-            label: cfg.label,
-            colorHex: cfg.colorHex,
-            x: cfg.position.x * w,
-            y: cfg.position.y * h,
-          })),
+        const newOff = getSceneOffset(
+          app.screen.width,
+          app.screen.height,
         );
+        scene.position.set(newOff.x, newOff.y);
+        updateLabels();
       });
       ro.observe(el);
 
-      // Store cleanup for resize observer
       const origCleanup = cleanupBg;
       cleanupBg = () => {
         ro.disconnect();
@@ -172,8 +201,10 @@ export default function ArenaCanvas() {
       cleanupBg?.();
       nodesApiRef.current?.destroy();
       effectsApiRef.current?.destroy();
+      officeApiRef.current?.destroy();
       nodesApiRef.current = null;
       effectsApiRef.current = null;
+      officeApiRef.current = null;
       if (containerRef.current) {
         const canvas = containerRef.current.querySelector("canvas");
         canvas?.remove();
@@ -189,23 +220,23 @@ export default function ArenaCanvas() {
       {/* PixiJS canvas mount point */}
       <div ref={containerRef} className="absolute inset-0" />
 
-      {/* ── HUD: Title (top-left) ─────────────────────── */}
+      {/* -- HUD: Title (top-left) ----------------------------------- */}
       <div className="absolute top-4 left-6 z-10 pointer-events-none select-none">
         <h1
           className="text-xl font-mono font-bold tracking-[0.25em]"
           style={{ color: "#00f0ff", textShadow: "0 0 20px #00f0ff44" }}
         >
-          XMETAV ARENA
+          XMETAV HQ
         </h1>
         <p
           className="text-[10px] font-mono mt-1 tracking-wider"
           style={{ color: "#00f0ff33" }}
         >
-          REAL-TIME AGENT VISUALIZATION
+          COMMAND CENTER LIVE VIEW
         </p>
       </div>
 
-      {/* ── HUD: Back button (top-right) ──────────────── */}
+      {/* -- HUD: Back button (top-right) ---------------------------- */}
       <a
         href="/agent"
         className="absolute top-4 right-6 z-10 px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#00f0ff55]"
@@ -218,7 +249,7 @@ export default function ArenaCanvas() {
         &larr; DASHBOARD
       </a>
 
-      {/* ── HUD: Stats (bottom-left) ─────────────────── */}
+      {/* -- HUD: Stats (bottom-left) -------------------------------- */}
       <div
         className="absolute bottom-4 left-6 z-10 p-3 rounded pointer-events-none select-none"
         style={{
@@ -253,7 +284,7 @@ export default function ArenaCanvas() {
         </div>
       </div>
 
-      {/* ── HUD: Legend (bottom-right) ────────────────── */}
+      {/* -- HUD: Legend (bottom-right) ------------------------------ */}
       <div
         className="absolute bottom-4 right-6 z-10 p-3 rounded pointer-events-none select-none"
         style={{
@@ -287,19 +318,19 @@ export default function ArenaCanvas() {
         </div>
       </div>
 
-      {/* ── Floating agent labels ─────────────────────── */}
+      {/* -- Floating agent labels ----------------------------------- */}
       {labelPositions.map((lbl) => (
         <div
           key={lbl.id}
           className="absolute z-10 pointer-events-none select-none text-center"
           style={{
             left: lbl.x,
-            top: lbl.y + 55,
+            top: lbl.y + 30,
             transform: "translateX(-50%)",
           }}
         >
           <div
-            className="text-[9px] font-mono tracking-wider"
+            className="text-[8px] font-mono tracking-wider"
             style={{
               color: lbl.colorHex,
               textShadow: `0 0 6px ${lbl.colorHex}44`,
