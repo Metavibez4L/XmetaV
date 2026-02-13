@@ -76,6 +76,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
 /** Meeting table center tile (for dispatch beam routing) */
 export const MEETING_TABLE_TILE = { col: 4.5, row: 4.5 };
 
+/** Seat assignments around the meeting table.
+ *  Angles are in degrees, radius is in screen pixels from table center. */
+export const MEETING_SEATS: { agentId: string; angle: number }[] = [
+  { agentId: "main", angle: 270 },           // top seat (facing table)
+  { agentId: "operator", angle: 330 },        // upper-right
+  { agentId: "akua", angle: 210 },            // upper-left
+  { agentId: "basedintern", angle: 30 },      // lower-right
+  { agentId: "akua_web", angle: 150 },        // lower-left
+  { agentId: "basedintern_web", angle: 90 },  // bottom
+];
+
 /** Static topology connections (kept for dispatch beam logic) */
 export const ARENA_CONNECTIONS: [string, string][] = [
   ["operator", "main"],

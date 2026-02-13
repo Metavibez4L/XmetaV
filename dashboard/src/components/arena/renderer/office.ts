@@ -6,6 +6,7 @@ export type ScreenState = "idle" | "busy" | "fail" | "off";
 
 export interface OfficeApi {
   setScreenState(agentId: string, state: ScreenState): void;
+  setMeetingMode(active: boolean): void;
   destroy(): void;
 }
 
@@ -209,6 +210,7 @@ export function initOffice(
 
   // -- Animation ticker -----------------------------------------------
   let time = 0;
+  let meetingMode = false;
   const tick = (ticker: { deltaMS: number }) => {
     time += ticker.deltaMS / 1000;
 
@@ -242,8 +244,14 @@ export function initOffice(
       }
     }
 
-    // Projector pulse
-    projector.alpha = 0.6 + Math.sin(time * 2) * 0.2;
+    // Projector pulse (brighter during meetings)
+    if (meetingMode) {
+      projector.alpha = 0.9 + Math.sin(time * 3) * 0.1;
+      projector.scale.set(1 + Math.sin(time * 2) * 0.15);
+    } else {
+      projector.alpha = 0.6 + Math.sin(time * 2) * 0.2;
+      projector.scale.set(1);
+    }
   };
   app.ticker.add(tick);
 
@@ -252,6 +260,9 @@ export function initOffice(
     setScreenState(agentId, state) {
       const s = screens.get(agentId);
       if (s) s.state = state;
+    },
+    setMeetingMode(active) {
+      meetingMode = active;
     },
     destroy() {
       app.ticker.remove(tick);
