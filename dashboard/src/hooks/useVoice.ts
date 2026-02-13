@@ -7,6 +7,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 export interface VoiceSettings {
   voice: string;
   model: string;
+  sttModel: string;
   speed: number;
   autoSpeak: boolean;
   pushToTalk: boolean;
@@ -58,6 +59,7 @@ const SILENCE_DURATION_MS = 2_000; // 2s of silence → auto-stop (continuous mo
 const DEFAULT_SETTINGS: VoiceSettings = {
   voice: "nova",
   model: "tts-1",
+  sttModel: "gpt-4o-transcribe",
   speed: 1.0,
   autoSpeak: true,
   pushToTalk: false,
@@ -253,7 +255,9 @@ export function useVoice(): UseVoiceReturn {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 16000,
+          autoGainControl: true,
+          sampleRate: 48000,       // higher sample rate for better fidelity
+          channelCount: 1,          // mono — cleaner for speech
         },
       });
       streamRef.current = stream;
@@ -278,7 +282,10 @@ export function useVoice(): UseVoiceReturn {
         ? "audio/webm;codecs=opus"
         : "audio/webm";
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128_000, // 128kbps for clear speech
+      });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -288,7 +295,7 @@ export function useVoice(): UseVoiceReturn {
         }
       };
 
-      recorder.start(100); // 100ms chunks for lower latency
+      recorder.start(250); // 250ms chunks — less fragmentation, better quality
       setIsListening(true);
 
       // Auto-stop after max duration
@@ -347,6 +354,7 @@ export function useVoice(): UseVoiceReturn {
         try {
           const formData = new FormData();
           formData.append("audio", blob, "recording.webm");
+          formData.append("sttModel", settings.sttModel || "gpt-4o-transcribe");
 
           const res = await fetch("/api/voice/transcribe", {
             method: "POST",

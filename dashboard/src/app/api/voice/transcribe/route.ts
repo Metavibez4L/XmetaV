@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get("audio");
+    const sttModel = (formData.get("sttModel") as string) || "gpt-4o-transcribe";
 
     if (!audioFile || !(audioFile instanceof Blob)) {
       return NextResponse.json(
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const filename =
       audioFile instanceof File ? audioFile.name : "recording.webm";
-    const text = await transcribeAudio(buffer, filename);
+    const text = await transcribeAudio(buffer, filename, sttModel);
 
     return NextResponse.json({ text });
   } catch (err) {
