@@ -340,11 +340,19 @@ export function AgentChat() {
 
   // ── Command complete — merge final text into messages array once ──
   const [lastCompletedCmdId, setLastCompletedCmdId] = useState<string | null>(null);
+  const completedRef = useRef<string | null>(null); // guard against double-merge
+  const lastCompletedTextRef = useRef<string>(""); // final text for auto-speak
+
   useEffect(() => {
-    if (isComplete && activeCommandId) {
-      // Merge final content into messages (single array update at end of stream)
+    if (isComplete && activeCommandId && activeCommandId !== completedRef.current) {
+      // Guard: only merge once per command ID
+      completedRef.current = activeCommandId;
       const finalText = fullText;
       const completedId = activeCommandId;
+
+      // Save final text BEFORE clearing activeCommandId (which resets fullText)
+      lastCompletedTextRef.current = finalText;
+
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "agent" && last.commandId === completedId) {
@@ -371,6 +379,7 @@ export function AgentChat() {
       setSending(true);
       if (!overrideText) setInput("");
       shouldScrollRef.current = true;
+      completedRef.current = null; // allow completion merge for the new command
 
       const userMsg: ChatMessage = {
         id: nextId(),
@@ -435,7 +444,7 @@ export function AgentChat() {
 
   // ── Auto-speak response when voice mode + autoSpeak is on ──
   // Track by command ID (unique per command) to prevent re-speaking stale responses.
-  // Use a ref for `speak` so callback identity changes don't re-trigger the effect.
+  // Read final text from lastCompletedTextRef (captured before activeCommandId is cleared).
   const lastSpokenCmdRef = useRef<string | null>(null);
   const speakRef = useRef(speak);
   speakRef.current = speak;
@@ -446,13 +455,15 @@ export function AgentChat() {
       settings.autoSpeak &&
       lastCompletedCmdId &&
       lastCompletedCmdId !== lastSpokenCmdRef.current &&
-      fullText &&
       !isSpeaking
     ) {
-      lastSpokenCmdRef.current = lastCompletedCmdId;
-      speakRef.current(fullText);
+      const textToSpeak = lastCompletedTextRef.current;
+      if (textToSpeak) {
+        lastSpokenCmdRef.current = lastCompletedCmdId;
+        speakRef.current(textToSpeak);
+      }
     }
-  }, [voiceEnabled, settings.autoSpeak, lastCompletedCmdId, fullText, isSpeaking]);
+  }, [voiceEnabled, settings.autoSpeak, lastCompletedCmdId, isSpeaking]);
 
   // ── Continuous conversation: auto-listen after TTS finishes ──
   const wasSpeakingRef = useRef(false);

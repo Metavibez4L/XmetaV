@@ -24,7 +24,25 @@ export function useRealtimeMessages(commandId: string | null) {
   const seenIds = useRef(new Set<string>());
   const textRef = useRef(""); // running text accumulator
   const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevCommandIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
+
+  // ── Synchronous reset when commandId changes ──
+  // This runs during render (before paint) so the StreamingBubble
+  // never sees stale fullText from a previous command.
+  if (commandId !== prevCommandIdRef.current) {
+    prevCommandIdRef.current = commandId;
+    textRef.current = "";
+    seenIds.current.clear();
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+      throttleRef.current = null;
+    }
+    // These setState calls during render trigger a synchronous re-render
+    // before the browser paints — React supports this pattern.
+    if (fullText !== "") setFullText("");
+    if (isComplete) setIsComplete(false);
+  }
 
   /** Push accumulated text to React state (throttled) */
   const scheduleUpdate = useCallback(() => {

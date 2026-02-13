@@ -16,7 +16,7 @@ const tokenAddress = XMETAV_TOKEN.address as `0x${string}`;
 // Use batch-enabled transport so multicall collapses into fewer RPC calls
 const client = createPublicClient({
   chain: base,
-  transport: http("https://mainnet.base.org"),
+  transport: http("https://mainnet.base.org", { timeout: 10_000 }),
   batch: { multicall: true },
 });
 

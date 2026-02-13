@@ -61,17 +61,22 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
   const [payments, setPayments] = useState<PaymentsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
+    setError(null);
     try {
       const [walletRes, paymentsRes] = await Promise.all([
-        fetch("/api/x402/wallet"),
-        fetch("/api/x402/payments"),
+        fetch("/api/x402/wallet").catch(() => null),
+        fetch("/api/x402/payments").catch(() => null),
       ]);
-      if (walletRes.ok) setWallet(await walletRes.json());
-      if (paymentsRes.ok) setPayments(await paymentsRes.json());
+      if (walletRes?.ok) setWallet(await walletRes.json());
+      else if (walletRes) setError(`Wallet API returned ${walletRes.status}`);
+      if (paymentsRes?.ok) setPayments(await paymentsRes.json());
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(`Failed to load wallet data: ${msg}`);
       console.error("Failed to fetch x402 data:", err);
     } finally {
       setLoading(false);
@@ -89,6 +94,25 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00f0ff" }} />
+      </div>
+    );
+  }
+
+  if (error && !wallet) {
+    return (
+      <div className="rounded-lg border p-6 text-center" style={{ background: "#0a1020", borderColor: "#ff2d5e20" }}>
+        <XCircle className="h-8 w-8 mx-auto mb-3" style={{ color: "#ff2d5e44" }} />
+        <div className="text-sm font-mono" style={{ color: "#ff2d5e" }}>{error}</div>
+        <div className="text-[10px] font-mono mt-1" style={{ color: "#4a6a8a" }}>
+          Wallet data is loaded server-side — MetaMask is not required
+        </div>
+        <button
+          onClick={() => fetchData(true)}
+          className="mt-3 text-[10px] font-mono px-3 py-1.5 rounded transition-colors"
+          style={{ color: "#00f0ff88", border: "1px solid #00f0ff20" }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -438,11 +462,16 @@ function TokenTierCard({ wallet }: { wallet?: string | null }) {
     color: string;
     balance: number;
   } | null>(null);
+  const [tierError, setTierError] = useState(false);
 
   useEffect(() => {
     if (!wallet) return;
+    setTierError(false);
     fetch(`/api/token?wallet=${wallet}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (d.wallet) {
           setTier({
@@ -453,7 +482,7 @@ function TokenTierCard({ wallet }: { wallet?: string | null }) {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => setTierError(true));
   }, [wallet]);
 
   return (
@@ -470,10 +499,14 @@ function TokenTierCard({ wallet }: { wallet?: string | null }) {
         </span>
       </div>
       <div className="text-lg font-mono font-bold" style={{ color: tier?.color || "#4a6a8a" }}>
-        {tier?.name || "—"}
+        {tier?.name || (tierError ? "Unavailable" : "—")}
       </div>
       <div className="text-[10px] font-mono mt-1" style={{ color: "#4a6a8a" }}>
-        {tier ? `${tier.discount} discount · ${tier.balance.toLocaleString()} XMETAV` : "Loading..."}
+        {tier
+          ? `${tier.discount} discount · ${tier.balance.toLocaleString()} XMETAV`
+          : tierError
+            ? "Could not load token tier — RPC may be unavailable"
+            : "Loading..."}
       </div>
     </div>
   );

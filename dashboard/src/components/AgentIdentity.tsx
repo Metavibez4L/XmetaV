@@ -55,18 +55,24 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
   const [data, setData] = useState<IdentityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [agentId, setAgentId] = useState(DEFAULT_AGENT_ID);
   const [copied, setCopied] = useState<string | null>(null);
 
   const fetchIdentity = useCallback(
     async (showRefresh = false) => {
       if (showRefresh) setRefreshing(true);
+      setError(null);
       try {
         const res = await fetch(`/api/erc8004/identity?agentId=${agentId}`);
         if (res.ok) {
           setData(await res.json());
+        } else {
+          setError(`Identity lookup failed (HTTP ${res.status})`);
         }
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        setError(`Failed to fetch identity: ${msg}`);
         console.error("Failed to fetch identity:", err);
       } finally {
         setLoading(false);
@@ -90,6 +96,55 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00f0ff" }} />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="space-y-6">
+        {/* Agent ID Lookup — keep visible even on error */}
+        <div
+          className="rounded-lg border p-4"
+          style={{ background: "#0a1020", borderColor: "#00f0ff15" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
+              Agent ID
+            </span>
+            <input
+              type="text"
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="flex-1 bg-transparent border rounded px-3 py-1.5 text-sm font-mono outline-none"
+              style={{ borderColor: "#00f0ff20", color: "#e0e8f0" }}
+              placeholder="Enter agentId (token ID)"
+            />
+            <button
+              onClick={() => fetchIdentity(true)}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 text-[10px] font-mono px-3 py-1.5 rounded transition-colors"
+              style={{ color: "#00f0ff88", border: "1px solid #00f0ff20" }}
+            >
+              <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+              Lookup
+            </button>
+          </div>
+        </div>
+        <div className="rounded-lg border p-6 text-center" style={{ background: "#0a1020", borderColor: "#ff2d5e20" }}>
+          <Fingerprint className="h-8 w-8 mx-auto mb-3" style={{ color: "#ff2d5e44" }} />
+          <div className="text-sm font-mono" style={{ color: "#ff2d5e" }}>{error}</div>
+          <div className="text-[10px] font-mono mt-1" style={{ color: "#4a6a8a" }}>
+            Identity data is read from on-chain contracts — MetaMask is not required
+          </div>
+          <button
+            onClick={() => fetchIdentity(true)}
+            className="mt-3 text-[10px] font-mono px-3 py-1.5 rounded transition-colors"
+            style={{ color: "#00f0ff88", border: "1px solid #00f0ff20" }}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -638,11 +693,16 @@ function TokenBalanceRow({ wallet }: { wallet?: string | null }) {
     discount: string;
     tierColor: string;
   } | null>(null);
+  const [tokenError, setTokenError] = useState(false);
 
   useEffect(() => {
     if (!wallet) return;
+    setTokenError(false);
     fetch(`/api/token?wallet=${wallet}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (d.wallet) {
           setTokenData({
@@ -653,8 +713,23 @@ function TokenBalanceRow({ wallet }: { wallet?: string | null }) {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => setTokenError(true));
   }, [wallet]);
+
+  if (!tokenData && !tokenError) return null;
+
+  if (tokenError) {
+    return (
+      <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: "#00f0ff08" }}>
+        <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#ffd70066" }}>
+          $XMETAV
+        </span>
+        <span className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+          Token data unavailable — RPC may be down
+        </span>
+      </div>
+    );
+  }
 
   if (!tokenData) return null;
 
