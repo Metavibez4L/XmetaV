@@ -102,6 +102,7 @@ export function useArenaEvents(
       }
 
       initialFetchDone.current = true;
+      console.log("[arena-events] Initial fetch done. Sessions:", sessions?.length ?? 0, "Controls:", controls?.length ?? 0);
 
       // Pre-populate command-agent mapping for active commands
       const { data: commands } = await supabase
@@ -125,6 +126,7 @@ export function useArenaEvents(
         { event: "*", schema: "public", table: "agent_sessions" },
         (payload) => {
           const row = payload.new as AgentSession;
+          console.log("[arena-events] session realtime:", row?.agent_id, row?.status);
           if (row?.agent_id) {
             handlersRef.current?.onStatus(
               row.agent_id,
@@ -142,6 +144,7 @@ export function useArenaEvents(
         { event: "INSERT", schema: "public", table: "agent_commands" },
         (payload) => {
           const row = payload.new as AgentCommand;
+          console.log("[arena-events] command INSERT:", row.agent_id, row.id?.slice(0, 8));
           cmdAgentMap.current.set(row.id, row.agent_id);
           handlersRef.current?.onCommand(row.id, row.agent_id, row.message);
         },
@@ -191,7 +194,28 @@ export function useArenaEvents(
       )
       .subscribe();
 
+    // -- Periodic sync (safety net for dropped realtime events) ----------
+    const syncInterval = setInterval(async () => {
+      if (!initialFetchDone.current) return;
+      const { data: sessions } = await supabase
+        .from("agent_sessions")
+        .select("*");
+      if (sessions) {
+        for (const s of sessions as AgentSession[]) {
+          const HEARTBEAT_TIMEOUT = 60_000;
+          const stale =
+            Date.now() - new Date(s.last_heartbeat).getTime() >
+            HEARTBEAT_TIMEOUT;
+          const status = stale
+            ? "idle"
+            : ((s.status as "idle" | "busy" | "offline") ?? "idle");
+          handlersRef.current?.onStatus(s.agent_id, status);
+        }
+      }
+    }, 10_000);
+
     return () => {
+      clearInterval(syncInterval);
       supabase.removeChannel(sessionsChannel);
       supabase.removeChannel(commandsChannel);
       supabase.removeChannel(responsesChannel);

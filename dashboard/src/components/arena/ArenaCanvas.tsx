@@ -38,6 +38,7 @@ export default function ArenaCanvas() {
   >([]);
 
   // -- Meeting detection (stable callback via refs) ---------------------
+  const checkMeetingRef = useRef<() => void>(() => {});
   const checkMeeting = useCallback(() => {
     const busyCount = busyAgentsRef.current.size;
     const busyIds = Array.from(busyAgentsRef.current);
@@ -78,6 +79,9 @@ export default function ArenaCanvas() {
       }));
     }
   }, []);
+
+  // Keep checkMeeting ref current for use in the async PixiJS init
+  checkMeetingRef.current = checkMeeting;
 
   // -- Arena event handlers (updated every render via ref assignment) --
   const handlersRef = useRef<ArenaHandlers | null>(null);
@@ -224,6 +228,17 @@ export default function ArenaCanvas() {
       officeApiRef.current = officeApi;
 
       console.log("[arena] PixiJS initialized, all APIs ready");
+
+      // -- Replay buffered state that arrived before PixiJS was ready --
+      // Sync individual agent states (busy/idle/offline)
+      for (const [agentId, status] of nodeStatesRef.current.entries()) {
+        nodesApi.setState(agentId, status as "idle" | "busy" | "offline");
+        const screenState = status === "busy" ? "busy" : status === "offline" ? "off" : "idle";
+        officeApi.setScreenState(agentId, screenState as "idle" | "busy" | "off" | "fail");
+      }
+      // Trigger meeting check now that PixiJS can actually render it
+      console.log("[arena] Replaying state: busyAgents =", Array.from(busyAgentsRef.current));
+      checkMeetingRef.current();
 
       // Compute label positions (iso coords + scene offset = screen coords)
       function updateLabels() {

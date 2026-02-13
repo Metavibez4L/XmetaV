@@ -149,14 +149,14 @@ export function ChatHistory({
         />
       )}
 
-      {/* Sidebar */}
+      {/* History panel — slides in from the right to avoid overlapping the nav sidebar */}
       <div
-        className="fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-200"
+        className="fixed inset-y-0 right-0 z-50 flex flex-col transition-transform duration-200"
         style={{
-          width: "300px",
+          width: "320px",
           background: "linear-gradient(180deg, #060b14, #05080f)",
-          borderRight: "1px solid #00f0ff12",
-          transform: open ? "translateX(0)" : "translateX(-100%)",
+          borderLeft: "1px solid #00f0ff12",
+          transform: open ? "translateX(0)" : "translateX(100%)",
         }}
       >
         {/* Header */}
