@@ -1,4 +1,6 @@
 import { supabase } from "./supabase.js";
+import { anchorMemory, isAnchoringEnabled, MemoryCategory } from "./memory-anchor.js";
+import type { MemoryCategoryType } from "./memory-anchor.js";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -188,6 +190,7 @@ export function extractOutcomeSummary(rawOutput: string, maxLines = 5): string {
 
 /**
  * After a command completes, capture a summary into agent memory.
+ * If the outcome is significant (milestone/decision/incident), also anchor on-chain.
  */
 export async function captureCommandOutcome(
   agentId: string,
@@ -208,4 +211,84 @@ export async function captureCommandOutcome(
     source: "bridge",
     ttl_hours: 72, // Auto-expire after 3 days
   });
+
+  // Anchor significant memories on-chain (IPFS + Base)
+  await anchorIfSignificant(agentId, kind, taskSnippet, summary);
+}
+
+// ---- On-Chain Anchoring ----
+
+/** Keywords that indicate a milestone worth anchoring */
+const MILESTONE_KEYWORDS = [
+  "deploy", "deployed", "launch", "launched", "release", "shipped",
+  "contract", "token", "created", "initialized", "migration",
+  "first", "production", "mainnet", "live",
+];
+
+/** Keywords that indicate an important decision */
+const DECISION_KEYWORDS = [
+  "chose", "decided", "switched", "migrated", "upgraded",
+  "replaced", "configured", "enabled", "disabled",
+];
+
+/** Keywords that indicate an incident */
+const INCIDENT_KEYWORDS = [
+  "crash", "down", "outage", "failed", "timeout", "panic",
+  "critical", "emergency", "rollback", "revert",
+];
+
+/**
+ * Determine if a memory outcome is significant enough to anchor on-chain.
+ * If so, pin to IPFS and write the hash to the AgentMemoryAnchor contract.
+ */
+async function anchorIfSignificant(
+  agentId: string,
+  kind: MemoryKind,
+  task: string,
+  summary: string
+): Promise<void> {
+  if (!isAnchoringEnabled()) return;
+
+  const text = `${task} ${summary}`.toLowerCase();
+  let category: MemoryCategoryType | null = null;
+
+  // Incidents take priority (errors + incident keywords)
+  if (kind === "error" && INCIDENT_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.INCIDENT;
+  }
+  // Milestones
+  else if (MILESTONE_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.MILESTONE;
+  }
+  // Decisions
+  else if (DECISION_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.DECISION;
+  }
+
+  if (category === null) return;
+
+  const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
+
+  const categoryNames = ["milestone", "decision", "incident"];
+  console.log(`[anchor] Detected ${categoryNames[category]}: "${task.slice(0, 60)}..." — anchoring on-chain`);
+
+  const result = await anchorMemory(agentTokenId, category, {
+    content: summary,
+    kind,
+    source: agentId,
+    task,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (result) {
+    console.log(`[anchor] ✓ IPFS: ${result.ipfsCid} | TX: ${result.txHash}`);
+    // Write a memory noting the anchor
+    await writeMemory({
+      agent_id: agentId,
+      kind: "fact",
+      content: `Memory anchored on-chain: ipfs://${result.ipfsCid} (tx: ${result.txHash})`,
+      source: "anchor",
+      ttl_hours: null, // permanent
+    });
+  }
 }
