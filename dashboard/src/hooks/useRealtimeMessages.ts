@@ -15,7 +15,7 @@ import type { AgentResponse } from "@/lib/types";
  *  - Stable callback refs to avoid re-subscriptions
  *  - Proper cleanup on unmount and commandId change
  */
-const THROTTLE_MS = 80; // batch rapid chunks — update UI at ~12fps
+const THROTTLE_MS = 50; // batch rapid chunks — update UI at ~20fps (was 80/12fps)
 
 export function useRealtimeMessages(commandId: string | null) {
   const [fullText, setFullText] = useState("");
@@ -23,6 +23,7 @@ export function useRealtimeMessages(commandId: string | null) {
 
   const seenIds = useRef(new Set<string>());
   const textRef = useRef(""); // running text accumulator
+  const rafRef = useRef<number | null>(null);
   const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevCommandIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
@@ -38,18 +39,27 @@ export function useRealtimeMessages(commandId: string | null) {
       clearTimeout(throttleRef.current);
       throttleRef.current = null;
     }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     // These setState calls during render trigger a synchronous re-render
     // before the browser paints — React supports this pattern.
     if (fullText !== "") setFullText("");
     if (isComplete) setIsComplete(false);
   }
 
-  /** Push accumulated text to React state (throttled) */
+  /** Push accumulated text to React state (throttled + RAF aligned) */
   const scheduleUpdate = useCallback(() => {
     if (throttleRef.current) return; // already scheduled
     throttleRef.current = setTimeout(() => {
       throttleRef.current = null;
-      setFullText(textRef.current);
+      // Align state update with next animation frame for smoother rendering
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        setFullText(textRef.current);
+      });
     }, THROTTLE_MS);
   }, []);
 
@@ -58,6 +68,10 @@ export function useRealtimeMessages(commandId: string | null) {
     if (throttleRef.current) {
       clearTimeout(throttleRef.current);
       throttleRef.current = null;
+    }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
     setFullText(textRef.current);
   }, []);
@@ -70,6 +84,10 @@ export function useRealtimeMessages(commandId: string | null) {
     if (throttleRef.current) {
       clearTimeout(throttleRef.current);
       throttleRef.current = null;
+    }
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
   }, []);
 
@@ -133,6 +151,7 @@ export function useRealtimeMessages(commandId: string | null) {
     return () => {
       cancelled = true;
       if (throttleRef.current) clearTimeout(throttleRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       supabase.removeChannel(channel);
     };
   }, [commandId, reset, supabase, scheduleUpdate, flushNow]);

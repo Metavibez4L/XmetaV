@@ -173,16 +173,42 @@ export async function executeCommand(command: {
   // Accumulate raw output for memory capture
   let rawOutput = "";
 
+  // Token batching: collect small rapid-fire tokens before flushing to reduce
+  // DB write pressure. Flushes after 6 tokens or 15ms — whichever comes first.
+  let tokenBatch = "";
+  let tokenCount = 0;
+  let batchTimer: ReturnType<typeof setTimeout> | null = null;
+  const BATCH_TOKENS = 6;
+  const BATCH_MS = 15;
+
+  function flushTokenBatch() {
+    if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }
+    if (tokenBatch.length > 0) {
+      streamer.write(tokenBatch);
+      tokenBatch = "";
+      tokenCount = 0;
+    }
+  }
+
   try {
     const child = runAgentWithFallback({
       agentId: agent_id,
       message: enrichedMessage,
       onChunk: (text) => {
         rawOutput += text;
-        streamer.write(text);
+        tokenBatch += text;
+        tokenCount++;
+        if (tokenCount >= BATCH_TOKENS) {
+          flushTokenBatch();
+        } else if (!batchTimer) {
+          batchTimer = setTimeout(flushTokenBatch, BATCH_MS);
+        }
       },
       onExit: async (code) => {
         running.delete(agent_id);
+
+        // Flush any remaining batched tokens before ending the stream
+        flushTokenBatch();
 
         await streamer.end(code);
 

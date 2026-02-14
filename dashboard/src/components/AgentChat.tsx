@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { useVoice } from "@/hooks/useVoice";
@@ -131,9 +131,10 @@ const MessageBubble = React.memo(function MessageBubble({
 
 // ────────────────────────────────────────────────────
 // Streaming bubble — renders live text without copying messages array
+// Memoized to avoid re-renders when parent state changes
 // ────────────────────────────────────────────────────
 
-function StreamingBubble({
+const StreamingBubble = React.memo(function StreamingBubble({
   agentId: streamAgentId,
   fullText: streamText,
   isComplete: streamDone,
@@ -142,8 +143,30 @@ function StreamingBubble({
   fullText: string;
   isComplete: boolean;
 }) {
+  // Memoize the cleaned output to avoid re-running regex on every render
+  const cleanedText = useMemo(
+    () => cleanAgentOutput(streamText) || "// waiting for bridge...",
+    [streamText]
+  );
+
+  // Auto-scroll: keep the streaming content in view
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = bubbleRef.current;
+    if (!el) return;
+    // Only auto-scroll if user is near the bottom (within 120px)
+    const parent = el.closest("[data-scroll-container]") as HTMLElement | null;
+    if (parent) {
+      const nearBottom =
+        parent.scrollHeight - parent.scrollTop - parent.clientHeight < 120;
+      if (nearBottom) {
+        parent.scrollTop = parent.scrollHeight;
+      }
+    }
+  }, [cleanedText]);
+
   return (
-    <div className="flex justify-start">
+    <div className="flex justify-start" ref={bubbleRef}>
       <div
         className="max-w-[85%] rounded-lg px-4 py-3 relative"
         style={{
@@ -181,7 +204,7 @@ function StreamingBubble({
           className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
           style={{ color: "#c8d6e5cc" }}
         >
-          {cleanAgentOutput(streamText) || "// waiting for bridge..."}
+          {cleanedText}
         </pre>
         {!streamDone && (
           <span
@@ -192,7 +215,7 @@ function StreamingBubble({
       </div>
     </div>
   );
-}
+});
 
 // ────────────────────────────────────────────────────
 // Auto-resize textarea hook
@@ -768,6 +791,7 @@ export function AgentChat() {
         className="flex-1 overflow-auto p-4 sm:p-5"
         ref={scrollRef}
         onScroll={checkShouldScroll}
+        data-scroll-container
       >
         <div className="mx-auto max-w-3xl space-y-4">
           {messages.length === 0 && (
