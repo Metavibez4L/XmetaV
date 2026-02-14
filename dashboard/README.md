@@ -28,6 +28,9 @@ https://supabase.com/dashboard/project/ptlneqcjsnrxxruutsxm/sql/new
 2. `scripts/setup-db-agent-controls.sql` — creates `agent_controls` table for enable/disable toggles
 3. `scripts/setup-db-swarms.sql` — creates `swarm_runs` + `swarm_tasks` tables with RLS + Realtime
 4. `scripts/setup-db-agent-memory.sql` — creates `agent_memory` table for persistent memory (`_shared` + per-agent) with RLS + Realtime
+5. `scripts/setup-db-x402.sql` — creates `x402_payments` table with payment logging, daily spend view, indexes
+6. `scripts/setup-db-intent.sql` — creates `intent_sessions` table for intent resolution tracking
+7. `supabase/migrations/005_x402_metadata_column.sql` — adds `metadata` jsonb column to `x402_payments`, fixes network default to mainnet
 
 ### 2. Create Admin User
 
@@ -122,7 +125,7 @@ Set the three environment variables in Vercel project settings.
 | `agent_controls` | Agent enable/disable state | `id`, `agent_id`, `enabled` |
 | `swarm_runs` | Swarm run metadata | `id`, `name`, `mode`, `status`, `manifest`, `synthesis` |
 | `swarm_tasks` | Per-task status and output | `id`, `swarm_id`, `agent_id`, `message`, `status`, `output` |
-| `x402_payments` | x402 payment transaction log | `id`, `endpoint`, `amount`, `tx_hash`, `payer_address`, `status` |
+| `x402_payments` | x402 payment transaction log | `id`, `endpoint`, `amount`, `agent_id`, `payer_address`, `payee_address`, `network`, `status`, `metadata` |
 | `intent_sessions` | Intent resolution sessions | `id`, `query`, `cursor_agent_id`, `status` |
 
 All tables have:

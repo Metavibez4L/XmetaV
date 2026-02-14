@@ -158,14 +158,17 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 
 ### x402 Payment Service (Express)
 
-A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
+A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase CDP facilitator with JWT auth).
 
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
-- **Endpoints**: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02), `/voice/transcribe` ($0.005), `/voice/synthesize` ($0.01)
+- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08)
+- **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
+- **Discovery**: `GET /agent/:agentId/payment-info` — public ERC-8004 lookup with x402 detection
+- **Payment Logging**: Writes to `x402_payments` Supabase table (agent_id, payer/payee, network, metadata)
 - **Token Tiers**: Checks caller's $XMETAV balance on-chain and applies tier discount to pricing
-- **Free endpoints**: `/health`, `/token-info`
+- **Free endpoints**: `/health`, `/token-info`, `/agent/:agentId/payment-info`
 - **Settlement**: USDC on Base Mainnet
-- **Facilitator**: Coinbase x402 facilitator verifies and settles payments
+- **Facilitator**: `@coinbase/x402` CDP facilitator with `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` JWT auth
 - **Location**: `dashboard/x402-server/`
 
 ### ERC-8004 Agent Identity

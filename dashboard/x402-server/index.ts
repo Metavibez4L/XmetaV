@@ -3,6 +3,7 @@ import express from "express";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
+import { facilitator as cdpFacilitator } from "@coinbase/x402";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createPublicClient, http } from "viem";
@@ -14,16 +15,11 @@ import { base } from "viem/chains";
 // ============================================================
 
 const evmAddress = process.env.EVM_ADDRESS as `0x${string}`;
-const facilitatorUrl = process.env.FACILITATOR_URL;
 const port = parseInt(process.env.PORT || "4021", 10);
 const network = process.env.NETWORK || "eip155:8453"; // Base Mainnet default
 
 if (!evmAddress) {
   console.error("EVM_ADDRESS environment variable is required");
-  process.exit(1);
-}
-if (!facilitatorUrl) {
-  console.error("FACILITATOR_URL environment variable is required");
   process.exit(1);
 }
 
@@ -37,7 +33,11 @@ const supabase =
       })
     : null;
 
-const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
+// Facilitator: use @coinbase/x402 CDP facilitator (mainnet) or custom URL
+const facilitatorUrl = process.env.FACILITATOR_URL;
+const facilitatorClient = facilitatorUrl
+  ? new HTTPFacilitatorClient({ url: facilitatorUrl })
+  : new HTTPFacilitatorClient(cdpFacilitator);
 
 // OpenAI for voice endpoints (optional — voice endpoints disabled if no key)
 const openaiKey = process.env.OPENAI_API_KEY;

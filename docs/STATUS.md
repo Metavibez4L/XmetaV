@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-14  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v15 (Sentinel + Agent Memory + Identity System)
+**XmetaV Version:** v16 (x402 CDP Auth + ERC-8004 Identity Middleware)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -726,7 +726,7 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 
 ## ERC-8004 Agent Identity (Base mainnet)
 
-The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
+The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT with full x402 payment support declared in metadata.
 
 | Property | Value |
 |----------|-------|
@@ -734,8 +734,25 @@ The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
 | Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
 | Network | Base Mainnet |
 | Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| tokenURI | `https://raw.githubusercontent.com/Metavibez4L/XmetaV/dev/dashboard/erc8004/metadata.json` |
+| x402Support | `enabled: true` (declared in on-chain metadata) |
+| setAgentURI tx | [BaseScan](https://basescan.org/tx/0xc5c67e881d94c09746378f791eaee56e70c424742dc30c528109895ee5f23339) |
 | NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
-| Tx | [BaseScan](https://basescan.org/tx/0xee8da73203e1a6ce48560f66731a02fb4a74c346d6f1a02bd4cf94d7e05adb3b) |
+
+### Identity Resolution Middleware
+
+The x402 server includes ERC-8004 identity resolution middleware:
+- Incoming requests with `X-Agent-Id` header trigger on-chain lookup
+- Resolves `ownerOf`, `tokenURI`, `getAgentWallet` from the Identity Registry
+- Fetches metadata and checks `x402Support.enabled`
+- Attaches resolved identity to `req.callerAgent` for downstream handlers
+
+### Discovery Endpoint
+
+```
+GET /agent/16905/payment-info
+```
+Returns: owner, wallet, tokenURI, x402 support status, accepted schemes, pricing, and registry address.
 
 ### Dashboard `/identity` page
 
@@ -747,6 +764,7 @@ Shows agent registration status, owner, wallet, capabilities, services, trust mo
 |----------|----------|-------------|
 | `ERC8004_AGENT_ID` | `bridge/.env` | On-chain agent ID (16905) |
 | `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
+| `BASE_RPC_URL` | `x402-server/.env` | Alchemy RPC for on-chain reads |
 
 Full reference: `capabilities/erc8004-identity.md`
 
