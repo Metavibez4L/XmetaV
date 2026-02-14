@@ -232,9 +232,10 @@ export function initAvatars(
           console.log("[arena]   - skipping", id, ": not found");
           continue;
         }
+
+        // Wake offline agents — the caller already decided who joins
         if (entry.state === "offline") {
-          console.log("[arena]   - skipping", id, ": offline");
-          continue;
+          entry.state = "idle";
         }
 
         const seat = MEETING_SEATS.find((s) => s.agentId === id);

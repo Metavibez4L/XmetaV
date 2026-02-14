@@ -44,6 +44,7 @@ export default function ArenaCanvas() {
 
   // -- Meeting detection (stable callback via refs) ---------------------
   const checkMeetingRef = useRef<() => void>(() => {});
+  const meetingEndCooldownRef = useRef(0);
 
   // Soul always joins meetings as the observer/memory orchestrator
   const withSoul = (ids: string[]) => {
@@ -64,6 +65,7 @@ export default function ArenaCanvas() {
       const meetingIds = withSoul(busyIds);
       console.log("[arena] >>> STARTING AUTO MEETING", meetingIds);
       meetingActiveRef.current = true;
+      meetingEndCooldownRef.current = Date.now();
       nodesApiRef.current?.startMeeting(meetingIds);
       effectsApiRef.current?.meetingStart(meetingIds);
       officeApiRef.current?.setMeetingMode(true);
@@ -83,6 +85,12 @@ export default function ArenaCanvas() {
         meetingAgents: meetingIds,
       }));
     } else if (busyCount < 2 && meetingActiveRef.current) {
+      // Prevent the periodic sync from ending a meeting too quickly
+      // — agents need at least 5s to animate to seats and be visible
+      if (Date.now() - meetingEndCooldownRef.current < 5000) {
+        console.log("[arena] checkMeeting: skipping end (cooldown)");
+        return;
+      }
       console.log("[arena] >>> ENDING AUTO MEETING");
       meetingActiveRef.current = false;
       nodesApiRef.current?.endMeeting();
@@ -151,6 +159,16 @@ export default function ArenaCanvas() {
   // Assign fresh handlers on every render so closures stay current
   handlersRef.current = {
     onStatus(agentId, status) {
+      // If this agent has an active command, don't let session sync
+      // override its busy state — the command is the source of truth
+      const hasActiveCommand = Array.from(activeCommandsRef.current).length > 0 &&
+        busyAgentsRef.current.has(agentId);
+      if (hasActiveCommand && status !== "busy") {
+        // Only update screen visuals, don't touch busy tracking
+        nodeStatesRef.current.set(agentId, "busy");
+        return;
+      }
+
       nodesApiRef.current?.setState(agentId, status);
       const screenState =
         status === "busy" ? "busy" : status === "offline" ? "off" : "idle";
@@ -158,7 +176,7 @@ export default function ArenaCanvas() {
 
       nodeStatesRef.current.set(agentId, status);
 
-      // Also track busy from status events
+      // Track busy from status events
       if (status === "busy") {
         busyAgentsRef.current.add(agentId);
       } else {
@@ -173,7 +191,11 @@ export default function ArenaCanvas() {
         online,
         lastEvent: `${agentId} ${status}`,
       }));
-      checkMeeting();
+
+      // Don't let session sync noise end meetings prematurely
+      if (!meetingActiveRef.current || status === "busy") {
+        checkMeeting();
+      }
     },
     onCommand(commandId, agentId, message) {
       console.log("[arena] onCommand:", agentId, commandId);
