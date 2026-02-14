@@ -276,4 +276,11 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
   },
+  {
+    id: "soul",
+    name: "Soul (Memory Orchestrator)",
+    workspace: "/home/manifest/soul",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+  },
 ];
