@@ -109,14 +109,26 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
   if (!supabase) return;
   try {
     const callerAddress = req.headers["x-caller-address"] as string | undefined;
-    const paymentPayload = req.headers["x-payment"] as string | undefined;
-    await supabase.from("x402_payments").insert({
+    const callerAgent = (req as any).callerAgent as {
+      agentId: string; owner: string; wallet: string; x402Enabled?: boolean;
+    } | undefined;
+    const row: Record<string, unknown> = {
       endpoint,
       amount,
-      payer_address: callerAddress || null,
+      agent_id: callerAgent?.agentId || "external",
+      payer_address: callerAddress || callerAgent?.wallet || null,
+      payee_address: evmAddress,
+      network,
       status: "settled",
-      metadata: paymentPayload ? { hasPayload: true } : null,
-    });
+    };
+    // metadata column may not exist yet — try with it, fallback without
+    const metaPayload = callerAgent
+      ? { callerAgentId: callerAgent.agentId, callerOwner: callerAgent.owner, x402Enabled: callerAgent.x402Enabled }
+      : null;
+    const { error } = await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
+    if (error?.message?.includes("metadata")) {
+      await supabase.from("x402_payments").insert(row);
+    }
   } catch { /* best effort */ }
 }
 

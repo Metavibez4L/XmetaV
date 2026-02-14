@@ -16,15 +16,18 @@ create table if not exists x402_payments (
   endpoint text not null,
   amount text not null,
   currency text not null default 'USDC',
-  network text not null default 'eip155:84532',
+  network text not null default 'eip155:8453',
 
   -- Settlement
   tx_hash text,
   payer_address text,
   payee_address text,
 
-  -- Status: pending -> completed | failed
+  -- Status: pending -> settled | completed | failed
   status text not null default 'pending',
+
+  -- Optional metadata (caller agent info, payment details)
+  metadata jsonb,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
