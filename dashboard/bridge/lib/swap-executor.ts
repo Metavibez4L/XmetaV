@@ -254,6 +254,43 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
   const isFromETH = from.address.toLowerCase() === ETH_ADDRESS.toLowerCase();
   const isToETH = to.address.toLowerCase() === ETH_ADDRESS.toLowerCase();
 
+  // ── Pre-flight: check ETH balance for gas ──
+  const ethBalance = await publicClient.getBalance({ address: walletAddress });
+  const MIN_GAS_ETH = 4_000_000_000_000n; // ~0.000004 ETH minimum for gas
+  console.log(`[swap] Wallet ETH balance: ${formatUnits(ethBalance, 18)} ETH`);
+
+  if (isFromETH) {
+    // Swapping ETH — need amount + gas
+    const needed = amountIn + MIN_GAS_ETH;
+    if (ethBalance < needed) {
+      const have = formatUnits(ethBalance, 18);
+      const need = formatUnits(needed, 18);
+      return fail(`Insufficient ETH. Have ${have} ETH, need ~${need} ETH (${amount} to swap + gas). Send more ETH to ${walletAddress}`);
+    }
+  } else {
+    // Swapping tokens — need ETH only for gas
+    // Estimate ~0.005 ETH for approve + swap on Base
+    const gasEstimate = 5_000_000_000_000_000n; // 0.005 ETH
+    if (ethBalance < gasEstimate) {
+      const have = formatUnits(ethBalance, 18);
+      return fail(`Insufficient ETH for gas. Have ${have} ETH, need ~0.005 ETH. Send ETH to ${walletAddress} first.`);
+    }
+  }
+
+  // ── Pre-flight: check token balance ──
+  if (!isFromETH) {
+    const tokenBalance = await publicClient.readContract({
+      address: from.address,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [walletAddress],
+    });
+    if (tokenBalance < amountIn) {
+      const have = formatUnits(tokenBalance, from.decimals);
+      return fail(`Insufficient ${from.symbol}. Have ${have}, need ${amount}. Wallet: ${walletAddress}`);
+    }
+  }
+
   // Use WETH for routing (ETH is not an ERC-20)
   const routeFrom = isFromETH ? WETH_ADDRESS : from.address;
   const routeTo = isToETH ? WETH_ADDRESS : to.address;
@@ -370,10 +407,46 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
 
     return result;
   } catch (err) {
-    const msg = (err as Error).message || String(err);
-    console.error(`[swap] Transaction failed:`, msg);
-    return fail(msg);
+    const rawMsg = (err as Error).message || String(err);
+    console.error(`[swap] Transaction failed:`, rawMsg);
+    // Clean up viem error messages — extract the human-readable part
+    const cleanMsg = cleanSwapError(rawMsg, walletAddress);
+    const result = fail(cleanMsg);
+    await logSwap(result, agentId, commandId).catch(() => {});
+    return result;
   }
+}
+
+/**
+ * Clean up verbose viem/contract errors into human-readable messages.
+ */
+function cleanSwapError(raw: string, wallet: string): string {
+  // Insufficient funds for gas
+  if (raw.includes("insufficient funds") || raw.includes("exceeds the balance")) {
+    const haveMatch = raw.match(/have\s+(\d+)/);
+    const wantMatch = raw.match(/want\s+(\d+)/);
+    if (haveMatch && wantMatch) {
+      const have = formatUnits(BigInt(haveMatch[1]), 18);
+      const want = formatUnits(BigInt(wantMatch[1]), 18);
+      return `Not enough ETH for gas. Have ${have} ETH, need ~${want} ETH. Send more ETH to ${wallet}.`;
+    }
+    return `Not enough ETH for gas. Send more ETH to ${wallet}.`;
+  }
+  // User rejected
+  if (raw.includes("User rejected") || raw.includes("user denied")) {
+    return "Transaction rejected.";
+  }
+  // Revert / execution reverted
+  if (raw.includes("reverted") || raw.includes("UNPREDICTABLE_GAS_LIMIT")) {
+    return `Swap reverted on-chain. The pool may lack liquidity or slippage is too high. Try a smaller amount.`;
+  }
+  // Timeout
+  if (raw.includes("timeout") || raw.includes("Timeout")) {
+    return "Transaction timed out waiting for confirmation. Check BaseScan for pending txs.";
+  }
+  // Fallback: truncate to first meaningful line
+  const firstLine = raw.split("\n")[0];
+  return firstLine.length > 200 ? firstLine.slice(0, 200) + "..." : firstLine;
 }
 
 // ── Parse swap commands from natural language ───────────────────────

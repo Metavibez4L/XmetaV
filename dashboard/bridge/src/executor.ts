@@ -86,8 +86,8 @@ export async function executeCommand(command: {
     const streamer = createStreamer(id);
     streamer.start();
 
-    await streamer.write(`\n🔄 Executing swap: ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}\n`);
-    await streamer.write(`⏳ Getting quote from Aerodrome...\n`);
+    streamer.write(`\n🔄 **Executing swap:** ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}\n\n`);
+    streamer.write(`⏳ Checking balances & getting quote from Aerodrome...\n\n`);
 
     try {
       const result = await executeSwap({
@@ -97,15 +97,16 @@ export async function executeCommand(command: {
       });
 
       if (result.success) {
-        await streamer.write(`✅ Swap executed successfully!\n`);
-        await streamer.write(`📊 ${result.amountIn} → ${result.amountOut}\n`);
-        await streamer.write(`🔗 ${result.explorerUrl}\n`);
+        streamer.write(`✅ **Swap executed successfully!**\n\n`);
+        streamer.write(`📊 **${result.amountIn} → ${result.amountOut}**\n\n`);
+        streamer.write(`🔗 [View on BaseScan](${result.explorerUrl})\n\n`);
         if (result.approveTxHash) {
-          await streamer.write(`🔐 Approval tx: https://basescan.org/tx/${result.approveTxHash}\n`);
+          streamer.write(`🔐 Approval: [${result.approveTxHash.slice(0, 10)}...](https://basescan.org/tx/${result.approveTxHash})\n\n`);
         }
-        await streamer.write(`\nTransaction hash: ${result.txHash}\n`);
+        streamer.write(`Transaction: \`${result.txHash}\`\n`);
       } else {
-        await streamer.write(`❌ Swap failed: ${result.error}\n`);
+        streamer.write(`\n❌ **Swap failed**\n\n`);
+        streamer.write(`${result.error}\n`);
       }
 
       await streamer.end(result.success ? 0 : 1);
@@ -116,7 +117,9 @@ export async function executeCommand(command: {
         .eq("id", id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await streamer.write(`❌ Swap error: ${msg}\n`);
+      // Clean error for display
+      const cleanMsg = msg.length > 300 ? msg.slice(0, 300) + "..." : msg;
+      streamer.write(`\n❌ **Swap error**\n\n${cleanMsg}\n`);
       await streamer.end(1);
 
       await supabase

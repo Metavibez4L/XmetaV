@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 import { cleanAgentOutput } from "@/lib/utils";
+import { createClient } from "@/lib/supabase-browser";
 
 // ────────────────────────────────────────────────────
 // Types
@@ -354,20 +355,48 @@ export function AgentChat() {
       // Save final text BEFORE clearing activeCommandId (which resets fullText)
       lastCompletedTextRef.current = finalText;
 
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "agent" && last.commandId === completedId) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: finalText, status: "completed" },
-          ];
-        }
-        return prev;
-      });
-      setLastCompletedCmdId(completedId);
-      setActiveCommandId(null);
-      setSending(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      // Fetch actual command status from DB to correctly mark failed swaps
+      const sb = createClient();
+      sb.from("agent_commands")
+        .select("status")
+        .eq("id", completedId)
+        .single()
+        .then(({ data: cmd }) => {
+          const finalStatus: "completed" | "failed" =
+            cmd?.status === "failed" ? "failed" : "completed";
+
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "agent" && last.commandId === completedId) {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: finalText, status: finalStatus },
+              ];
+            }
+            return prev;
+          });
+          setLastCompletedCmdId(completedId);
+          setActiveCommandId(null);
+          setSending(false);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        })
+        .catch(() => {
+          // Fallback: just mark as completed
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "agent" && last.commandId === completedId) {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: finalText, status: "completed" },
+              ];
+            }
+            return prev;
+          });
+          setLastCompletedCmdId(completedId);
+          setActiveCommandId(null);
+          setSending(false);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        });
     }
   }, [isComplete, activeCommandId, fullText]);
 
