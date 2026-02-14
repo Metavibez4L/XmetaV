@@ -1,7 +1,8 @@
 import { supabase } from "../lib/supabase.js";
 import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
-import { buildMemoryContext, captureCommandOutcome } from "../lib/agent-memory.js";
+import { captureCommandOutcome } from "../lib/agent-memory.js";
+import { buildSoulContext } from "../lib/soul/index.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -62,16 +63,16 @@ export async function executeCommand(command: {
 
   console.log(`[executor] Executing command ${id} on agent "${agent_id}"`);
 
-  // Inject persistent memory context into the dispatch message
+  // Inject Soul-curated context into the dispatch message
   let enrichedMessage = message;
   try {
-    const memoryCtx = await buildMemoryContext(agent_id);
-    if (memoryCtx) {
-      enrichedMessage = memoryCtx + message;
-      console.log(`[executor] Injected ${memoryCtx.split("\n").length - 3} memory entries for "${agent_id}"`);
+    const soulCtx = await buildSoulContext(agent_id, message);
+    if (soulCtx) {
+      enrichedMessage = soulCtx + message;
+      console.log(`[executor] Soul injected context for "${agent_id}" (${soulCtx.length} chars)`);
     }
   } catch (err) {
-    console.error(`[executor] Memory injection failed (non-fatal):`, err);
+    console.error(`[executor] Soul context failed (non-fatal):`, err);
   }
 
   // Mark as running

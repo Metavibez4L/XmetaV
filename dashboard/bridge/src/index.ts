@@ -12,8 +12,8 @@ const HEALTH_PORT = Number(process.env.BRIDGE_PORT || 3001);
 const PID_FILE = path.resolve(import.meta.dirname, "../.bridge.pid");
 
 console.log("╔══════════════════════════════════════╗");
-console.log("║    XmetaV Bridge Daemon v1.3.0       ║");
-console.log("║    + Intent Layer (Cursor API)       ║");
+console.log("║    XmetaV Bridge Daemon v1.4.0       ║");
+console.log("║    + Soul Agent (Memory Orchestrator) ║");
 console.log("╚══════════════════════════════════════╝");
 console.log("");
 
@@ -27,7 +27,7 @@ const healthServer = createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       status: "ok",
-      version: "1.3.0",
+      version: "1.4.0",
       pid: process.pid,
       uptime: process.uptime(),
       startedAt,

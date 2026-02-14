@@ -2,7 +2,7 @@
 
 Quick reference for everything you can do with your OpenClaw Command Center.
 
-**Last updated:** 2026-02-12 (v11 - $XMETAV Token + Voice Commands + x402 Payments + ERC-8004 Identity)
+**Last updated:** 2026-02-14 (v12 - Soul Agent + Memory Orchestration)
 
 ## Directory Contents
 
@@ -23,7 +23,7 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 
 ```
 ┌─────────────────────────────────────────┐
-│         XmetaV Command Center v11       │
+│         XmetaV Command Center v12       │
 ├─────────────────────────────────────────┤
 │  Config:   ~/.openclaw/openclaw.json    │
 │  Gateway:  127.0.0.1:18789             │
@@ -47,6 +47,7 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 │    ✓ ERC-8004 Identity #16905           │
 │    ✓ Voice commands (STT/TTS)           │
 │    ✓ $XMETAV token (tiered discounts)   │
+│    ✓ Soul agent (memory orchestrator)   │
 │    ✓ Dashboard (Next.js + Supabase)     │
 │    ✓ GitHub integration                 │
 └─────────────────────────────────────────┘

@@ -1,5 +1,6 @@
 import { hostname } from "os";
 import { supabase } from "../lib/supabase.js";
+import { maybeStartDream } from "../lib/soul/index.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000; // 30 seconds
 
@@ -21,6 +22,9 @@ async function sendHeartbeat() {
   if (error) {
     console.error(`[heartbeat] Failed:`, error.message);
   }
+
+  // Check if Soul should enter dream mode (idle consolidation)
+  maybeStartDream().catch(() => {});
 }
 
 export function startHeartbeat() {

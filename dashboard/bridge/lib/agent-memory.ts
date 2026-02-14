@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.js";
 import { anchorMemory, isAnchoringEnabled, MemoryCategory } from "./memory-anchor.js";
 import type { MemoryCategoryType } from "./memory-anchor.js";
+import { processNewMemory } from "./soul/index.js";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -102,18 +103,21 @@ export async function buildMemoryContext(agentId: string): Promise<string> {
 /**
  * Write a memory entry for an agent.
  */
-export async function writeMemory(entry: MemoryEntry): Promise<void> {
-  const { error } = await supabase.from("agent_memory").insert({
+export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
+  const { data, error } = await supabase.from("agent_memory").insert({
     agent_id: entry.agent_id,
     kind: entry.kind,
     content: entry.content,
     source: entry.source ?? "bridge",
     ttl_hours: entry.ttl_hours ?? null,
-  });
+  }).select("id").single();
 
   if (error) {
     console.error(`[memory] Failed to write memory for ${entry.agent_id}:`, error.message);
+    return null;
   }
+
+  return data?.id ?? null;
 }
 
 /**
@@ -204,13 +208,20 @@ export async function captureCommandOutcome(
   const kind: MemoryKind = exitCode === 0 ? "outcome" : "error";
   const taskSnippet = message.length > 80 ? message.slice(0, 80) + "..." : message;
 
-  await writeMemory({
+  const memContent = `Task: "${taskSnippet}" → ${kind === "outcome" ? "completed" : "failed (exit " + exitCode + ")"}. Output: ${summary}`;
+
+  const memoryId = await writeMemory({
     agent_id: agentId,
     kind,
-    content: `Task: "${taskSnippet}" → ${kind === "outcome" ? "completed" : "failed (exit " + exitCode + ")"}. Output: ${summary}`,
+    content: memContent,
     source: "bridge",
     ttl_hours: 72, // Auto-expire after 3 days
   });
+
+  // Soul: build associations from the new memory (non-blocking)
+  if (memoryId) {
+    processNewMemory(memoryId, agentId, memContent).catch(() => {});
+  }
 
   // Anchor significant memories on-chain (IPFS + Base)
   await anchorIfSignificant(agentId, kind, taskSnippet, summary);
