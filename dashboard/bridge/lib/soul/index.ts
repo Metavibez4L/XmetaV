@@ -11,5 +11,5 @@ export { buildSoulContext, processNewMemory, buildContextPacket } from "./contex
 export { retrieveRelevantMemories, extractKeywords } from "./retrieval.js";
 export { buildAssociations, reinforceAssociation } from "./associations.js";
 export { maybeStartDream, getRelevantInsights } from "./dream.js";
-export type { ContextPacket, PsycheConfig, DreamInsight, MemoryAssociation, MemoryQuery } from "./types.js";
+export type { ContextPacket, SoulConfig, DreamInsight, MemoryAssociation, MemoryQuery } from "./types.js";
 export { DEFAULT_CONFIG } from "./types.js";

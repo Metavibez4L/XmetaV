@@ -1,7 +1,7 @@
 /**
  * Soul Agent — Context Orchestrator
  *
- * The main entry point for Psyche's intelligence.
+ * The main entry point for Soul's intelligence.
  * Replaces the simple buildMemoryContext() with a relevance-aware
  * context builder that draws from:
  *   1. Keyword-scored recent memories

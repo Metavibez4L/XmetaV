@@ -4,10 +4,11 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 
 > Note: These docs intentionally avoid including any secrets (gateway tokens, API keys). Use `openclaw config get ...` locally when you need exact values.
 
-## Core Fleet (10 agents)
+## Core Fleet (11 agents)
 
 - [`main`](./main.md) — **orchestrator** (agent factory + swarm + command center)
 - [`sentinel`](./sentinel.md) — **fleet ops** (lifecycle manager, spawn coordination, health monitoring)
+- [`soul`](./main.md) — **memory orchestrator** (context curation, dream consolidation, association building, memory retrieval learning)
 - [`briefing`](./briefing.md) — **context curator** (continuity, health sentinel, memory distillation)
 - [`oracle`](./oracle.md) — **on-chain intel** (gas, prices, chain activity, crypto sentiment)
 - [`alchemist`](./alchemist.md) — **tokenomics** (supply, emissions, staking curves, liquidity)

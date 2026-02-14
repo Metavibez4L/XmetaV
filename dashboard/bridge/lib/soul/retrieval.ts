@@ -10,9 +10,9 @@
 import { supabase } from "../supabase.js";
 import type { MemoryEntry } from "../agent-memory.js";
 import { DEFAULT_CONFIG } from "./types.js";
-import type { PsycheConfig } from "./types.js";
+import type { SoulConfig } from "./types.js";
 
-const config: PsycheConfig = DEFAULT_CONFIG;
+const config: SoulConfig = DEFAULT_CONFIG;
 
 /** Stop words to exclude from keyword extraction */
 const STOP_WORDS = new Set([

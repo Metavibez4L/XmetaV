@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-14  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v16 (x402 CDP Auth + ERC-8004 Identity Middleware)
+**XmetaV Version:** v17 (Soul Agent + ERC-8004 Metadata + Arena Soul Office)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -54,6 +54,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 |-------|-------|-----------|-------|------|
 | `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
 | `sentinel` | `kimi-k2.5:cloud` | `/home/manifest/sentinel` | coding | **Fleet Ops** — lifecycle, spawn coordination, health |
+| `soul` | `kimi-k2.5:cloud` | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dreams, associations |
 | `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
 | `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
@@ -591,6 +592,26 @@ Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unre
 - Chairs: brighter colors with edge glow
 - Ghost silhouettes: increased alpha for idle (0.35) and busy (0.5) states
 - Meeting mode: brighter glow and silhouette when seated
+
+---
+
+## Soul Agent (v17)
+
+Memory orchestrator providing context curation, association building, dream consolidation, and fleet-wide memory retrieval learning.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, retrieval, types) |
+| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights` tables |
+| Arena Presence | Active | Room: SOUL (private alcove), Color: Magenta (#ff006e) |
+| Arena Office | Active | L-shaped surveillance desk + arc of mini fleet-monitor screens |
+| Meeting Seat | Active | Observer position (195°) |
+| Topology | Active | Watches: main, briefing, oracle, alchemist, sentinel |
+| ERC-8004 | Active | Listed in `fleet.agents` + 5 soul capabilities in metadata |
+| Bridge | Active | Listed in ALLOWED_AGENTS |
+| Supabase | Active | Registered in agent_controls |
+
+Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
 
 ---
 

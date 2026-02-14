@@ -44,7 +44,7 @@ export interface DreamInsight {
 
 // ---- Context Packet ----
 
-/** What Psyche assembles for pre-dispatch injection */
+/** What Soul assembles for pre-dispatch injection */
 export interface ContextPacket {
   memories: Array<{
     id: string;
@@ -61,9 +61,9 @@ export interface ContextPacket {
   total_anchors: number;
 }
 
-// ---- Psyche Config ----
+// ---- Soul Config ----
 
-export interface PsycheConfig {
+export interface SoulConfig {
   /** Max memories to retrieve per context query */
   maxRetrievalCount: number;
   /** Max characters in injected context */
@@ -76,7 +76,7 @@ export interface PsycheConfig {
   associationScanWindow: number;
 }
 
-export const DEFAULT_CONFIG: PsycheConfig = {
+export const DEFAULT_CONFIG: SoulConfig = {
   maxRetrievalCount: 10,
   maxContextChars: 3000,
   dreamIdleThresholdHours: 6,

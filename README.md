@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v16
+Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v17
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,7 @@ Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v16
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  10 (main + sentinel + intel + dev)  |
+ |   agents:  11 (main + sentinel + soul + fleet) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
@@ -41,8 +41,9 @@ Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v16
 - **ERC-8004 Identity** — On-chain agent identity (NFT #16905) with `x402Support` metadata, identity resolution middleware, and `/agent/:id/payment-info` discovery endpoint
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.05-$0.08 per request)
 - **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
+- **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
-- Multi-agent management (10 agents: main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
+- Multi-agent management (11 agents: main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -790,6 +791,16 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
+### 2026-02-14 (v17) — Soul Agent + ERC-8004 Metadata Update + Arena Soul Office
+- **Soul Agent** — New memory orchestrator agent (`soul`): context curation, memory association building, dream consolidation during fleet idle, and memory retrieval learning. Room: SOUL (private magenta alcove). Color: Magenta (`#ff006e`)
+- **Soul Office in Arena** — Dedicated isometric alcove (cols 0–1, rows 2–5) with magenta floor tiles, glass partition walls, "SOUL" room label, L-shaped surveillance desk, and an arc of mini fleet-monitor screens that mirror every agent's state in real-time
+- **Soul Arena Integration** — Soul agent node, meeting seat (observer position at 195°), and topology connections to main, briefing, oracle, alchemist, sentinel (watches everyone)
+- **ERC-8004 Metadata Update** — Added Soul to `fleet.agents` and `fleet.rooms` in on-chain metadata. Added 5 soul-specific capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+- **Soul DB Schema** — Three Supabase tables (`memory_associations`, `memory_queries`, `dream_insights`) with RLS policies for Soul's memory orchestration layer
+- **Soul Bridge Library** — Full `bridge/lib/soul/` module: context building, memory retrieval, association building, dream mode (idle consolidation), and type definitions
+- **Sidebar Cleanup** — Removed Soul tab from sidebar navigation (no `/soul` page yet; Soul is an arena-only agent)
+- **Fleet Count** — 11 autonomous agents (main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web) + dynamic
+
 ### 2026-02-13 (v15) — Sentinel Agent + Agent Memory + Identity System + Noise Filter
 - **Sentinel Agent** — New fleet lifecycle manager (`sentinel`): spawn coordination, resource management, inter-agent communication, fleet health monitoring. Room: COMMAND. Color: Red (`#ef4444`). Commands: `status`, `health`, `spawn`, `queue`, `errors`
 - **Agent Identity System** — Created `IDENTITY.md` + `SOUL.md` for all sub-agents (web3dev, oracle, briefing, alchemist, sentinel). Agents now have full self-awareness: who they are, what commands they have, their team, operating principles, and communication style
@@ -985,5 +996,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator</sub>
 </p>
