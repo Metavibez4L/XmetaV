@@ -27,6 +27,7 @@ https://supabase.com/dashboard/project/ptlneqcjsnrxxruutsxm/sql/new
 1. `scripts/setup-db.sql` — creates `agent_commands`, `agent_responses`, `agent_sessions` tables with RLS + Realtime
 2. `scripts/setup-db-agent-controls.sql` — creates `agent_controls` table for enable/disable toggles
 3. `scripts/setup-db-swarms.sql` — creates `swarm_runs` + `swarm_tasks` tables with RLS + Realtime
+4. `scripts/setup-db-agent-memory.sql` — creates `agent_memory` table for persistent memory (`_shared` + per-agent) with RLS + Realtime
 
 ### 2. Create Admin User
 
@@ -73,6 +74,7 @@ The bridge daemon will:
 - Stream output back to the dashboard in real-time
 - Enforce agent enable/disable controls
 - Use persistent daily sessions for main agent (with lock-contention fallback)
+- Inject recent Supabase-backed memory entries into dispatch prompts and capture outcomes back into memory
 - Send periodic heartbeats
 
 ### 6. Deploy to Vercel
@@ -116,6 +118,7 @@ Set the three environment variables in Vercel project settings.
 | `agent_commands` | Command bus (dashboard -> bridge) | `id`, `agent_id`, `message`, `session_id`, `status` |
 | `agent_responses` | Response bus (bridge -> dashboard) | `id`, `command_id`, `content`, `is_complete` |
 | `agent_sessions` | Session tracking | `id`, `agent_id`, `session_id` |
+| `agent_memory` | Persistent memory bus (shared + per-agent) | `id`, `agent_id`, `kind`, `content`, `created_at` |
 | `agent_controls` | Agent enable/disable state | `id`, `agent_id`, `enabled` |
 | `swarm_runs` | Swarm run metadata | `id`, `name`, `mode`, `status`, `manifest`, `synthesis` |
 | `swarm_tasks` | Per-task status and output | `id`, `swarm_id`, `agent_id`, `message`, `status`, `output` |
@@ -132,6 +135,7 @@ All tables have:
 | Route | Method | Description |
 |-------|--------|-------------|
 | `/api/commands` | POST | Send a command to an agent |
+| `/api/agents/memory` | GET, POST, DELETE | List/write/delete persistent agent memory entries |
 | `/api/agents/controls` | GET, POST | Get/set agent enable/disable state |
 | `/api/bridge/status` | GET | Check bridge daemon status |
 | `/api/bridge/start` | POST | Start bridge daemon |

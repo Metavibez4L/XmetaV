@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v15
+Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v15
 
 ```
  ___   ___                    __           ___   ___
@@ -40,7 +40,7 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v15
 - **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
 - **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
-- **Agent Memory** — Main agent retains conversation context via persistent daily sessions with lock-contention fallback
+- **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
 - Multi-agent management (10 agents: main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)

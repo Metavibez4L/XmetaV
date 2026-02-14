@@ -3,6 +3,7 @@
   "name": "XmetaV",
   "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of specialized agents across intel, development, and operations — including on-chain intelligence (oracle), tokenomics analysis (alchemist), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, and ERC-8004 identity on Base Mainnet.",
   "image": "",
+  "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
     {
       "type": "x402",
@@ -62,36 +63,14 @@
   ],
   "fleet": {
     "agents": [
-      {
-        "id": "main",
-        "role": "Orchestrator & fleet commander",
-        "room": "command"
-      },
-      {
-        "id": "sentinel",
-        "role": "Agent lifecycle manager — spawn coordination, fleet health, inter-agent dispatch",
-        "room": "command"
-      },
-      {
-        "id": "briefing",
-        "role": "Context curator — SITREP & memory consolidation",
-        "room": "intel"
-      },
-      {
-        "id": "oracle",
-        "role": "On-chain intelligence — gas, prices, chain stats, sentiment",
-        "room": "intel"
-      },
-      {
-        "id": "alchemist",
-        "role": "Tokenomics specialist — $XMETAV supply, emissions, staking",
-        "room": "intel"
-      },
-      {
-        "id": "web3dev",
-        "role": "Blockchain developer — Solidity, Hardhat, Base deployments",
-        "room": "web3Lab"
-      }
+      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command" },
+      { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
+      { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
+      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel" },
+      { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel" },
+      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab" },
+      { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
+      { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" }
     ],
     "model": "ollama/kimi-k2.5:cloud",
     "meetingCapacity": 7,

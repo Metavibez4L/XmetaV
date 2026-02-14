@@ -66,6 +66,22 @@ Manual cleanup:
 find ~/.openclaw -name "*.lock" -type f -delete
 ```
 
+## Persistent memory (dashboard + bridge)
+
+In addition to OpenClaw session history, XmetaV supports a Supabase-backed **persistent memory bus** used by the dashboard + bridge:
+
+- Table: `agent_memory`
+- Shared memory: entries with `agent_id = "_shared"`
+- Bridge behavior: prepends recent memory entries to the dispatched message; writes an `outcome`/`error` memory entry after completion
+
+Setup:
+- Run `dashboard/scripts/setup-db-agent-memory.sql` in the Supabase SQL editor
+
+API (dashboard, service-role on server side):
+- `GET /api/agents/memory?agent_id=<id>&limit=<n>`
+- `POST /api/agents/memory` (insert `{ agent_id, kind, content, source?, ttl_hours? }`)
+- `DELETE /api/agents/memory?id=<uuid>`
+
 ## Deterministic smoke tests
 
 Use a new session id each time to avoid ambiguous session state:

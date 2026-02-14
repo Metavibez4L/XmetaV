@@ -22,6 +22,7 @@ flowchart TB
         TBL_CMD["agent_commands"]
         TBL_RESP["agent_responses"]
         TBL_CTRL["agent_controls"]
+        TBL_MEM["agent_memory"]
         TBL_SRUN["swarm_runs"]
         TBL_STASK["swarm_tasks"]
         TBL_X402["x402_payments"]
@@ -141,7 +142,7 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
 ### Bridge Daemon (Node.js)

@@ -1,5 +1,5 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-13  
+**Last verified:** 2026-02-14  
 **System:** metavibez4L (WSL2)  
 **XmetaV Version:** v15 (Sentinel + Agent Memory + Identity System)
 
@@ -19,6 +19,14 @@ This file captures the **known-good** runtime settings for this machine and the 
 # Verify OpenClaw
 openclaw health
 openclaw --version  # Expected: 2026.2.1
+
+# Supabase tables sanity (service role / admin only)
+# - agent_memory is the persistent memory bus used by the bridge
+# - shared memory entries use agent_id = "_shared"
+#
+# Example SQL in Supabase editor:
+#   select agent_id, kind, created_at from agent_memory order by created_at desc limit 10;
+#   select count(*) from agent_memory;
 ```
 
 ---
@@ -178,6 +186,16 @@ openclaw agent --agent main --local --thinking off \
   --session-id tool_test_$(date +%s) \
   --message "Call exec: echo TOOL_OK"
 # Expected: agent calls exec tool and returns TOOL_OK
+
+## Persistent memory bus (Supabase)
+
+This environment supports a Supabase-backed memory bus that complements OpenClaw session history:
+
+- Table: `agent_memory`
+- Scope: per-agent entries plus shared entries (`agent_id = "_shared"`)
+- Bridge behavior: injects recent memory into dispatch prompts; writes an `outcome`/`error` entry after completion
+
+Migration file (dashboard): `dashboard/scripts/setup-db-agent-memory.sql`
 ```
 
 ## Standard way to run the agent (stable)
