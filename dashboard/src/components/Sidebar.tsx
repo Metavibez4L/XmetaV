@@ -4,20 +4,21 @@ import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: LayoutDashboard, shortcut: "01", key: "1" },
   { href: "/intent", label: "Intent", icon: Zap, shortcut: "02", key: "2" },
-  { href: "/agent", label: "Agent Chat", icon: MessageSquare, shortcut: "03", key: "3" },
-  { href: "/swarms", label: "Swarms", icon: Network, shortcut: "04", key: "4" },
-  { href: "/fleet", label: "Fleet", icon: Users, shortcut: "05", key: "5" },
-  { href: "/payments", label: "Payments", icon: Wallet, shortcut: "06", key: "6" },
-  { href: "/identity", label: "Identity", icon: Fingerprint, shortcut: "07", key: "7" },
-  { href: "/token", label: "$XMETAV", icon: Coins, shortcut: "08", key: "8" },
-  { href: "/logs", label: "Logs", icon: Terminal, shortcut: "09", key: "9" },
-  { href: "/arena", label: "Arena", icon: Swords, shortcut: "10", key: "0" },
+  { href: "/consciousness", label: "Consciousness", icon: Brain, shortcut: "03", key: "3" },
+  { href: "/agent", label: "Agent Chat", icon: MessageSquare, shortcut: "04", key: "4" },
+  { href: "/swarms", label: "Swarms", icon: Network, shortcut: "05", key: "5" },
+  { href: "/fleet", label: "Fleet", icon: Users, shortcut: "06", key: "6" },
+  { href: "/payments", label: "Payments", icon: Wallet, shortcut: "07", key: "7" },
+  { href: "/identity", label: "Identity", icon: Fingerprint, shortcut: "08", key: "8" },
+  { href: "/token", label: "$XMETAV", icon: Coins, shortcut: "09", key: "9" },
+  { href: "/logs", label: "Logs", icon: Terminal, shortcut: "10", key: "0" },
+  { href: "/arena", label: "Arena", icon: Swords, shortcut: "11" },
 ];
 
 interface SidebarProps {
