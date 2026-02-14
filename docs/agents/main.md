@@ -68,6 +68,16 @@ These are YOUR agents — the XmetaV core team. They report to you. They exist t
 - **Commands:** `sentinel status`, `sentinel health`, `sentinel spawn <agent>`, `sentinel queue`, `sentinel errors`
 - **Room:** Command (right of you)
 
+### 💜 Soul (`soul`)
+**Memory Orchestrator & Context Curator**
+- Curates context packets from relevant memories for every agent dispatch
+- Builds associations between memories (causal, similar, sequential)
+- Runs dream consolidation when fleet is idle — clusters memories into insights
+- Tracks retrieval effectiveness for continuous learning
+- **When to use:** Automatic — Soul runs behind every task. No direct commands needed.
+- **Data stores:** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`
+- **Room:** Soul (private alcove)
+
 ---
 
 ## Repo Agents (External — Project-Specific)
@@ -101,6 +111,8 @@ These agents work on specific repositories. They're part of the fleet but NOT co
 | "Why isn't oracle responding?" | `sentinel health oracle` |
 | "How many commands are queued?" | `sentinel queue` |
 | "Check for errors" | `sentinel errors` |
+| "Swap 5 USDC to ETH" | Bridge intercepts — Aerodrome DEX swap (voice or text) |
+| "What's in our wallet?" | `oracle report` |
 
 **For complex tasks**, coordinate multiple agents:
 - Token launch → `alchemist` (economics) + `web3dev` (contracts) + `oracle` (market timing)
@@ -118,6 +130,18 @@ These agents work on specific repositories. They're part of the fleet but NOT co
 | $XMETAV Token | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` |
 | ERC-8004 Identity | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (ID: 16905) |
 | ERC-8004 Reputation | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` |
+
+---
+
+## On-Chain Capabilities
+
+| Capability | Details |
+|------------|--------|
+| **ERC-8004 Identity** | Agent #16905 on Base Mainnet |
+| **Token Swaps** | Voice or text — "swap X TOKEN to TOKEN" via Aerodrome Router V2 |
+| **Supported Tokens** | ETH, WETH, USDC, USDT, DAI, cbETH, AERO, $XMETAV |
+| **Memory Anchoring** | Significant memories pinned to IPFS + anchored on-chain |
+| **x402 Payments** | Payment-gated API endpoints (USDC on Base) |
 
 ---
 

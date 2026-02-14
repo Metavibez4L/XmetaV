@@ -1,7 +1,7 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of specialized agents across intel, development, and operations — including on-chain intelligence (oracle), tokenomics analysis (alchemist), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of specialized agents across intel, development, and operations — including on-chain intelligence (oracle), tokenomics analysis (alchemist), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
@@ -24,6 +24,11 @@
       "type": "github",
       "url": "https://github.com/Metavibez4L/XmetaV",
       "description": "Source repository — scripts, dashboard, bridge, docs, and agent templates"
+    },
+    {
+      "type": "swap",
+      "url": "http://localhost:3001",
+      "description": "Token swap execution via Aerodrome Router V2 on Base — voice and text commands"
     }
   ],
   "registrations": [
@@ -64,7 +69,10 @@
     "dream-consolidation",
     "memory-association-building",
     "context-packet-curation",
-    "memory-retrieval-learning"
+    "memory-retrieval-learning",
+    "token-swap-execution",
+    "voice-swap-commands",
+    "dex-trading"
   ],
   "fleet": {
     "agents": [
@@ -103,7 +111,7 @@
   "wallet": {
     "address": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
     "network": "eip155:8453",
-    "supports": ["USDC", "ETH", "$XMETAV"]
+    "supports": ["USDC", "ETH", "WETH", "USDT", "DAI", "cbETH", "AERO", "$XMETAV"]
   },
   "x402Support": {
     "enabled": true,
