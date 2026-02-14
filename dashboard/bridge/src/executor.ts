@@ -3,6 +3,7 @@ import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
 import { captureCommandOutcome } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
+import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -62,6 +63,80 @@ export async function executeCommand(command: {
   }
 
   console.log(`[executor] Executing command ${id} on agent "${agent_id}"`);
+
+  // ── Swap command interception ──────────────────────────────────
+  // If the message is a swap command (e.g. "swap 5 USDC to ETH"),
+  // execute it directly instead of spawning an agent.
+  const swapParams = parseSwapCommand(message);
+  if (swapParams && isSwapEnabled()) {
+    console.log(`[executor] Swap command detected: ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    await streamer.write(`\n🔄 Executing swap: ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}\n`);
+    await streamer.write(`⏳ Getting quote from Aerodrome...\n`);
+
+    try {
+      const result = await executeSwap({
+        ...swapParams,
+        agentId: agent_id,
+        commandId: id,
+      });
+
+      if (result.success) {
+        await streamer.write(`✅ Swap executed successfully!\n`);
+        await streamer.write(`📊 ${result.amountIn} → ${result.amountOut}\n`);
+        await streamer.write(`🔗 ${result.explorerUrl}\n`);
+        if (result.approveTxHash) {
+          await streamer.write(`🔐 Approval tx: https://basescan.org/tx/${result.approveTxHash}\n`);
+        }
+        await streamer.write(`\nTransaction hash: ${result.txHash}\n`);
+      } else {
+        await streamer.write(`❌ Swap failed: ${result.error}\n`);
+      }
+
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await streamer.write(`❌ Swap error: ${msg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
+    // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
 
   // Inject Soul-curated context into the dispatch message
   let enrichedMessage = message;

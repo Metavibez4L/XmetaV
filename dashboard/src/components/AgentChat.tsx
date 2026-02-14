@@ -393,6 +393,19 @@ export function AgentChat() {
       scrollToBottom();
 
       try {
+        // Detect meeting commands and broadcast to arena tab via localStorage
+        const lowerMsg = trimmed.toLowerCase();
+        const isMeetingCmd = /meeting/i.test(lowerMsg);
+        if (isMeetingCmd) {
+          const AGENT_IDS = ["main","operator","sentinel","soul","briefing","oracle","alchemist","web3dev","akua","akua_web","basedintern","basedintern_web"];
+          const mentioned = AGENT_IDS.filter((id) => lowerMsg.includes(id.replace(/_/g, " ")) || lowerMsg.includes(id));
+          const meetingSet = new Set([agentId, "main", ...mentioned]);
+          if (mentioned.length === 0) { meetingSet.add("briefing"); meetingSet.add("oracle"); }
+          const payload = JSON.stringify({ type: "call-meeting", agentIds: Array.from(meetingSet), ts: Date.now() });
+          localStorage.setItem("xmetav-arena-meeting", payload);
+          console.log("[chat] Meeting command sent to arena via localStorage:", Array.from(meetingSet));
+        }
+
         const res = await fetch("/api/commands", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

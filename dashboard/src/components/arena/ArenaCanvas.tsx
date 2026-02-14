@@ -25,6 +25,7 @@ export default function ArenaCanvas() {
   const nodeStatesRef = useRef(new Map<string, string>());
   const busyAgentsRef = useRef(new Set<string>());
   const meetingActiveRef = useRef(false);
+  const meetingAgentsRef = useRef(new Set<string>());
 
   const [hudStats, setHudStats] = useState<HudStats>({
     online: 0,
@@ -65,6 +66,7 @@ export default function ArenaCanvas() {
       const meetingIds = withSoul(busyIds);
       console.log("[arena] >>> STARTING AUTO MEETING", meetingIds);
       meetingActiveRef.current = true;
+      meetingAgentsRef.current = new Set(meetingIds);
       meetingEndCooldownRef.current = Date.now();
       nodesApiRef.current?.startMeeting(meetingIds);
       effectsApiRef.current?.meetingStart(meetingIds);
@@ -78,6 +80,7 @@ export default function ArenaCanvas() {
       }));
     } else if (busyCount >= 2 && meetingActiveRef.current) {
       const meetingIds = withSoul(busyIds);
+      meetingAgentsRef.current = new Set(meetingIds);
       nodesApiRef.current?.startMeeting(meetingIds);
       effectsApiRef.current?.meetingStart(meetingIds);
       setHudStats((s) => ({
@@ -93,6 +96,7 @@ export default function ArenaCanvas() {
       }
       console.log("[arena] >>> ENDING AUTO MEETING");
       meetingActiveRef.current = false;
+      meetingAgentsRef.current.clear();
       nodesApiRef.current?.endMeeting();
       effectsApiRef.current?.meetingEnd();
       officeApiRef.current?.setMeetingMode(false);
@@ -110,9 +114,10 @@ export default function ArenaCanvas() {
   const callMeeting = useCallback((agentIds: string[]) => {
     if (agentIds.length < 2) return;
     const meetingIds = withSoul(agentIds);
-    console.log("[arena] >>> CALLING MANUAL MEETING:", meetingIds);
+    console.log("[arena] >>> CALLING MANUAL MEETING:", meetingIds, "nodesApi:", !!nodesApiRef.current);
     manualMeetingRef.current = true;
     meetingActiveRef.current = true;
+    meetingAgentsRef.current = new Set(meetingIds);
 
     // Visually set called agents to "busy" for the meeting
     for (const id of meetingIds) {
@@ -138,6 +143,7 @@ export default function ArenaCanvas() {
     console.log("[arena] >>> DISMISSING MEETING");
     manualMeetingRef.current = false;
     meetingActiveRef.current = false;
+    meetingAgentsRef.current.clear();
     nodesApiRef.current?.endMeeting();
     effectsApiRef.current?.meetingEnd();
     officeApiRef.current?.setMeetingMode(false);
@@ -150,8 +156,30 @@ export default function ArenaCanvas() {
     }));
   }, []);
 
-  // Keep checkMeeting ref current for use in the async PixiJS init
+  // Keep refs current for use in async callbacks & cross-tab listeners
   checkMeetingRef.current = checkMeeting;
+  const callMeetingRef = useRef(callMeeting);
+  callMeetingRef.current = callMeeting;
+
+  // -- Cross-tab meeting listener (localStorage "storage" event) ------
+  // When AgentChat (on /agent tab) detects a meeting command, it writes
+  // to localStorage. The "storage" event fires only in OTHER tabs.
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key !== "xmetav-arena-meeting" || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        if (data?.type === "call-meeting" && Array.isArray(data.agentIds)) {
+          console.log("[arena] Cross-tab meeting received:", data.agentIds);
+          if (!meetingActiveRef.current) {
+            callMeetingRef.current(data.agentIds);
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // -- Arena event handlers (updated every render via ref assignment) --
   const handlersRef = useRef<ArenaHandlers | null>(null);
@@ -164,8 +192,18 @@ export default function ArenaCanvas() {
       const hasActiveCommand = Array.from(activeCommandsRef.current).length > 0 &&
         busyAgentsRef.current.has(agentId);
       if (hasActiveCommand && status !== "busy") {
-        // Only update screen visuals, don't touch busy tracking
         nodeStatesRef.current.set(agentId, "busy");
+        return;
+      }
+
+      // During an active meeting, don't let periodic sync disrupt
+      // meeting participants — they must stay "busy" at the table
+      if (meetingActiveRef.current && meetingAgentsRef.current.has(agentId) && status !== "busy") {
+        // Keep meeting participant at the table; only update online count
+        const online = Array.from(nodeStatesRef.current.values()).filter(
+          (s) => s !== "offline",
+        ).length;
+        setHudStats((s) => ({ ...s, online }));
         return;
       }
 
@@ -210,7 +248,28 @@ export default function ArenaCanvas() {
         activeCommands: activeCommandsRef.current.size,
         lastEvent: `CMD > ${agentId}: ${message.slice(0, 40)}`,
       }));
-      checkMeeting();
+
+      // Detect meeting commands from voice/chat and trigger arena meeting
+      const lower = message.toLowerCase();
+      const isMeetingCmd = /\b(call|start|begin|schedule|hold|run)\b.*\bmeeting\b|\bmeeting\b.*\b(call|start|begin|with)\b/i.test(lower);
+      if (isMeetingCmd && !meetingActiveRef.current) {
+        // Extract mentioned agent names from the message
+        const allIds = ARENA_AGENTS.map((a) => a.id);
+        const mentioned = allIds.filter((id) => lower.includes(id.replace(/_/g, " ")) || lower.includes(id));
+        // Always include the agent receiving the command + main
+        const meetingSet = new Set([agentId, "main", ...mentioned]);
+        // If no specific agents mentioned, add default intel squad
+        if (mentioned.length === 0) {
+          meetingSet.add("briefing");
+          meetingSet.add("oracle");
+        }
+        const meetingIds = Array.from(meetingSet);
+        console.log("[arena] Voice/chat meeting command detected:", message.slice(0, 60), "→", meetingIds);
+        // Small delay to let the command visuals settle first
+        setTimeout(() => callMeeting(meetingIds), 300);
+      } else {
+        checkMeeting();
+      }
     },
     onChunk(_commandId, agentId) {
       effectsApiRef.current?.streamStart(agentId);

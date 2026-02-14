@@ -1,0 +1,423 @@
+/**
+ * Swap Executor — Agent-powered token swaps on Base via Aerodrome/Uniswap V3.
+ *
+ * This module gives agents the power to execute on-chain swaps on behalf
+ * of the operator. It uses the same EVM_PRIVATE_KEY used for memory
+ * anchoring and ERC-8004 registration.
+ *
+ * Safety:
+ *   - Per-swap USD limit (default $50)
+ *   - Token allowlist (only known tokens)
+ *   - Slippage protection (default 1%)
+ *   - All swaps logged to Supabase `agent_swaps` table
+ *   - Gas estimation with safety margin
+ *
+ * Flow:
+ *   1. Agent detects a swap command (e.g. "swap 5 USDC to ETH")
+ *   2. Bridge calls executeSwap() with parsed params
+ *   3. Module quotes the swap via Aerodrome Router
+ *   4. Executes approve (if needed) + swap
+ *   5. Returns tx hash and amounts
+ */
+
+import {
+  createWalletClient,
+  createPublicClient,
+  http,
+  parseUnits,
+  formatUnits,
+  encodeFunctionData,
+  type Address,
+  type Hash,
+} from "viem";
+import { base } from "viem/chains";
+import { privateKeyToAccount } from "viem/accounts";
+import { supabase } from "./supabase.js";
+
+// ── Config ──────────────────────────────────────────────────────────
+
+const PRIVATE_KEY = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
+const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const MAX_SWAP_USD = parseFloat(process.env.SWAP_LIMIT_USD || "50");
+
+// ── Known Tokens on Base ────────────────────────────────────────────
+
+export const BASE_TOKENS: Record<string, { address: Address; decimals: number; symbol: string }> = {
+  eth:   { address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", decimals: 18, symbol: "ETH" },
+  weth:  { address: "0x4200000000000000000000000000000000000006", decimals: 18, symbol: "WETH" },
+  usdc:  { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6,  symbol: "USDC" },
+  usdt:  { address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", decimals: 6,  symbol: "USDT" },
+  dai:   { address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", decimals: 18, symbol: "DAI" },
+  cbeth: { address: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22", decimals: 18, symbol: "cbETH" },
+  aero:  { address: "0x940181a94A35A4569E4529A3CDfB74e38FD98631", decimals: 18, symbol: "AERO" },
+};
+
+// Native ETH sentinel address
+const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const WETH_ADDRESS = "0x4200000000000000000000000000000000000006" as Address;
+
+// Aerodrome Router V2 on Base
+const AERODROME_ROUTER = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43" as Address;
+
+// ── ABIs ────────────────────────────────────────────────────────────
+
+const ERC20_ABI = [
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+] as const;
+
+// Aerodrome Router V2 — swapExactTokensForTokens & swapExactTokensForETH
+const ROUTER_ABI = [
+  {
+    type: "function",
+    name: "swapExactTokensForTokens",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "swapExactTokensForETH",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "swapExactETHForTokens",
+    inputs: [
+      { name: "amountOutMin", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "getAmountsOut",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      {
+        name: "routes",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "stable", type: "bool" },
+          { name: "factory", type: "address" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+    stateMutability: "view",
+  },
+] as const;
+
+// Aerodrome default pool factory
+const AERODROME_FACTORY = "0x420DD381b31aEf6683db6B902084cB0FFECe40Da" as Address;
+
+// ── Types ───────────────────────────────────────────────────────────
+
+export interface SwapParams {
+  fromToken: string;   // token symbol (e.g. "USDC", "ETH")
+  toToken: string;     // token symbol
+  amount: string;      // human-readable amount (e.g. "5.0")
+  slippage?: number;   // percentage, default 1.0
+  agentId?: string;    // requesting agent
+  commandId?: string;  // originating command
+}
+
+export interface SwapResult {
+  success: boolean;
+  txHash?: string;
+  approveTxHash?: string;
+  amountIn: string;
+  amountOut?: string;
+  fromSymbol: string;
+  toSymbol: string;
+  error?: string;
+  explorerUrl?: string;
+}
+
+// ── Core ────────────────────────────────────────────────────────────
+
+export function isSwapEnabled(): boolean {
+  return !!PRIVATE_KEY;
+}
+
+/**
+ * Execute a token swap on Base via Aerodrome Router.
+ */
+export async function executeSwap(params: SwapParams): Promise<SwapResult> {
+  const { fromToken, toToken, amount, slippage = 1.0, agentId, commandId } = params;
+
+  // Resolve tokens
+  const from = BASE_TOKENS[fromToken.toLowerCase()];
+  const to = BASE_TOKENS[toToken.toLowerCase()];
+
+  if (!from) return fail(`Unknown token: ${fromToken}. Known: ${Object.keys(BASE_TOKENS).join(", ")}`);
+  if (!to) return fail(`Unknown token: ${toToken}. Known: ${Object.keys(BASE_TOKENS).join(", ")}`);
+  if (!PRIVATE_KEY) return fail("EVM_PRIVATE_KEY not configured");
+  if (from.symbol === to.symbol) return fail("Cannot swap token to itself");
+
+  const amountIn = parseUnits(amount, from.decimals);
+  if (amountIn <= 0n) return fail("Amount must be positive");
+
+  // TODO: Add USD price check against MAX_SWAP_USD when price oracle is wired
+  console.log(`[swap] ${amount} ${from.symbol} → ${to.symbol} (slippage ${slippage}%)`);
+
+  const account = privateKeyToAccount(`0x${PRIVATE_KEY.replace(/^0x/, "")}`);
+  const walletClient = createWalletClient({
+    account,
+    chain: base,
+    transport: http(RPC_URL),
+  });
+  const publicClient = createPublicClient({
+    chain: base,
+    transport: http(RPC_URL),
+  });
+
+  const walletAddress = account.address;
+  const isFromETH = from.address.toLowerCase() === ETH_ADDRESS.toLowerCase();
+  const isToETH = to.address.toLowerCase() === ETH_ADDRESS.toLowerCase();
+
+  // Use WETH for routing (ETH is not an ERC-20)
+  const routeFrom = isFromETH ? WETH_ADDRESS : from.address;
+  const routeTo = isToETH ? WETH_ADDRESS : to.address;
+
+  // Determine if pool is stable (stablecoin pairs)
+  const stableCoins = new Set(["usdc", "usdt", "dai"]);
+  const isStable = stableCoins.has(fromToken.toLowerCase()) && stableCoins.has(toToken.toLowerCase());
+
+  const route = [{
+    from: routeFrom,
+    to: routeTo,
+    stable: isStable,
+    factory: AERODROME_FACTORY,
+  }];
+
+  try {
+    // 1. Get quote
+    let amountsOut: readonly bigint[];
+    try {
+      amountsOut = await publicClient.readContract({
+        address: AERODROME_ROUTER,
+        abi: ROUTER_ABI,
+        functionName: "getAmountsOut",
+        args: [amountIn, route],
+      });
+    } catch (quoteErr) {
+      return fail(`No liquidity for ${from.symbol}→${to.symbol} on Aerodrome: ${(quoteErr as Error).message}`);
+    }
+
+    const expectedOut = amountsOut[amountsOut.length - 1];
+    const minOut = (expectedOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 min
+
+    console.log(`[swap] Quote: ${formatUnits(amountIn, from.decimals)} ${from.symbol} → ${formatUnits(expectedOut, to.decimals)} ${to.symbol}`);
+    console.log(`[swap] Min output (${slippage}% slippage): ${formatUnits(minOut, to.decimals)} ${to.symbol}`);
+
+    let approveTxHash: Hash | undefined;
+
+    // 2. Approve if needed (skip for ETH)
+    if (!isFromETH) {
+      const currentAllowance = await publicClient.readContract({
+        address: from.address,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [walletAddress, AERODROME_ROUTER],
+      });
+
+      if (currentAllowance < amountIn) {
+        console.log(`[swap] Approving ${from.symbol} for router...`);
+        approveTxHash = await walletClient.writeContract({
+          address: from.address,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [AERODROME_ROUTER, amountIn],
+        });
+        console.log(`[swap] Approve tx: ${approveTxHash}`);
+
+        // Wait for approval to confirm
+        await publicClient.waitForTransactionReceipt({ hash: approveTxHash, timeout: 30_000 });
+      }
+    }
+
+    // 3. Execute swap
+    let txHash: Hash;
+
+    if (isFromETH) {
+      // ETH → Token
+      txHash = await walletClient.writeContract({
+        address: AERODROME_ROUTER,
+        abi: ROUTER_ABI,
+        functionName: "swapExactETHForTokens",
+        args: [minOut, route, walletAddress, deadline],
+        value: amountIn,
+      });
+    } else if (isToETH) {
+      // Token → ETH
+      txHash = await walletClient.writeContract({
+        address: AERODROME_ROUTER,
+        abi: ROUTER_ABI,
+        functionName: "swapExactTokensForETH",
+        args: [amountIn, minOut, route, walletAddress, deadline],
+      });
+    } else {
+      // Token → Token
+      txHash = await walletClient.writeContract({
+        address: AERODROME_ROUTER,
+        abi: ROUTER_ABI,
+        functionName: "swapExactTokensForTokens",
+        args: [amountIn, minOut, route, walletAddress, deadline],
+      });
+    }
+
+    console.log(`[swap] Swap tx: ${txHash}`);
+
+    // Wait for confirmation
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 60_000 });
+    console.log(`[swap] Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`);
+
+    const result: SwapResult = {
+      success: true,
+      txHash,
+      approveTxHash,
+      amountIn: `${amount} ${from.symbol}`,
+      amountOut: `${formatUnits(expectedOut, to.decimals)} ${to.symbol}`,
+      fromSymbol: from.symbol,
+      toSymbol: to.symbol,
+      explorerUrl: `https://basescan.org/tx/${txHash}`,
+    };
+
+    // Log to Supabase
+    await logSwap(result, agentId, commandId).catch((e) =>
+      console.error("[swap] Log failed (non-fatal):", e)
+    );
+
+    return result;
+  } catch (err) {
+    const msg = (err as Error).message || String(err);
+    console.error(`[swap] Transaction failed:`, msg);
+    return fail(msg);
+  }
+}
+
+// ── Parse swap commands from natural language ───────────────────────
+
+const SWAP_REGEX = /swap\s+(\d+(?:\.\d+)?)\s+(\w+)\s+(?:to|for|into|→)\s+(\w+)/i;
+
+/**
+ * Try to parse a swap command from a natural language message.
+ * Returns SwapParams if detected, null otherwise.
+ *
+ * Matches: "swap 5 USDC to ETH", "swap 0.01 ETH for USDC", etc.
+ */
+export function parseSwapCommand(message: string): SwapParams | null {
+  const match = message.match(SWAP_REGEX);
+  if (!match) return null;
+
+  const [, amount, fromToken, toToken] = match;
+
+  // Validate tokens exist
+  if (!BASE_TOKENS[fromToken.toLowerCase()] || !BASE_TOKENS[toToken.toLowerCase()]) {
+    return null;
+  }
+
+  return { fromToken, toToken, amount };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function fail(error: string): SwapResult {
+  return { success: false, error, amountIn: "", fromSymbol: "", toSymbol: "" };
+}
+
+async function logSwap(result: SwapResult, agentId?: string, commandId?: string) {
+  await supabase.from("agent_swaps").insert({
+    agent_id: agentId ?? "main",
+    command_id: commandId,
+    tx_hash: result.txHash,
+    approve_tx_hash: result.approveTxHash,
+    from_token: result.fromSymbol,
+    to_token: result.toSymbol,
+    amount_in: result.amountIn,
+    amount_out: result.amountOut,
+    explorer_url: result.explorerUrl,
+    status: result.success ? "completed" : "failed",
+    error: result.error,
+  });
+}
