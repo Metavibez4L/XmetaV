@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-14  
+**Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v17 (Soul Agent + ERC-8004 Metadata + Arena Soul Office)
+**XmetaV Version:** v18 (Consciousness Tab + Swap Execution + Streaming v2)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -331,6 +331,11 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `swarm_tasks` | Per-task status and output | Authenticated: SELECT, INSERT, UPDATE |
 | `x402_payments` | x402 payment transaction log | Authenticated: SELECT, INSERT |
 | `intent_sessions` | Intent resolution sessions | Authenticated: SELECT, INSERT |
+| `agent_memory` | Persistent memory bus (per-agent + shared) | Authenticated: SELECT, INSERT |
+| `memory_associations` | Soul agent memory association graph | Authenticated: SELECT, INSERT |
+| `memory_queries` | Soul agent memory retrieval log | Authenticated: SELECT, INSERT |
+| `dream_insights` | Soul agent dream consolidation insights | Authenticated: SELECT, INSERT |
+| `agent_swaps` | Token swap execution log | Authenticated: SELECT, INSERT, UPDATE |
 
 All tables have Realtime enabled for live updates.
 
@@ -347,6 +352,7 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 | `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
+| `/consciousness` | Consciousness | Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
 | `/arena` | XMETAV HQ | Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | Live Logs | Real-time log streaming with severity/agent filters and search |
 
@@ -529,9 +535,11 @@ When 2+ agents are "busy," avatars smoothly interpolate from their desks to assi
 
 ---
 
-## Streaming Optimization (v12)
+## Streaming Optimization (v12, further tuned v18)
 
 End-to-end optimization of the agent chat streaming pipeline for lower latency and smoother rendering.
+
+### v12 baseline
 
 | Component | Change | Impact |
 |-----------|--------|--------|
@@ -540,6 +548,17 @@ End-to-end optimization of the agent chat streaming pipeline for lower latency a
 | `useRealtimeMessages` | Ref-based string accumulator (no array/join) | Eliminates GC pressure |
 | `useRealtimeMessages` | 80ms throttle for batched renders | Smoother streaming UI |
 | `AgentChat.tsx` | StreamingBubble component | Independent render from message history |
+
+### v18 tuning (2.5× faster rendering)
+
+| Component | Change | Impact |
+|-----------|--------|--------|
+| `streamer.ts` | Chunk size 400→160, flush 200→80ms, first flush 50→30ms | 2.5× faster time-to-first-byte |
+| `streamer.ts` | Retry on failed Supabase inserts | No lost chunks under load |
+| `executor.ts` | Token batching (6 tokens / 15ms) before streamer.write() | Reduces DB round-trips |
+| `useRealtimeMessages` | Throttle 80→50ms (~20fps), RAF-aligned state updates | Eliminates frame drops |
+| `AgentChat.tsx` | StreamingBubble wrapped in React.memo, useMemo cleanAgentOutput | Zero unnecessary re-renders |
+| `AgentChat.tsx` | Smart auto-scroll with data-scroll-container | Only auto-scrolls when near bottom |
 
 ---
 
@@ -618,7 +637,56 @@ Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-associ
 
 ---
 
-## Sentinel Agent (v15)
+## Consciousness Tab (v18)
+
+Dual-aspect awareness dashboard at `/consciousness` providing real-time visualization of memory, anchoring, context, and dream consolidation.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Consciousness Page | Active | `/consciousness` — 6-panel awareness visualization |
+| Sidebar Nav | Active | Brain icon at position 03 (Ctrl+3) |
+| useConsciousness Hook | Active | Parallel fetch from 6 Supabase tables, 15s auto-refresh |
+
+### Panels
+
+| Panel | Component | Description |
+|-------|-----------|-------------|
+| Unified Awareness | `UnifiedAwareness.tsx` | Split view: Main (cyan) ↔ beam ↔ Soul (magenta), live status indicators |
+| Memory Graph | `MemoryGraph.tsx` | Force-directed canvas with drag/zoom, agent-clustered nodes, kind-colored |
+| Anchor Timeline | `AnchorTimeline.tsx` | Horizontal chain of on-chain anchors, click-to-BaseScan links |
+| Context Metrics | `ContextMetrics.tsx` | 4 metric cards + recent context injections feed |
+| Dream Mode | `DreamModeStatus.tsx` | 6hr idle threshold progress bar + insights feed |
+| Mini Arena | `MiniArena.tsx` | Stylized live agent positions with realtime subscription, focus toggle |
+
+Files: `dashboard/src/components/consciousness/`, `dashboard/src/hooks/useConsciousness.ts`
+
+---
+
+## Swap Execution System (v18)
+
+Agent-initiated token swap execution via the bridge, with voice normalization and on-chain pre-checks.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Swap Executor | Active | `bridge/src/swap-executor.ts` — intercepts swap intents from agent output |
+| Swap API | Active | `/api/swap` — POST endpoint for swap execution |
+| DB Table | Active | `agent_swaps` — swap execution log with status tracking |
+| Gas Pre-check | Active | Validates ETH balance for gas before submitting |
+| Token Balance Check | Active | Validates token balance before swap |
+| Error Handling | Active | Clean viem error messages, failed status shown in chat |
+
+### Voice Swap Normalization (v18)
+
+Voice-to-text often produces informal swap commands. The normalizer converts spoken aliases to canonical token symbols before the executor processes them.
+
+| Component | File | Description |
+|-----------|------|-------------|
+| VOICE_ALIASES | `bridge/src/swap-executor.ts` | Dictionary mapping spoken words → token symbols |
+| normalizeVoiceSwap | `bridge/src/swap-executor.ts` | Regex-based normalization function |
+
+Example normalizations:
+- "swap 50 bucks of ether for chain link" → "swap 50 USDC for ETH for LINK"
+- "trade one thousand dollars of wrapped bitcoin" → "swap 1000 USDC for WBTC"
 
 Fleet lifecycle manager providing spawn coordination, resource management, and inter-agent communication.
 

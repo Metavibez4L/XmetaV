@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v17
+Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v18
 
 ```
  ___   ___                    __           ___   ___
@@ -42,6 +42,9 @@ Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v17
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.05-$0.08 per request)
 - **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
 - **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
+- **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 15s auto-refresh from Supabase
+- **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
+- **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
 - Multi-agent management (11 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
@@ -85,9 +88,9 @@ XmetaV/
 |   |   |   |-- arena/        # XMETAV HQ isometric office visualization (standalone)
 |   |   |   |-- auth/         # Login page
 |   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
-|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, etc.
+|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, Consciousness, etc.
 |   |   |   +-- arena/        # PixiJS renderers (iso, background, office, avatars, effects)
-|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms)
+|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms, consciousness)
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
@@ -522,6 +525,7 @@ cd dashboard/bridge && npm install && npm start
 | `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
 | `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
+| `/consciousness` | **Consciousness** -- Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
 | `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
 
@@ -742,6 +746,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 autonomous payment protocol reference |
 | [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 on-chain agent identity reference |
 | [capabilities/voice-commands.md](capabilities/voice-commands.md) | Voice command & response system reference |
+| [docs/memory/](docs/memory/) | Memory system architecture — anchoring, Soul orchestration |
 | [capabilities/quick-commands.md](capabilities/quick-commands.md) | Essential daily-use commands |
 
 ---
@@ -790,6 +795,14 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-15 (v18) — Consciousness Tab + Swap Execution + Streaming v2
+- **Consciousness Tab** — New `/consciousness` route with 6-panel awareness dashboard: Unified Awareness (Main↔Soul split view), Memory Graph (force-directed canvas with drag/zoom), Anchor Timeline (on-chain anchors with BaseScan links), Context Metrics (4 metric cards + injections feed), Dream Mode Status (6hr idle threshold + insights), Mini Arena (stylized agent positions with realtime subscription). Brain icon in sidebar at position 03 (Ctrl+3). `useConsciousness` hook fetches from 6 Supabase tables with 15s auto-refresh
+- **Swap Execution System** — Agent-initiated token swaps via `bridge/src/swap-executor.ts`. `/api/swap` POST endpoint. `agent_swaps` Supabase table for swap history. Gas balance and token balance pre-checks before submission. Clean viem error messages with failed status in chat
+- **Voice Swap Normalization** — `VOICE_ALIASES` dictionary and `normalizeVoiceSwap()` function convert spoken swap commands ("fifty bucks of ether") to canonical form ("50 USDC for ETH")
+- **Streaming Pipeline v2** — 2.5× faster rendering: streamer chunk 400→160 / flush 200→80ms / first 50→30ms, executor token batching (6 tokens/15ms), `useRealtimeMessages` throttle 80→50ms with RAF alignment, `StreamingBubble` wrapped in `React.memo` with `useMemo` cleanAgentOutput, smart auto-scroll
+- **Identity & Schema Sync** — Updated `registration.json` and `metadata.json` with swap capabilities. Supabase migrations for `agent_memory` and soul tables
+- **Memory Docs** — Mermaid flowcharts in `docs/memory/` (README.md, SOUL.md, ANCHORING.md)
 
 ### 2026-02-14 (v17) — Soul Agent + ERC-8004 Metadata Update + Arena Soul Office
 - **Soul Agent** — New memory orchestrator agent (`soul`): context curation, memory association building, dream consolidation during fleet idle, and memory retrieval learning. Room: SOUL (private magenta alcove). Color: Magenta (`#ff006e`)
@@ -996,5 +1009,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution</sub>
 </p>
