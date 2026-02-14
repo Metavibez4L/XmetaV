@@ -451,16 +451,81 @@ function cleanSwapError(raw: string, wallet: string): string {
 
 // ── Parse swap commands from natural language ───────────────────────
 
+// ── Voice-aware swap command normalization ──────────────────────────
+
+/**
+ * Common voice transcription mistakes for crypto terms.
+ * Maps misheard words → correct token/keyword.
+ */
+const VOICE_ALIASES: Record<string, string> = {
+  // "swap" misheard
+  swat: "swap", swop: "swap", swept: "swap", stop: "swap", shop: "swap",
+  // "ETH" misheard
+  east: "ETH", eve: "ETH", eith: "ETH", eighth: "ETH", eath: "ETH",
+  "e t h": "ETH", eth: "ETH", ether: "ETH", ethereum: "ETH", ethan: "ETH",
+  // "USDC" misheard
+  "u s d c": "USDC", "usd c": "USDC", "us dc": "USDC", "usdc": "USDC",
+  "u.s.d.c": "USDC", "you ess dee see": "USDC", "usc": "USDC",
+  // "USDT" misheard
+  "u s d t": "USDT", "us dt": "USDT", "usd t": "USDT",
+  // "WETH" misheard
+  "w e t h": "WETH", weath: "WETH", "wet": "WETH", "weeth": "WETH",
+  // "DAI" misheard
+  die: "DAI", dye: "DAI", day: "DAI",
+  // "AERO" misheard
+  arrow: "AERO", aero: "AERO", "air oh": "AERO", "arrow": "AERO",
+  // connectors misheard
+  "2": "to", "two": "to", "too": "to", "in the": "to", "into the": "to",
+  "4": "for", "four": "for",
+};
+
+/**
+ * Normalize voice-transcribed text to fix common speech-to-text mistakes.
+ * Handles multi-word aliases (longest match first) and strips trailing noise like "on base".
+ */
+function normalizeVoiceSwap(raw: string): string {
+  let text = raw.toLowerCase().trim();
+
+  // Strip trailing "on base", "on the base", "base chain" etc.
+  text = text.replace(/\s+on\s+(the\s+)?base(\s+chain)?$/i, "");
+
+  // Sort aliases by length descending so multi-word matches go first
+  const sorted = Object.entries(VOICE_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  for (const [misheard, correct] of sorted) {
+    // Word-boundary aware replacement
+    const escaped = misheard.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`\\b${escaped}\\b`, "gi");
+    text = text.replace(re, correct);
+  }
+
+  return text;
+}
+
 const SWAP_REGEX = /swap\s+(\d+(?:\.\d+)?)\s+(\w+)\s+(?:to|for|into|→)\s+(\w+)/i;
 
 /**
  * Try to parse a swap command from a natural language message.
  * Returns SwapParams if detected, null otherwise.
  *
- * Matches: "swap 5 USDC to ETH", "swap 0.01 ETH for USDC", etc.
+ * Handles voice transcription quirks:
+ *   "SWAT 5 usdc in the east on base" → swap 5 USDC to ETH
+ *   "swap 5 usdc into East"           → swap 5 USDC to ETH
+ *   "swap 5 usdc 2 e t h"             → swap 5 USDC to ETH
  */
 export function parseSwapCommand(message: string): SwapParams | null {
-  const match = message.match(SWAP_REGEX);
+  // Try exact match first
+  let match = message.match(SWAP_REGEX);
+  if (match) {
+    const [, amount, fromToken, toToken] = match;
+    if (BASE_TOKENS[fromToken.toLowerCase()] && BASE_TOKENS[toToken.toLowerCase()]) {
+      return { fromToken, toToken, amount };
+    }
+  }
+
+  // Normalize voice transcription and retry
+  const normalized = normalizeVoiceSwap(message);
+  console.log(`[swap-parse] Normalized: "${message}" → "${normalized}"`);
+  match = normalized.match(SWAP_REGEX);
   if (!match) return null;
 
   const [, amount, fromToken, toToken] = match;
