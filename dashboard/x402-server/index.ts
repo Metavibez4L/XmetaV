@@ -134,6 +134,69 @@ if (XMETAV_TOKEN_ADDRESS) {
   });
 }
 
+// ---- ERC-8004 Identity Resolution Middleware ----
+// Resolves calling agent's on-chain identity from X-Agent-Id header
+const ERC8004_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
+const ERC8004_ABI = [
+  { name: "ownerOf", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+  { name: "tokenURI", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "string" }] },
+  { name: "getAgentWallet", type: "function", stateMutability: "view",
+    inputs: [{ name: "agentId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+] as const;
+
+const erc8004Client = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
+});
+
+// Extend Express Request to carry resolved agent identity
+declare global {
+  namespace Express {
+    interface Request {
+      callerAgent?: {
+        agentId: string;
+        owner: string;
+        wallet: string;
+        tokenURI: string;
+        x402Enabled?: boolean;
+      };
+    }
+  }
+}
+
+app.use(async (req, _res, next) => {
+  const agentIdHeader = req.headers["x-agent-id"] as string | undefined;
+  if (!agentIdHeader) return next();
+  try {
+    const agentId = BigInt(agentIdHeader);
+    const [owner, uri, wallet] = await Promise.all([
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
+    ]);
+    let x402Enabled = false;
+    if (uri) {
+      try {
+        const meta = await fetch(uri).then(r => r.json());
+        x402Enabled = meta?.x402Support?.enabled === true;
+      } catch { /* metadata fetch optional */ }
+    }
+    req.callerAgent = {
+      agentId: agentId.toString(),
+      owner: owner as string,
+      wallet: wallet as string,
+      tokenURI: uri as string,
+      x402Enabled,
+    };
+    console.log(`[ERC-8004] Resolved caller agent #${agentId} — owner: ${owner}, x402: ${x402Enabled}`);
+  } catch {
+    console.log(`[ERC-8004] Agent #${agentIdHeader} not found in registry, proceeding without identity`);
+  }
+  next();
+});
+
 // ---- x402 Payment Middleware ----
 // Gates XmetaV platform endpoints with USDC micro-payments on Base
 // PRICING: Cost + margin for profitability
@@ -600,30 +663,16 @@ app.get("/health", (_req, res) => {
 });
 
 // ---- ERC-8004 Agent Payment Info (free, public discovery) ----
-
-const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
-const IDENTITY_ABI = [
-  { name: "ownerOf", type: "function", stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
-  { name: "tokenURI", type: "function", stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "string" }] },
-  { name: "getAgentWallet", type: "function", stateMutability: "view",
-    inputs: [{ name: "agentId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
-] as const;
-
-const identityClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
-});
+// Uses the shared erc8004Client and ERC8004_ABI from identity middleware above
 
 app.get("/agent/:agentId/payment-info", async (req, res) => {
   const agentId = BigInt(req.params.agentId);
 
   try {
     const [owner, tokenURI, agentWallet] = await Promise.all([
-      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "ownerOf", args: [agentId] }),
-      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "tokenURI", args: [agentId] }),
-      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "getAgentWallet", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
     ]);
 
     // Check if the agent metadata declares x402 support
@@ -639,8 +688,10 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
           if (resp.ok) metadata = await resp.json() as Record<string, unknown>;
         }
         if (metadata) {
+          // Check both new x402Support.enabled flag and legacy services array
+          const x402Support = metadata.x402Support as { enabled?: boolean } | undefined;
           const services = metadata.services as Array<{ type: string }> | undefined;
-          x402Enabled = !!services?.some((s) => s.type === "x402");
+          x402Enabled = x402Support?.enabled === true || !!services?.some((s) => s.type === "x402");
         }
       } catch { /* metadata fetch failed — ok, just report what we have */ }
     }
@@ -656,13 +707,13 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
       pricing: x402Enabled && metadata
         ? (metadata as Record<string, unknown>)
         : null,
-      registry: IDENTITY_REGISTRY,
+      registry: ERC8004_REGISTRY,
       timestamp: new Date().toISOString(),
     });
   } catch {
     res.status(404).json({
       error: `Agent #${agentId} not found in ERC-8004 registry`,
-      registry: IDENTITY_REGISTRY,
+      registry: ERC8004_REGISTRY,
     });
   }
 });

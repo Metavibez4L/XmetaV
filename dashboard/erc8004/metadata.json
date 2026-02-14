@@ -98,5 +98,31 @@
     "address": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
     "network": "eip155:8453",
     "supports": ["USDC", "ETH", "$XMETAV"]
+  },
+  "x402Support": {
+    "enabled": true,
+    "network": "eip155:8453",
+    "payTo": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "acceptedSchemes": ["exact"],
+    "denomination": "USDC",
+    "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402",
+    "pricing": {
+      "POST /agent-task": "$0.10",
+      "POST /intent": "$0.05",
+      "GET /fleet-status": "$0.01",
+      "POST /swarm": "$0.50",
+      "POST /voice/transcribe": "$0.05",
+      "POST /voice/synthesize": "$0.08"
+    },
+    "tokenDiscounts": {
+      "token": "$XMETAV",
+      "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
+      "tiers": {
+        "Bronze": { "minBalance": 1000, "discount": "10%" },
+        "Silver": { "minBalance": 10000, "discount": "20%" },
+        "Gold": { "minBalance": 100000, "discount": "35%" },
+        "Diamond": { "minBalance": 1000000, "discount": "50%" }
+      }
+    }
   }
 }
