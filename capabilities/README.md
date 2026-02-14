@@ -17,6 +17,7 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 | [erc8004-identity.md](erc8004-identity.md) | **ERC-8004 on-chain identity** — Agent NFT #16905 on Base |
 | [voice-commands.md](voice-commands.md) | **Voice Commands** — Whisper STT + TTS with x402 gating |
 | [xmetav-token.md](xmetav-token.md) | **$XMETAV Token** — ERC-20 on Base with tiered discounts |
+| [erc8004-identity.md](erc8004-identity.md) | **On-Chain Memory** — IPFS + Base anchoring for milestones/decisions/incidents |
 
 ## Your Setup at a Glance
 
