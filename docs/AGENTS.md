@@ -26,7 +26,7 @@ For per-agent runbooks, see `docs/agents/`:
 - **Swarm collab**: `./scripts/swarm.sh --collab "review task" basedintern akua`
 - **Swarm status**: `./scripts/swarm.sh --status`
 - **Dashboard**: `cd dashboard && npm run dev` → http://localhost:3000
-- **Bridge daemon**: `cd dashboard/bridge && npm start`
+- **Bridge daemon**: `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot)
 - **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
 - **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
 - **x402 payments**: See `capabilities/x402-payments.md`

@@ -63,8 +63,16 @@ flowchart TB
             subgraph FLEET["Agent Fleet"]
                 direction LR
                 A_MAIN["main"]
-                A_BI["basedintern"]
+                A_SENT["sentinel"]
+                A_SOUL["soul"]
+                A_BRIEF["briefing"]
+                A_ORA["oracle"]
+                A_ALCH["alchemist"]
+                A_W3["web3dev"]
                 A_AKUA["akua"]
+                A_AKUA_W["akua_web"]
+                A_BI["basedintern"]
+                A_BI_W["basedintern_web"]
                 A_DYN["dynamic"]
             end
         end
@@ -128,11 +136,11 @@ A standalone fullscreen page (`/arena`) rendering an isometric cyberpunk office 
 
 - **Renderer**: PixiJS v8.16.0 with dynamic imports (SSR-safe via `next/dynamic`)
 - **Isometric Engine**: Custom `iso.ts` with 2:1 projection, tile/cube/wall drawing primitives
-- **Office Layout**: Boss office (Main + Operator), meeting area (hex table + projector), 4 agent workstations
+- **Office Layout**: Command room (Main + Operator visualization orb), meeting area (hex table + projector), Intel room, Dev floor, Soul office alcove
 - **Agent Avatars**: Glowing translucent orbs with ghost silhouettes — idle (breathing pulse), busy (spinning ring), offline (static flicker)
 - **Reactive Furniture**: Holo screens on every desk animate based on agent state (scrolling code, red flicker, dim)
 - **Real-Time Effects**: Command pulses travel office pathways, streaming particles rise from desks, dispatch beams route through meeting table, completion bursts, failure glitches
-- **Data Source**: `useArenaEvents` hook subscribes to Supabase Realtime channels (sessions, commands, responses, controls) and drives PixiJS imperatively via refs
+- **Data Source**: `useArenaEvents` hook subscribes to Supabase Realtime channels (sessions, commands, responses, controls) and drives PixiJS imperatively via refs (plus 10s periodic sync)
 - **HUD**: DOM overlay with title, system status, agent legend, and floating labels computed from isometric coordinates
 - **Location**: `dashboard/src/components/arena/` (ArenaCanvas, agents, useArenaEvents, renderer/)
 

@@ -305,6 +305,7 @@ cd dashboard/x402-server
 cp .env.example .env  # fill in EVM_ADDRESS, FACILITATOR_URL
 npm install
 npm start             # starts on port 4021
+# dev: npm run dev     # watch mode
 ```
 
 Gated endpoints: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02). Free endpoint: `/health`.
@@ -328,8 +329,8 @@ npx tsx register.ts   # register or re-register the agent
 The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 10+ agents in real-time across a 10x10 isometric grid.
 
 **Office Layout (v14 — reorganized):**
-- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above
-- **MEETING area** (center): Hexagonal glass table with holographic projector and 10 chairs
+- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above (visual-only; not an OpenClaw agent)
+- **MEETING area** (center): Hexagonal glass table with holographic projector and 12 seats
 - **INTEL room** (bottom-left, glass walls): Briefing, Oracle, Alchemist workstations — blue-tinted floor, room for 2 more agents
 - **DEV FLOOR** (bottom-right, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks — green-tinted grid lines
 
@@ -342,7 +343,7 @@ The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (
 - Completion bursts and failure glitch effects per-agent
 - Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
 
-**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (10 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
+**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (12 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
 
 **Architecture:** `Supabase Realtime + 10s periodic sync -> useArenaEvents hook -> PixiJS imperative API (refs)`
 
@@ -353,8 +354,9 @@ No React re-renders for animations -- the hook calls PixiJS methods directly via
 | Agent | Color | Room |
 |-------|-------|------|
 | Main | Cyan `#00f0ff` | COMMAND |
-| Operator | Amber `#f59e0b` | COMMAND |
+| Operator (visual) | Amber `#f59e0b` | COMMAND |
 | Sentinel | Red `#ef4444` | COMMAND |
+| Soul | Magenta `#ff006e` | SOUL |
 | Briefing | Sky `#38bdf8` | INTEL |
 | Oracle | Gold `#fbbf24` | INTEL |
 | Alchemist | Fuchsia `#e879f9` | INTEL |
@@ -395,7 +397,7 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 |-------|----------|
 | Dashboard won't start | Check `.env.local` has all 3 Supabase keys; run `npm install` |
 | Bridge not connecting | Verify Supabase URL/keys match in both `dashboard/.env.local` and `bridge/.env` |
-| Commands not executing | Ensure bridge daemon is running (`npm start` in `bridge/`); check bridge heartbeat on Command Center |
+| Commands not executing | Ensure bridge daemon is running (`npm run dev` in `bridge/` for local watch); check bridge heartbeat on Command Center |
 | Swarm stuck in pending | Bridge daemon must be running; check that swarm_runs Realtime is enabled in Supabase |
 | Agent disabled warning | Check Fleet page; toggle the agent back to enabled |
 | Cancel not working | Verify RLS UPDATE policies exist on `swarm_runs` and `swarm_tasks` (run `setup-db-swarms.sql`) |

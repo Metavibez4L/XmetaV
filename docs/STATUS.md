@@ -316,7 +316,7 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Dashboard (Next.js) | Active | `cd dashboard && npm run dev` (localhost:3000) |
-| Bridge Daemon | Active when running | `cd dashboard/bridge && npm start` |
+| Bridge Daemon | Active when running | `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot) |
 | Supabase | Active | Project: `ptlneqcjsnrxxruutsxm` |
 
 ### Supabase tables
@@ -467,7 +467,7 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
-## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14)
+## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14, extended v17)
 
 Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
 
@@ -482,14 +482,15 @@ Full isometric office visualization rendered with PixiJS at `/arena`, driven by 
 | Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
 | Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls + 10s periodic sync |
 | HUD Overlay | Active | DOM: title, system status, agent legend, floating labels, TEST MEETING button |
-| Meeting Sync | **Fixed (v13)** | State replay after PixiJS init resolves race condition; periodic sync catches dropped events |
+| Meeting Sync | **Stabilized (v17)** | Replay after PixiJS init + periodic sync; meeting lifecycle guards reduce status-churn ending meetings early |
 
 ### Office layout (v14 — reorganized)
 
-Grid expanded from 10x8 to 10x10 with four distinct zones:
+Grid expanded from 10x8 to 10x10 with five distinct zones:
 
-- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above
-- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 10 chairs for all agents
+- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above (visual-only; not an OpenClaw agent)
+- **SOUL office** (left alcove, cols 0–1): Magenta-tinted private alcove behind glass with surveillance desk + mini fleet monitors
+- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 12 seats
 - **INTEL room** (bottom-left, rows 6–9, glass walls): Briefing, Oracle, Alchemist — with space for 2 future agents. Blue-tinted floor and `#38bdf8` glass partition walls.
 - **DEV FLOOR** (bottom-right, rows 6–9, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks. Green-tinted grid lines.
 
@@ -509,6 +510,8 @@ When 2+ agents are "busy," avatars smoothly interpolate from their desks to assi
 | Bottom-left | akua_web | 120 |
 | Bottom-right | basedintern_web | 60 |
 | Right center | web3dev | 0 |
+| Upper-right (near operator) | sentinel | 300 |
+| Observer | soul | 195 |
 
 **TEST MEETING** button in the HUD (top-right) forces a meeting for visual verification.
 
@@ -701,7 +704,7 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` |
+| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` (dev: `npm run dev`) |
 | Bridge x402 Client | **Mainnet** ✅ | Auto-pays with `EVM_PRIVATE_KEY` |
 | Supabase `x402_payments` table | Active | Payment logging with daily spend view |
 | Dashboard `/payments` page | Active | Wallet status, history, gated endpoints |

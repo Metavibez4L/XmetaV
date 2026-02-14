@@ -8,7 +8,7 @@
 
 ## Usage Example
 ```
-openclaw agent --agent main --local --message '/github help' --json
+openclaw agent --agent main --local --thinking off --message "/github help" --json
 ```
 
 ## Troubleshooting
@@ -17,4 +17,4 @@ openclaw agent --agent main --local --message '/github help' --json
 - Restart gateway after any skill install or config change.
 
 ## Last Verified
-- 2026-02-03
+- 2026-02-14

@@ -8,7 +8,7 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 
 - [`main`](./main.md) — **orchestrator** (agent factory + swarm + command center)
 - [`sentinel`](./sentinel.md) — **fleet ops** (lifecycle manager, spawn coordination, health monitoring)
-- [`soul`](./main.md) — **memory orchestrator** (context curation, dream consolidation, association building, memory retrieval learning)
+- [`soul`](./soul.md) — **memory orchestrator** (context curation, dream consolidation, association building, memory retrieval learning)
 - [`briefing`](./briefing.md) — **context curator** (continuity, health sentinel, memory distillation)
 - [`oracle`](./oracle.md) — **on-chain intel** (gas, prices, chain activity, crypto sentiment)
 - [`alchemist`](./alchemist.md) — **tokenomics** (supply, emissions, staking curves, liquidity)
@@ -117,7 +117,8 @@ find ~/.openclaw -name "*.lock" -type f -delete
 cd dashboard && npm run dev
 
 # Start the bridge daemon (dashboard <-> OpenClaw)
-cd dashboard/bridge && npm start
+cd dashboard/bridge && npm run dev  # local watch
+# or: npm start  # one-shot
 ```
 
 ## Tooling baseline

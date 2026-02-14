@@ -330,7 +330,7 @@ cd dashboard && npm run dev -- --port 3001
 **Fix:**
 ```bash
 # Start bridge daemon
-cd dashboard/bridge && npm start
+cd dashboard/bridge && npm run dev
 
 # Check bridge status
 curl http://localhost:3000/api/bridge/status
