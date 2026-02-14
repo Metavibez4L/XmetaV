@@ -35,7 +35,7 @@ openclaw --version  # Expected: 2026.2.1
 - State dir: `~/.openclaw/`
 - Config file: `~/.openclaw/openclaw.json`
 - Workspace(s): per-agent (`openclaw agents list`)
-- Gateway: local (`gateway.mode: local`)
+- Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local` — agents use `--local` flag, gateway is fallback for channels)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
 
 ## Configured agents (this machine)
@@ -58,7 +58,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 
 \* = default agent
 
-Detailed agent runbooks:
+Detailed agent runbooks (index: [`docs/agents/README.md`](agents/README.md)):
 - `docs/agents/main.md`
 - `docs/agents/sentinel.md`
 - `docs/agents/briefing.md`
@@ -171,9 +171,18 @@ Expected values (high level):
 - `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
 - `models.providers.ollama.apiKey`: set to a non-secret placeholder (e.g. `"local"`) to satisfy OpenClaw auth checks for local Ollama
 
+Quick tool-calling sanity test:
+
+```bash
+openclaw agent --agent main --local --thinking off \
+  --session-id tool_test_$(date +%s) \
+  --message "Call exec: echo TOOL_OK"
+# Expected: agent calls exec tool and returns TOOL_OK
+```
+
 ## Standard way to run the agent (stable)
 
-Use embedded mode + disable thinking for “simple chat” reliability on small local models:
+Use `--local` + `--thinking off` for reliable agent calls (bypasses gateway websocket, runs embedded):
 
 ```bash
 openclaw agent \
@@ -216,6 +225,7 @@ curl -i -sS http://127.0.0.1:11434/api/chat \
 
 Fix:
 - Wait for the limit to reset, or upgrade your Ollama plan.
+- **Temporary fallback**: route non-critical agents (sentinel, briefing) to local `qwen2.5:7b-instruct` while keeping main on cloud. Edit the agent's `models.json` to swap the model.
 
 ## Health checks
 
@@ -260,7 +270,7 @@ fuser -k 18789/tcp 2>/dev/null || true
 
 ## Tool Calling (System Automation)
 
-With `tools.profile=coding` (or `full` for `basedintern`) and `api=openai-responses`, the agent can:
+With `tools.profile=full` (main) or `coding` (repo agents) and `api=openai-responses`, the agent can:
 - Execute shell commands via `exec` tool
 - Read/write files via `read`/`write` tools
 - Manage background processes via `process` tool
@@ -344,10 +354,10 @@ Required environment variables (in `dashboard/.env.local`):
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public, used in browser) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
-| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (**server-side only**, never expose to browser) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS (**server-side only**) |
 | `XMETAV_TOKEN_ADDRESS` | Deployed $XMETAV ERC-20 contract address |
 
 ### Swarm runs (dashboard)
@@ -774,28 +784,3 @@ With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes 
 Workarounds:
 - Use the deterministic `openclaw browser ...` CLI for browser automation.
 - Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
-
-aw config set browser.enabled true
-openclaw config set browser.defaultProfile openclaw
-openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
-```
-
-### Smoke test (CLI)
-
-```bash
-# Start gateway (if not already running)
-./scripts/start-gateway.sh
-
-openclaw browser start
-openclaw browser open https://example.com
-openclaw browser snapshot
-```
-
-### Known limitation (small local models)
-
-With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
-
-Workarounds:
-- Use the deterministic `openclaw browser ...` CLI for browser automation.
-- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
-
