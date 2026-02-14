@@ -4,16 +4,17 @@ Reference for integrating **x402** — Coinbase's open payment protocol — with
 
 > Source: https://github.com/coinbase/x402
 
-## Current Status (June 2025)
+## Current Status (February 2026)
 
 | Component | Status |
 |-----------|--------|
-| x402 Server | **Live** on port 4021 (Base Mainnet, USDC) |
+| x402 Server | **Live** on port 4021 (Base Mainnet, USDC, CDP JWT auth) |
 | Payment middleware | 6 gated endpoints |
 | ERC-8004 identity middleware | **Active** — resolves caller agent via `X-Agent-Id` header |
 | On-chain metadata | Agent #16905, `x402Support.enabled: true` in tokenURI |
-| Payment logging | Writes to `x402_payments` Supabase table |
-| $XMETAV token discounts | 4-tier system (Bronze → Diamond, 10-50% off) |
+| Payment logging | Writes to `x402_payments` Supabase table (with caller identity) |
+| $XMETAV token discounts | **Active** — 5-tier system (None → Diamond, 0-50% off) |
+| API Reference | [`docs/API.md`](../docs/API.md) — full endpoint documentation |
 | Agent-to-agent payments | Phase 2 (planned) |
 
 ## Live Pricing
@@ -59,6 +60,8 @@ GET /agent/16905/payment-info
 ```
 
 Returns: owner, wallet, tokenURI, x402 support status, accepted schemes, and pricing.
+
+> **Full API Reference**: See [`docs/API.md`](../docs/API.md) for complete endpoint documentation with request/response schemas, authentication details, and agent-to-agent discovery flow.
 
 ## What is x402?
 
