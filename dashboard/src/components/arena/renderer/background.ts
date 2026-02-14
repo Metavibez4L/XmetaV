@@ -66,6 +66,14 @@ export function initBackground(
     }
   }
 
+  // Soul office (cols 0–1, rows 2–5) — magenta-tinted alcove
+  for (let c = 0; c <= 1; c++) {
+    for (let r = 2; r <= 5; r++) {
+      drawIsoTile(floor, c, r, 0x120818, 0.8);
+      strokeIsoTile(floor, c, r, 0xff006e, 0.04, 0.5);
+    }
+  }
+
   // Dev floor (cols 5–9, rows 6–9) — standard open floor
   for (let c = 5; c <= 9; c++) {
     for (let r = 6; r <= 9; r++) {
@@ -126,6 +134,15 @@ export function initBackground(
   // Front wall (row 5.5, cols 7–10) — lower glass with gap for entry
   drawIsoWall(walls, 7, 5.5, 8, 5.5, PART_H * 0.6, 0x0c1425, 0xf97316, 0.06);
   drawIsoWall(walls, 9, 5.5, 10, 5.5, PART_H * 0.6, 0x0c1425, 0xf97316, 0.06);
+
+  // ── Soul office (private alcove, left side) ───────────────────
+  // Back wall (row 2, cols 0–2) — connects to command room
+  drawIsoWall(walls, 0, 2, 2, 2, PART_H, 0x140818, 0xff006e, 0.10);
+  // Left wall (col 0, rows 2–5.5)
+  drawIsoWall(walls, 0, 2, 0, 5.5, PART_H, 0x140818, 0xff006e, 0.06);
+  // Front wall (row 5.5, cols 0–2) — lower glass with entry gap
+  drawIsoWall(walls, 0, 5.5, 0.5, 5.5, PART_H * 0.6, 0x140818, 0xff006e, 0.06);
+  drawIsoWall(walls, 1.5, 5.5, 2, 5.5, PART_H * 0.6, 0x140818, 0xff006e, 0.06);
 
   scene.addChild(walls);
 
@@ -188,6 +205,17 @@ export function initBackground(
   devLabel.position.set(devPos.x, devPos.y - 10);
   devLabel.alpha = 0.2;
   scene.addChild(devLabel);
+
+  // SOUL label (private alcove, left side)
+  const soulLabel = new Text({
+    text: "SOUL",
+    style: { ...labelStyle, fill: "#ff006e", fontSize: 8 },
+  });
+  const soulPos = toScreen(0.5, 2.3);
+  soulLabel.anchor.set(0.5, 0.5);
+  soulLabel.position.set(soulPos.x, soulPos.y - 10);
+  soulLabel.alpha = 0.25;
+  scene.addChild(soulLabel);
 
   // -- Ambient particles (in scene, around office area) ---------------
   const particles: { g: Graphics; vx: number; vy: number }[] = [];

@@ -59,7 +59,12 @@
     "selective-meetings",
     "agent-lifecycle-management",
     "fleet-health-monitoring",
-    "spawn-coordination"
+    "spawn-coordination",
+    "soul-memory-orchestration",
+    "dream-consolidation",
+    "memory-association-building",
+    "context-packet-curation",
+    "memory-retrieval-learning"
   ],
   "fleet": {
     "agents": [
@@ -70,11 +75,12 @@
       { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel" },
       { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab" },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
-      { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" }
+      { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
+      { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
     ],
     "model": "ollama/kimi-k2.5:cloud",
     "meetingCapacity": 7,
-    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor"]
+    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul"]
   },
   "contracts": {
     "token": {

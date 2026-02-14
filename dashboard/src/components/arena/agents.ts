@@ -1,4 +1,4 @@
-export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops";
+export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops" | "soul";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -44,6 +44,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     room: "command",
     tile: { col: 2.5, row: 1.5 },
     size: 28,
+  },
+
+  // ── SOUL OFFICE (left alcove, behind glass) ────────────────────
+  {
+    id: "soul",
+    label: "SOUL",
+    color: 0xff006e,
+    colorHex: "#ff006e",
+    room: "soul",
+    tile: { col: 0.5, row: 3.5 },
+    size: 30,
   },
 
   // ── INTEL ROOM (bottom-left, glass enclosed) ────────────────────
@@ -142,6 +153,7 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "basedintern_web", angle: 60 },  // bottom-right
   { agentId: "web3dev", angle: 0 },           // right center
   { agentId: "sentinel", angle: 300 },        // upper-right (near operator)
+  { agentId: "soul", angle: 195 },              // lower-left (observer seat)
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -165,4 +177,10 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["main", "basedintern"],
   ["akua", "akua_web"],
   ["basedintern", "basedintern_web"],
+  // Soul watches everyone
+  ["soul", "main"],
+  ["soul", "briefing"],
+  ["soul", "oracle"],
+  ["soul", "alchemist"],
+  ["soul", "sentinel"],
 ];
