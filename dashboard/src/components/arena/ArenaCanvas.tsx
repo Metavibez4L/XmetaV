@@ -44,6 +44,13 @@ export default function ArenaCanvas() {
 
   // -- Meeting detection (stable callback via refs) ---------------------
   const checkMeetingRef = useRef<() => void>(() => {});
+
+  // Soul always joins meetings as the observer/memory orchestrator
+  const withSoul = (ids: string[]) => {
+    if (!ids.includes("soul")) return [...ids, "soul"];
+    return ids;
+  };
+
   const checkMeeting = useCallback(() => {
     // Don't auto-manage meetings while a manual meeting is active
     if (manualMeetingRef.current) return;
@@ -54,24 +61,26 @@ export default function ArenaCanvas() {
     console.log("[arena] checkMeeting:", busyCount, "busy →", busyIds, "meetingActive:", meetingActiveRef.current);
 
     if (busyCount >= 2 && !meetingActiveRef.current) {
-      console.log("[arena] >>> STARTING AUTO MEETING", busyIds);
+      const meetingIds = withSoul(busyIds);
+      console.log("[arena] >>> STARTING AUTO MEETING", meetingIds);
       meetingActiveRef.current = true;
-      nodesApiRef.current?.startMeeting(busyIds);
-      effectsApiRef.current?.meetingStart(busyIds);
+      nodesApiRef.current?.startMeeting(meetingIds);
+      effectsApiRef.current?.meetingStart(meetingIds);
       officeApiRef.current?.setMeetingMode(true);
       setHudStats((s) => ({
         ...s,
         meetingActive: true,
-        meetingAgents: busyIds,
+        meetingAgents: meetingIds,
         meetingType: "auto",
-        lastEvent: `MEETING: ${busyIds.length} agents at table`,
+        lastEvent: `MEETING: ${meetingIds.length} agents at table`,
       }));
     } else if (busyCount >= 2 && meetingActiveRef.current) {
-      nodesApiRef.current?.startMeeting(busyIds);
-      effectsApiRef.current?.meetingStart(busyIds);
+      const meetingIds = withSoul(busyIds);
+      nodesApiRef.current?.startMeeting(meetingIds);
+      effectsApiRef.current?.meetingStart(meetingIds);
       setHudStats((s) => ({
         ...s,
-        meetingAgents: busyIds,
+        meetingAgents: meetingIds,
       }));
     } else if (busyCount < 2 && meetingActiveRef.current) {
       console.log("[arena] >>> ENDING AUTO MEETING");
@@ -92,25 +101,26 @@ export default function ArenaCanvas() {
   // -- Call a specific meeting with chosen agents ----------------------
   const callMeeting = useCallback((agentIds: string[]) => {
     if (agentIds.length < 2) return;
-    console.log("[arena] >>> CALLING MANUAL MEETING:", agentIds);
+    const meetingIds = withSoul(agentIds);
+    console.log("[arena] >>> CALLING MANUAL MEETING:", meetingIds);
     manualMeetingRef.current = true;
     meetingActiveRef.current = true;
 
     // Visually set called agents to "busy" for the meeting
-    for (const id of agentIds) {
+    for (const id of meetingIds) {
       nodesApiRef.current?.setState(id, "busy");
       officeApiRef.current?.setScreenState(id, "busy");
     }
 
-    nodesApiRef.current?.startMeeting(agentIds);
-    effectsApiRef.current?.meetingStart(agentIds);
+    nodesApiRef.current?.startMeeting(meetingIds);
+    effectsApiRef.current?.meetingStart(meetingIds);
     officeApiRef.current?.setMeetingMode(true);
     setHudStats((s) => ({
       ...s,
       meetingActive: true,
-      meetingAgents: agentIds,
+      meetingAgents: meetingIds,
       meetingType: "manual",
-      lastEvent: `MEETING CALLED: ${agentIds.join(", ")}`,
+      lastEvent: `MEETING CALLED: ${meetingIds.join(", ")}`,
     }));
     setMeetingPanelOpen(false);
   }, []);
