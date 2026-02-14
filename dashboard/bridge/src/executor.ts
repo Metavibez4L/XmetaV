@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase.js";
 import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
+import { buildMemoryContext, captureCommandOutcome } from "../lib/agent-memory.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -61,6 +62,18 @@ export async function executeCommand(command: {
 
   console.log(`[executor] Executing command ${id} on agent "${agent_id}"`);
 
+  // Inject persistent memory context into the dispatch message
+  let enrichedMessage = message;
+  try {
+    const memoryCtx = await buildMemoryContext(agent_id);
+    if (memoryCtx) {
+      enrichedMessage = memoryCtx + message;
+      console.log(`[executor] Injected ${memoryCtx.split("\n").length - 3} memory entries for "${agent_id}"`);
+    }
+  } catch (err) {
+    console.error(`[executor] Memory injection failed (non-fatal):`, err);
+  }
+
   // Mark as running
   await supabase
     .from("agent_commands")
@@ -78,11 +91,17 @@ export async function executeCommand(command: {
   const streamer = createStreamer(id);
   streamer.start();
 
+  // Accumulate raw output for memory capture
+  let rawOutput = "";
+
   try {
     const child = runAgentWithFallback({
       agentId: agent_id,
-      message,
-      onChunk: (text) => streamer.write(text),
+      message: enrichedMessage,
+      onChunk: (text) => {
+        rawOutput += text;
+        streamer.write(text);
+      },
       onExit: async (code) => {
         running.delete(agent_id);
 
@@ -93,6 +112,11 @@ export async function executeCommand(command: {
           .from("agent_commands")
           .update({ status })
           .eq("id", id);
+
+        // Capture outcome to agent memory (non-blocking)
+        captureCommandOutcome(agent_id, message, rawOutput, code).catch((err) =>
+          console.error(`[executor] Memory capture failed (non-fatal):`, err)
+        );
 
         // Reset agent session to idle
         await supabase
