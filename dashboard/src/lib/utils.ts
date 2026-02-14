@@ -53,6 +53,11 @@ const NOISE_PATTERNS: RegExp[] = [
   /^.*session file locked/,        // session file locked (timeout ...)
 ];
 
+function stripAnsi(input: string): string {
+  // Matches standard ANSI escape sequences (colors, cursor movement, etc.)
+  return input.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
 /**
  * Strip verbose debug lines from agent output, keeping only the actual response.
  * Safe to call on any string — returns input unchanged if no noise is found.
@@ -61,7 +66,10 @@ export function cleanAgentOutput(raw: string): string {
   if (!raw) return raw;
   const lines = raw.split("\n");
   const cleaned = lines.filter(
-    (line) => !NOISE_PATTERNS.some((pat) => pat.test(line.trim()))
+    (line) => {
+      const normalized = stripAnsi(line).trim();
+      return !NOISE_PATTERNS.some((pat) => pat.test(normalized));
+    }
   );
   // Collapse leading/trailing blank lines left by filtering
   const result = cleaned.join("\n").replace(/^\n+/, "").replace(/\n{3,}/g, "\n\n");
