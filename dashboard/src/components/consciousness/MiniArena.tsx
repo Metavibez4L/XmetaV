@@ -26,7 +26,7 @@ const AGENTS: { id: string; label: string; color: string; baseX: number; baseY: 
   { id: "basedintern", label: "BASEDINTERN", color: "#f472b6", baseX: 55, baseY: 75 },
 ];
 
-type Focus = "both" | "main" | "psyche";
+type Focus = "both" | "main" | "soul";
 
 export const MiniArena = React.memo(function MiniArena() {
   const supabase = useMemo(() => createClient(), []);
@@ -92,7 +92,7 @@ export const MiniArena = React.memo(function MiniArena() {
           </h2>
         </div>
         <div className="flex gap-1">
-          {(["both", "main", "psyche"] as Focus[]).map((f) => (
+          {(["both", "main", "soul"] as Focus[]).map((f) => (
             <button
               key={f}
               onClick={() => setFocus(f)}
@@ -103,7 +103,7 @@ export const MiniArena = React.memo(function MiniArena() {
                 background: focus === f ? "#00f0ff08" : "transparent",
               }}
             >
-              {f === "psyche" ? "soul" : f}
+              {f}
             </button>
           ))}
         </div>

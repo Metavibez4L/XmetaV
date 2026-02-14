@@ -143,7 +143,7 @@ export const UnifiedAwareness = React.memo(function UnifiedAwareness({
           />
         </div>
 
-        {/* SOUL/Psyche Aspect */}
+        {/* SOUL Aspect */}
         <div
           className="flex-1 rounded-lg p-4 relative overflow-hidden"
           style={{
@@ -171,7 +171,7 @@ export const UnifiedAwareness = React.memo(function UnifiedAwareness({
               className="text-xs font-mono font-bold tracking-widest"
               style={{ color: SOUL_COLOR }}
             >
-              PSYCHE
+              SOUL
             </span>
           </div>
           <div className="space-y-2">
