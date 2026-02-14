@@ -104,6 +104,22 @@ async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
 const app = express();
 app.use(express.json());
 
+// ---- Payment logging helper ----
+async function logPayment(endpoint: string, amount: string, req: express.Request) {
+  if (!supabase) return;
+  try {
+    const callerAddress = req.headers["x-caller-address"] as string | undefined;
+    const paymentPayload = req.headers["x-payment"] as string | undefined;
+    await supabase.from("x402_payments").insert({
+      endpoint,
+      amount,
+      payer_address: callerAddress || null,
+      status: "settled",
+      metadata: paymentPayload ? { hasPayload: true } : null,
+    });
+  } catch { /* best effort */ }
+}
+
 // ---- Token tier middleware: adds X-Token-Tier and X-Token-Discount headers ----
 if (XMETAV_TOKEN_ADDRESS) {
   app.use(async (req, res, next) => {
@@ -201,25 +217,6 @@ app.use(
             },
           }
         : {}),
-                },
-              ],
-              description: "Speech-to-text transcription via Whisper",
-              mimeType: "application/json",
-            },
-            "POST /voice/synthesize": {
-              accepts: [
-                {
-                  scheme: "exact",
-                  price: "$0.08",  // Was $0.01 — 8x (covers TTS $0.015 + healthy margin)
-                  network,
-                  payTo: evmAddress,
-                },
-              ],
-              description: "Text-to-speech synthesis via OpenAI TTS",
-              mimeType: "audio/mpeg",
-            },
-          }
-        : {}),
     },
     new x402ResourceServer(facilitatorClient).register(
       network,
@@ -235,6 +232,7 @@ app.use(
  * Body: { agent: "main"|"akua"|"basedintern", message: "..." }
  */
 app.post("/agent-task", async (req, res) => {
+  logPayment("/agent-task", "$0.10", req);
   const { agent, message } = req.body;
 
   if (!agent || !message) {
@@ -287,6 +285,7 @@ app.post("/agent-task", async (req, res) => {
  * Body: { goal: "Deploy an NFT contract on Base" }
  */
 app.post("/intent", async (req, res) => {
+  logPayment("/intent", "$0.05", req);
   const { goal } = req.body;
 
   if (!goal || typeof goal !== "string") {
@@ -336,6 +335,7 @@ app.post("/intent", async (req, res) => {
  * GET /fleet-status — live status of all agents
  */
 app.get("/fleet-status", async (_req, res) => {
+  logPayment("/fleet-status", "$0.01", _req);
   if (supabase) {
     const { data: sessions } = await supabase
       .from("agent_sessions")
@@ -347,6 +347,11 @@ app.get("/fleet-status", async (_req, res) => {
 
     const fleet = [
       { id: "main", name: "Main (Orchestrator)", workspace: "~/.openclaw/workspace" },
+      { id: "sentinel", name: "Sentinel (Fleet Ops)", workspace: "/home/manifest/sentinel" },
+      { id: "briefing", name: "Briefing (Context Curator)", workspace: "/home/manifest/briefing" },
+      { id: "oracle", name: "Oracle (On-Chain Intel)", workspace: "/home/manifest/oracle" },
+      { id: "alchemist", name: "Alchemist (Tokenomics)", workspace: "/home/manifest/alchemist" },
+      { id: "web3dev", name: "Web3Dev (Blockchain Dev)", workspace: "/home/manifest/web3dev" },
       { id: "akua", name: "Akua (Solidity/Base)", workspace: "/home/manifest/akua" },
       { id: "basedintern", name: "BasedIntern (TypeScript)", workspace: "/home/manifest/basedintern" },
     ].map((agent) => {
@@ -370,6 +375,11 @@ app.get("/fleet-status", async (_req, res) => {
     res.json({
       fleet: [
         { id: "main", name: "Main (Orchestrator)", status: "unknown" },
+        { id: "sentinel", name: "Sentinel (Fleet Ops)", status: "unknown" },
+        { id: "briefing", name: "Briefing (Context Curator)", status: "unknown" },
+        { id: "oracle", name: "Oracle (On-Chain Intel)", status: "unknown" },
+        { id: "alchemist", name: "Alchemist (Tokenomics)", status: "unknown" },
+        { id: "web3dev", name: "Web3Dev (Blockchain Dev)", status: "unknown" },
         { id: "akua", name: "Akua (Solidity/Base)", status: "unknown" },
         { id: "basedintern", name: "BasedIntern (TypeScript)", status: "unknown" },
       ],
@@ -384,6 +394,7 @@ app.get("/fleet-status", async (_req, res) => {
  * Body: { mode: "parallel"|"pipeline"|"collab", tasks: [{ agent: "...", message: "..." }] }
  */
 app.post("/swarm", async (req, res) => {
+  logPayment("/swarm", "$0.50", req);
   const { mode, tasks } = req.body;
 
   const validModes = ["parallel", "pipeline", "collab"];
@@ -568,23 +579,92 @@ app.get("/health", (_req, res) => {
       : "disabled (no XMETAV_TOKEN_ADDRESS)",
     endpoints: {
       gated: {
-        "POST /agent-task": "$0.01 — dispatch a task to an agent",
-        "POST /intent": "$0.005 — resolve a goal into commands",
-        "GET /fleet-status": "$0.001 — live agent fleet status",
-        "POST /swarm": "$0.02 — launch multi-agent swarm",
+        "POST /agent-task": "$0.10 — dispatch a task to an agent",
+        "POST /intent": "$0.05 — resolve a goal into commands",
+        "GET /fleet-status": "$0.01 — live agent fleet status",
+        "POST /swarm": "$0.50 — launch multi-agent swarm",
         ...(openai
           ? {
-              "POST /voice/transcribe": "$0.005 — speech-to-text (Whisper)",
-              "POST /voice/synthesize": "$0.01 — text-to-speech (TTS HD)",
+              "POST /voice/transcribe": "$0.05 — speech-to-text (Whisper)",
+              "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)",
             }
           : {}),
       },
       free: {
         "GET /health": "this endpoint",
         "GET /token-info": "XMETAV token info and tier table",
+        "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
       },
     },
   });
+});
+
+// ---- ERC-8004 Agent Payment Info (free, public discovery) ----
+
+const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
+const IDENTITY_ABI = [
+  { name: "ownerOf", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+  { name: "tokenURI", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "string" }] },
+  { name: "getAgentWallet", type: "function", stateMutability: "view",
+    inputs: [{ name: "agentId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+] as const;
+
+const identityClient = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
+});
+
+app.get("/agent/:agentId/payment-info", async (req, res) => {
+  const agentId = BigInt(req.params.agentId);
+
+  try {
+    const [owner, tokenURI, agentWallet] = await Promise.all([
+      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "ownerOf", args: [agentId] }),
+      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "tokenURI", args: [agentId] }),
+      identityClient.readContract({ address: IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "getAgentWallet", args: [agentId] }),
+    ]);
+
+    // Check if the agent metadata declares x402 support
+    let metadata: Record<string, unknown> | null = null;
+    let x402Enabled = false;
+    if (tokenURI) {
+      try {
+        if ((tokenURI as string).startsWith("data:")) {
+          const json64 = (tokenURI as string).split(",")[1];
+          metadata = JSON.parse(Buffer.from(json64, "base64").toString());
+        } else {
+          const resp = await fetch(tokenURI as string, { signal: AbortSignal.timeout(5000) });
+          if (resp.ok) metadata = await resp.json() as Record<string, unknown>;
+        }
+        if (metadata) {
+          const services = metadata.services as Array<{ type: string }> | undefined;
+          x402Enabled = !!services?.some((s) => s.type === "x402");
+        }
+      } catch { /* metadata fetch failed — ok, just report what we have */ }
+    }
+
+    res.json({
+      agentId: agentId.toString(),
+      owner: owner as string,
+      agentWallet: agentWallet as string,
+      tokenURI: tokenURI as string,
+      x402Enabled,
+      acceptedSchemes: x402Enabled ? ["exact"] : [],
+      network: "eip155:8453",
+      pricing: x402Enabled && metadata
+        ? (metadata as Record<string, unknown>)
+        : null,
+      registry: IDENTITY_REGISTRY,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    res.status(404).json({
+      error: `Agent #${agentId} not found in ERC-8004 registry`,
+      registry: IDENTITY_REGISTRY,
+    });
+  }
 });
 
 // ---- Start ----
@@ -600,13 +680,17 @@ app.listen(port, () => {
   console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
   console.log(`  Token:     ${XMETAV_TOKEN_ADDRESS ? XMETAV_TOKEN_ADDRESS : "disabled (no XMETAV_TOKEN_ADDRESS)"}`);
   console.log(`\n  Gated endpoints:`);
-  console.log(`    POST /agent-task       $0.01   Dispatch task to agent`);
-  console.log(`    POST /intent           $0.005  Resolve goal → commands`);
-  console.log(`    GET  /fleet-status     $0.001  Live fleet status`);
-  console.log(`    POST /swarm            $0.02   Multi-agent swarm`);
+  console.log(`    POST /agent-task       $0.10   Dispatch task to agent`);
+  console.log(`    POST /intent           $0.05   Resolve goal → commands`);
+  console.log(`    GET  /fleet-status     $0.01   Live fleet status`);
+  console.log(`    POST /swarm            $0.50   Multi-agent swarm`);
   if (openai) {
-    console.log(`    POST /voice/transcribe $0.005  Speech-to-text (Whisper)`);
-    console.log(`    POST /voice/synthesize $0.01   Text-to-speech (TTS HD)`);
+    console.log(`    POST /voice/transcribe $0.05   Speech-to-text (Whisper)`);
+    console.log(`    POST /voice/synthesize $0.08   Text-to-speech (TTS HD)`);
   }
+  console.log(`\n  Free endpoints:`);
+  console.log(`    GET  /health                    Service health`);
+  console.log(`    GET  /token-info                Token tiers & discounts`);
+  console.log(`    GET  /agent/:agentId/payment-info  ERC-8004 agent lookup`);
   console.log();
 });
