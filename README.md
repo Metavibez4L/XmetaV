@@ -53,8 +53,8 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v22
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
-- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle). Skills displayed as badges in Fleet table and Identity page
-- Multi-agent management (11 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web
+- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle), gas/standards/addresses/concepts (midas). Skills displayed as badges in Fleet table and Identity page
+- Multi-agent management (12 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -861,6 +861,7 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
   - **main**: `wallets` (EOAs, Safe multisig, EIP-7702, ERC-4337, key safety)
   - **web3dev**: `tools`, `l2s`, `orchestration`, `addresses`, `concepts`, `security`, `standards`, `frontend-ux`, `frontend-playbook`, `building-blocks` (10 skills)
   - **oracle**: `gas` (L1 vs L2 tx costs), `l2s` (Arbitrum, Optimism, Base, zkSync, Scroll, Linea)
+  - **midas**: `gas`, `standards`, `addresses`, `concepts` (4 EthSkills for revenue context)
 - **Agent Identity Updates** — Updated IDENTITY.md files for main (created from scratch + SOUL.md), web3dev, and oracle to include Skills sections
 - **ERC-8004 Metadata Update** — 13 new capabilities added to on-chain metadata (ethereum-wallet-management, eip-7702-smart-eoas, safe-multisig, erc-4337-account-abstraction, l2-deployment, cross-chain-bridging, gas-economics, defi-composability, solidity-security-patterns, ethereum-standards, dapp-orchestration, frontend-ux, verified-contract-addresses, dev-tooling). Per-agent `skills` arrays added to `fleet.agents`. AgentMemoryAnchor contract added
 - **Dashboard Skills UI** — Skills badges displayed per agent in Fleet table (purple #e879f9 badges) and Identity page fleet roster grid. New `isSkill` color category for skill-related capabilities
