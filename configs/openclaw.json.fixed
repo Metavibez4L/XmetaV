@@ -114,6 +114,104 @@
             "security": "full"
           }
         }
+      },
+      {
+        "id": "sentinel",
+        "workspace": "/home/manifest/sentinel",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "briefing",
+        "workspace": "/home/manifest/briefing",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "oracle",
+        "workspace": "/home/manifest/oracle",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "skills": ["gas", "l2s"],
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "alchemist",
+        "workspace": "/home/manifest/alchemist",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "web3dev",
+        "workspace": "/home/manifest/web3dev",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"],
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
+      },
+      {
+        "id": "soul",
+        "workspace": "/home/manifest/soul",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": ["exec", "process", "read", "write"],
+          "deny": ["tts"],
+          "exec": {
+            "host": "gateway",
+            "security": "full"
+          }
+        }
       }
     ]
   },
