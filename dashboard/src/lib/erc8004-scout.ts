@@ -63,7 +63,7 @@ const REPUTATION_ABI = [
 
 // ---- Shared viem client ----
 
-const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const RPC_URL = process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs";
 
 export const scoutClient = createPublicClient({
   chain: base,

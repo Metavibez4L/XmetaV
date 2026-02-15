@@ -37,7 +37,7 @@ const formattedKey = privateKey.startsWith("0x")
 const account = privateKeyToAccount(formattedKey);
 
 // Use a custom RPC if set, otherwise fall back to default Base public RPC
-const rpcUrl = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const rpcUrl = process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs";
 
 const walletClient = createWalletClient({
   account,

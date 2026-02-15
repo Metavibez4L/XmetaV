@@ -28,7 +28,7 @@ const IDENTITY_ABI = [
 
 const viemClient = createPublicClient({
   chain: base,
-  transport: http("https://mainnet.base.org", { timeout: 10_000 }),
+  transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs", { timeout: 10_000 }),
 });
 
 /** GET /api/x402/wallet -- wallet info (from ERC-8004 on-chain) + payment stats */

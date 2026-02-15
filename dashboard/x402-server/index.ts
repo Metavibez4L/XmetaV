@@ -82,7 +82,7 @@ function getTier(balance: number): TokenTier {
 }
 
 const viemClient = XMETAV_TOKEN_ADDRESS
-  ? createPublicClient({ chain: base, transport: http("https://mainnet.base.org") })
+  ? createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs") })
   : null;
 
 async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
@@ -160,7 +160,7 @@ const ERC8004_ABI = [
 
 const erc8004Client = createPublicClient({
   chain: base,
-  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
+  transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs"),
 });
 
 // Extend Express Request to carry resolved agent identity

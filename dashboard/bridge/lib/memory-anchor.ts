@@ -22,7 +22,7 @@ import { pinJSON, isPinataConfigured, ipfsGatewayURL } from "./ipfs-pinata.js";
 /** Shared public client for reads */
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org", {
+  transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs", {
     timeout: 10_000,
   }),
 });
@@ -98,7 +98,7 @@ export type MemoryCategoryType = (typeof MemoryCategory)[keyof typeof MemoryCate
 
 const ANCHOR_ADDRESS = process.env.ANCHOR_CONTRACT_ADDRESS as `0x${string}` | undefined;
 const PRIVATE_KEY = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
-const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const RPC_URL = process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs";
 
 /**
  * Check if on-chain anchoring is fully configured.

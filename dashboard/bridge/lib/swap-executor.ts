@@ -37,7 +37,7 @@ import { supabase } from "./supabase.js";
 // ── Config ──────────────────────────────────────────────────────────
 
 const PRIVATE_KEY = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
-const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+const RPC_URL = process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs";
 const MAX_SWAP_USD = parseFloat(process.env.SWAP_LIMIT_USD || "50");
 
 // ── Known Tokens on Base ────────────────────────────────────────────

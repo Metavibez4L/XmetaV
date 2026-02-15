@@ -74,7 +74,7 @@ const REPUTATION_ABI = [
 
 const viemClient = createPublicClient({
   chain: base,
-  transport: http("https://mainnet.base.org", { timeout: 10_000 }),
+  transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs", { timeout: 10_000 }),
 });
 
 /**

@@ -534,7 +534,7 @@ export function initEffects(
           for (const d of meeting.holoDiscs) d.destroy();
           meeting = null;
           meetingTime = 0;
-          lastMeetingPosHash = \"\";
+          lastMeetingPosHash = "";
           return; // skip the rest for this frame
         }
       }
