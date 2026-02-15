@@ -222,6 +222,111 @@ export interface X402WalletInfo {
 }
 
 // ============================================================
+// Memory Crystal (Materia) types
+// ============================================================
+
+export type CrystalType = "milestone" | "decision" | "incident";
+export type CrystalColor = "cyan" | "magenta" | "gold" | "red" | "green" | "purple" | "amber";
+export type CrystalClass =
+  | "anchor" | "knight" | "paladin" | "mage" | "sage"
+  | "rogue" | "ninja" | "summoner" | "godhand";
+
+/** Row in the memory_crystals table */
+export interface MemoryCrystal {
+  id: string;
+  memory_id: string | null;
+  anchor_tx_hash: string | null;
+  ipfs_cid: string | null;
+  agent_id: string;
+  name: string;
+  description: string | null;
+  crystal_type: CrystalType;
+  crystal_color: CrystalColor;
+  star_rating: number;
+  xp: number;
+  level: number;
+  class: CrystalClass;
+  effects: Record<string, number>;
+  equipped_by: string | null;
+  is_fused: boolean;
+  is_legendary: boolean;
+  created_at: string;
+  evolved_at: string | null;
+  last_used_at: string | null;
+}
+
+/** Row in the memory_fusions table */
+export interface MemoryFusion {
+  id: string;
+  crystal_a_id: string;
+  crystal_b_id: string;
+  result_crystal_id: string | null;
+  recipe_name: string;
+  recipe_key: string;
+  result_effects: Record<string, number>;
+  result_star: number;
+  fused_by: string;
+  fused_at: string;
+}
+
+/** Row in the memory_summons table */
+export interface MemorySummon {
+  id: string;
+  crystal_id: string;
+  summoned_by: string;
+  task_context: string | null;
+  context_boost: number;
+  xp_gained: number;
+  arena_effect: string;
+  summoned_at: string;
+}
+
+/** Row in the limit_breaks table */
+export interface LimitBreak {
+  id: string;
+  trigger_event: string;
+  trigger_agent: string;
+  legendary_crystal_id: string | null;
+  power_boost: number;
+  agents_affected: string[];
+  anchor_count_at_trigger: number;
+  active: boolean;
+  activated_at: string;
+  resolved_at: string | null;
+}
+
+/** Row in the memory_achievements table */
+export interface MemoryAchievement {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  tier: "bronze" | "silver" | "gold" | "legendary";
+  requirement: Record<string, number>;
+  unlocked: boolean;
+  progress: number;
+  target: number;
+  unlocked_at: string | null;
+  created_at: string;
+}
+
+/** Row in the daily_quests table */
+export interface DailyQuest {
+  id: string;
+  quest_date: string;
+  title: string;
+  description: string | null;
+  quest_type: string;
+  target: number;
+  progress: number;
+  completed: boolean;
+  xp_reward: number;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// ============================================================
 // Agent fleet
 // ============================================================
 

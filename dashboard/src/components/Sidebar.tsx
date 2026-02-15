@@ -4,7 +4,7 @@ import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords, Brain } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords, Brain, Gem } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/token", label: "$XMETAV", icon: Coins, shortcut: "09", key: "9" },
   { href: "/logs", label: "Logs", icon: Terminal, shortcut: "10", key: "0" },
   { href: "/arena", label: "Arena", icon: Swords, shortcut: "11" },
+  { href: "/memory-cosmos", label: "Memory Cosmos", icon: Gem, shortcut: "12" },
 ];
 
 interface SidebarProps {
