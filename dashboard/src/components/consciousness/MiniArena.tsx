@@ -24,6 +24,7 @@ const AGENTS: { id: string; label: string; color: string; baseX: number; baseY: 
   { id: "web3dev", label: "WEB3DEV", color: "#39ff14", baseX: 75, baseY: 65 },
   { id: "akua", label: "AKUA", color: "#06b6d4", baseX: 85, baseY: 65 },
   { id: "basedintern", label: "BASEDINTERN", color: "#f472b6", baseX: 55, baseY: 75 },
+  { id: "midas", label: "MIDAS", color: "#f59e0b", baseX: 35, baseY: 75 },
 ];
 
 type Focus = "both" | "main" | "soul";

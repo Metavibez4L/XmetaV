@@ -85,6 +85,15 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     tile: { col: 1, row: 9 },
     size: 26,
   },
+  {
+    id: "midas",
+    label: "MIDAS",
+    color: 0xf59e0b,
+    colorHex: "#f59e0b",
+    room: "intel",
+    tile: { col: 3, row: 9 },
+    size: 26,
+  },
 
   // ── WEB3 LAB (private cubicle, right of meeting area) ─────────
   {
@@ -154,6 +163,7 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "web3dev", angle: 0 },           // right center
   { agentId: "sentinel", angle: 300 },        // upper-right (near operator)
   { agentId: "soul", angle: 195 },              // lower-left (observer seat)
+  { agentId: "midas", angle: 165 },              // between oracle & alchemist
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -183,4 +193,9 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["soul", "oracle"],
   ["soul", "alchemist"],
   ["soul", "sentinel"],
+  // Midas revenue connections
+  ["midas", "oracle"],
+  ["midas", "alchemist"],
+  ["midas", "main"],
+  ["midas", "soul"],
 ];

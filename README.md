@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v21
+Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v22
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,7 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v21
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  11 (+ dynamic)                     |
+ |   agents:  12 (+ dynamic)                     |
  |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
@@ -164,6 +164,7 @@ XmetaV/
         |-- briefing.md       # briefing (context curator) runbook
         |-- oracle.md         # oracle (on-chain intel) runbook
         |-- alchemist.md      # alchemist (tokenomics) runbook
+        |-- midas.md          # midas (revenue & growth) runbook
         |-- web3dev.md        # web3dev (blockchain dev) runbook
         |-- sentinel.md      # sentinel (fleet ops) runbook
 ```
@@ -237,6 +238,7 @@ openclaw agent --agent main --local --thinking off \
 | **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
 | **`oracle-agent.sh`** | **Oracle Agent** -- on-chain intel, gas, prices, sentiment, alerts | `./scripts/oracle-agent.sh` |
 | **`alchemist-agent.sh`** | **Alchemist Agent** -- $XMETAV tokenomics, emissions, staking curves | `./scripts/alchemist-agent.sh` |
+| **`midas-agent.sh`** | **Midas Agent** -- x402 revenue analytics, pricing, growth pipeline | `./scripts/midas-agent.sh` |
 | **`web3dev-agent.sh`** | **Web3Dev Agent** -- compile, test, audit, deploy smart contracts | `./scripts/web3dev-agent.sh` |
 
 ---
@@ -390,6 +392,31 @@ Reads directly from the $XMETAV contract on Base Mainnet. Models emission schedu
 ```
 
 See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
+
+### Agent: `midas` (revenue & growth)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Revenue intelligence & growth strategy |
+| **Workspace** | `/home/manifest/midas` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `revenue`, `pricing`, `growth`, `forecast` |
+| **Role** | x402 analytics, endpoint pricing, revenue forecasts, growth pipeline, R&D prioritisation |
+
+Sits between Oracle and Alchemist (arena seat 165°). Synthesizes market intel + tokenomics into revenue strategy. Tracks all x402 payment flows, analyzes endpoint performance, recommends pricing adjustments, and maintains a ROI-ranked growth opportunity pipeline.
+
+```bash
+# Run manually
+./scripts/midas-agent.sh
+
+# Revenue snapshot daily at 6 AM, endpoints every 12h, growth scan Monday 8 AM:
+# 0 6 * * *    /home/manifest/XmetaV/scripts/midas-agent.sh --report    >> /tmp/midas.log 2>&1
+# 0 */12 * * * /home/manifest/XmetaV/scripts/midas-agent.sh --endpoints >> /tmp/midas.log 2>&1
+# 0 8 * * 1   /home/manifest/XmetaV/scripts/midas-agent.sh --growth    >> /tmp/midas.log 2>&1
+```
+
+See [docs/agents/midas.md](docs/agents/midas.md) for full documentation.
 
 ### Agent: `web3dev` (blockchain developer)
 
@@ -808,6 +835,26 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-15 (v22) — Midas Revenue Agent + Anchor Sync + DB Consolidation
+- **Midas Revenue Agent** — New revenue & growth intelligence agent (`midas`). Arena seat 165° (between Oracle 150° and Alchemist 180°). Color: Gold (`#f59e0b`). Skills: `revenue`, `pricing`, `growth`, `forecast`
+  - **Revenue Dashboard** — Aggregates x402 payments into daily snapshots with 7d/30d/90d forecasts, growth rates, and top-endpoint ranking
+  - **Endpoint Analytics** — Per-endpoint usage tracking: call counts, conversion rates, revenue trends (up/stable/down)
+  - **Pricing Intelligence** — Automated x402 tier analysis with confidence-scored pricing recommendations
+  - **Growth Pipeline** — ROI-ranked opportunity pipeline with category tags (endpoint/token/partnership/vertical/optimization) and status tracking
+  - **4 New Supabase Tables** — `revenue_metrics`, `endpoint_analytics`, `growth_opportunities`, `pricing_recommendations` with RLS, indexes, triggers, Realtime
+  - **Bridge Skill** — `bridge/lib/midas-revenue.ts` (~330 lines): report generation, endpoint analytics, pricing analysis, growth opportunity management
+  - **API Route** — `/api/midas?action=dashboard|report|endpoints|opportunities|pricing`
+  - **Agent Script** — `scripts/midas-agent.sh` (cron-compatible: `--report`, `--endpoints`, `--pricing`, `--growth`)
+  - **Arena Integration** — Intel room tile (col 3, row 9), meeting seat, connections to oracle/alchemist/main/soul, MiniArena dot
+- **Anchor Sync Fix** — Dashboard now keeps on-chain anchor count synced:
+  - AgentIdentity auto-refreshes every 30s (was mount-only)
+  - AnchorTimeline periodic 30s sync status refresh + re-fetches on anchor count change
+  - useConsciousness Supabase Realtime subscription on `agent_memory` INSERT where `source=anchor` for instant pickup
+  - Fixed `ANCHOR_CONTRACT_ADDRESS` missing from `.env.local` (was causing "Contract not configured")
+  - Switched anchors + identity API routes from cookie-based server client to admin client (service role) to bypass RLS
+- **DB Consolidation Migration** — Formalized 5 tables + 1 view that only existed as manual setup scripts into the migration chain (`agent_controls`, `intent_sessions`, `x402_payments`, `x402_daily_spend` view, `swarm_runs`, `swarm_tasks`). All `IF NOT EXISTS` guarded
+- **Fleet Count** — 12 autonomous agents + dynamic
 
 ### 2026-02-15 (v21) — EthSkills + Dashboard Skills UI + Build Hardening
 - **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents via `openclaw skills install`:

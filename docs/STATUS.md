@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v21 (EthSkills + Dashboard Skills UI + Build Hardening)
+**XmetaV Version:** v22 (Midas Revenue Agent + Anchor Sync + DB Consolidation)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -62,6 +62,7 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | `briefing` | `kimi-k2.5:cloud` | `/home/manifest/briefing` | coding | **Context Curator** — continuity, health, memory |
 | `oracle` | `kimi-k2.5:cloud` | `/home/manifest/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
 | `alchemist` | `kimi-k2.5:cloud` | `/home/manifest/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
+| `midas` | `kimi-k2.5:cloud` | `/home/manifest/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
 | `web3dev` | `kimi-k2.5:cloud` | `/home/manifest/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
 
@@ -73,6 +74,7 @@ Detailed agent runbooks (index: [`docs/agents/README.md`](agents/README.md)):
 - `docs/agents/briefing.md`
 - `docs/agents/oracle.md`
 - `docs/agents/alchemist.md`
+- `docs/agents/midas.md`
 - `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`
