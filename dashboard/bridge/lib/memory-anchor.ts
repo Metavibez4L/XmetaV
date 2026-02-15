@@ -8,10 +8,24 @@
  *   3. ~$0.0001 per anchor on Base
  */
 
-import { createWalletClient, createPublicClient, http, keccak256, toHex } from "viem";
+import {
+  createWalletClient,
+  createPublicClient,
+  http,
+  keccak256,
+  toHex,
+} from "viem";
 import { base } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import { pinJSON, isPinataConfigured, ipfsGatewayURL } from "./ipfs-pinata.js";
+
+/** Shared public client for reads */
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org", {
+    timeout: 10_000,
+  }),
+});
 
 // Contract ABI (only the functions we call)
 const ANCHOR_ABI = [
@@ -147,7 +161,30 @@ export async function anchorMemory(
       args: [BigInt(agentId), contentHash, category],
     });
 
-    console.log(`[anchor] On-chain tx: ${txHash}`);
+    console.log(`[anchor] On-chain tx submitted: ${txHash}`);
+
+    // 3. Wait for transaction confirmation (max 60s)
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1,
+        timeout: 60_000,
+      });
+
+      if (receipt.status === "reverted") {
+        console.error(`[anchor] TX reverted on-chain: ${txHash}`);
+        return null;
+      }
+
+      console.log(
+        `[anchor] ✓ Confirmed in block ${receipt.blockNumber} (gas: ${receipt.gasUsed})`
+      );
+    } catch (waitErr) {
+      console.warn(
+        `[anchor] TX confirmation timeout — recording anyway: ${(waitErr as Error).message}`
+      );
+      // Still return the hash — the tx may confirm later
+    }
 
     return {
       ipfsCid: pinResult.ipfsHash,
@@ -166,13 +203,8 @@ export async function anchorMemory(
 export async function getLatestAnchor(agentId: number) {
   if (!ANCHOR_ADDRESS) return null;
 
-  const client = createPublicClient({
-    chain: base,
-    transport: http(RPC_URL),
-  });
-
   try {
-    const count = await client.readContract({
+    const count = await publicClient.readContract({
       address: ANCHOR_ADDRESS,
       abi: ANCHOR_ABI,
       functionName: "anchorCount",
@@ -181,7 +213,7 @@ export async function getLatestAnchor(agentId: number) {
 
     if (count === BigInt(0)) return null;
 
-    const anchor = await client.readContract({
+    const anchor = await publicClient.readContract({
       address: ANCHOR_ADDRESS,
       abi: ANCHOR_ABI,
       functionName: "getLatest",
@@ -197,5 +229,80 @@ export async function getLatestAnchor(agentId: number) {
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Read just the on-chain anchor count for an agent. Fast single-read.
+ */
+export async function getAnchorCount(agentId: number): Promise<number> {
+  if (!ANCHOR_ADDRESS) return 0;
+
+  try {
+    const count = await publicClient.readContract({
+      address: ANCHOR_ADDRESS,
+      abi: ANCHOR_ABI,
+      functionName: "anchorCount",
+      args: [BigInt(agentId)],
+    });
+    return Number(count);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Read anchors from the chain (paginated).
+ * Returns an array of on-chain anchor structs.
+ */
+export async function getOnChainAnchors(
+  agentId: number,
+  from = 0,
+  count = 50
+): Promise<
+  Array<{
+    timestamp: number;
+    contentHash: string;
+    previousAnchor: string;
+    category: number;
+    index: number;
+  }>
+> {
+  if (!ANCHOR_ADDRESS) return [];
+
+  try {
+    const total = await publicClient.readContract({
+      address: ANCHOR_ADDRESS,
+      abi: ANCHOR_ABI,
+      functionName: "anchorCount",
+      args: [BigInt(agentId)],
+    });
+
+    if (total === BigInt(0)) return [];
+
+    const readCount = Math.min(count, Number(total) - from);
+    if (readCount <= 0) return [];
+
+    const anchors = await publicClient.readContract({
+      address: ANCHOR_ADDRESS,
+      abi: ANCHOR_ABI,
+      functionName: "getAnchors",
+      args: [BigInt(agentId), BigInt(from), BigInt(readCount)],
+    });
+
+    return (anchors as Array<{
+      timestamp: bigint;
+      contentHash: string;
+      previousAnchor: string;
+      category: number;
+    }>).map((a, i) => ({
+      timestamp: Number(a.timestamp),
+      contentHash: a.contentHash,
+      previousAnchor: a.previousAnchor,
+      category: a.category,
+      index: from + i,
+    }));
+  } catch {
+    return [];
   }
 }

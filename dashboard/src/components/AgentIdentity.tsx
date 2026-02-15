@@ -79,6 +79,8 @@ interface SoulStats {
   totalMemories: number;
   totalAssociations: number;
   totalAnchors: number;
+  onChainAnchors: number;
+  anchorsSynced: boolean;
   recentDreams: { category: string; confidence: number; created_at: string }[];
   dreamCount: number;
 }
@@ -352,7 +354,9 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
             <>
               <StatCard icon={<Brain className="h-4 w-4" />} label="Memories" value={soul.totalMemories} color="#ff006e" />
               <StatCard icon={<Zap className="h-4 w-4" />} label="Associations" value={soul.totalAssociations} color="#a855f7" />
-              <StatCard icon={<Anchor className="h-4 w-4" />} label="On-Chain Anchors" value={soul.totalAnchors} color="#00f0ff" />
+              <StatCard icon={<Anchor className="h-4 w-4" />} label="On-Chain Anchors" value={soul.onChainAnchors || soul.totalAnchors} color="#00f0ff"
+                sub={soul.anchorsSynced ? "synced" : `db: ${soul.totalAnchors}`}
+                subColor={soul.anchorsSynced ? "#39ff14" : "#f59e0b"} />
               <StatCard icon={<Moon className="h-4 w-4" />} label="Dream Insights" value={soul.dreamCount} color="#38bdf8" />
             </>
           )}
@@ -498,7 +502,7 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <SoulMetric label="Persistent Memories" value={soul.totalMemories} color="#ff006e" />
               <SoulMetric label="Association Graph" value={soul.totalAssociations} color="#a855f7" sub="edges" />
-              <SoulMetric label="On-Chain Anchors" value={soul.totalAnchors} color="#00f0ff" sub="Base" />
+              <SoulMetric label="On-Chain Anchors" value={soul.onChainAnchors || soul.totalAnchors} color="#00f0ff" sub={soul.anchorsSynced ? "synced ✓" : `db: ${soul.totalAnchors} (${soul.anchorsSynced ? "" : "out of sync"})`} />
               <SoulMetric label="Dream Insights" value={soul.dreamCount} color="#38bdf8" />
             </div>
             {/* Recent Dream Insights */}
@@ -753,15 +757,15 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
   );
 }
 
-function StatCard({ icon, label, value, color, sub }: {
-  icon: React.ReactNode; label: string; value: string | number; color: string; sub?: string;
+function StatCard({ icon, label, value, color, sub, subColor }: {
+  icon: React.ReactNode; label: string; value: string | number; color: string; sub?: string; subColor?: string;
 }) {
   return (
     <div className="rounded-lg p-3 text-center" style={{ background: `${color}06`, border: `1px solid ${color}15` }}>
       <div className="flex items-center justify-center mb-1" style={{ color: `${color}66` }}>{icon}</div>
       <div className="text-lg font-mono font-bold" style={{ color }}>{value}</div>
       <div className="text-[9px] font-mono uppercase tracking-wider" style={{ color: "#4a6a8a" }}>{label}</div>
-      {sub && <div className="text-[8px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>{sub}</div>}
+      {sub && <div className="text-[8px] font-mono mt-0.5" style={{ color: subColor || "#4a6a8a66" }}>{sub}</div>}
     </div>
   );
 }

@@ -9,6 +9,17 @@ export const runtime = "nodejs";
 
 const IDENTITY_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
 const REPUTATION_REGISTRY = "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" as const;
+const ANCHOR_CONTRACT = (process.env.ANCHOR_CONTRACT_ADDRESS || "") as `0x${string}`;
+
+const ANCHOR_ABI = [
+  {
+    name: "anchorCount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
 
 // Minimal ABIs — only the read functions we need
 const IDENTITY_ABI = [
@@ -154,7 +165,20 @@ export async function GET(request: NextRequest) {
       const supabase = await createClient();
 
       // Run all Supabase queries in parallel
-      const [paymentsRes, memoryRes, assocRes, dreamsRes, anchorsRes, crystalsRes, equippedRes] =
+      // Also read on-chain anchor count in parallel
+      const onChainAnchorCountP = ANCHOR_CONTRACT
+        ? viemClient
+            .readContract({
+              address: ANCHOR_CONTRACT,
+              abi: ANCHOR_ABI,
+              functionName: "anchorCount",
+              args: [agentId],
+            })
+            .then((c) => Number(c))
+            .catch(() => 0)
+        : Promise.resolve(0);
+
+      const [paymentsRes, memoryRes, assocRes, dreamsRes, anchorsRes, crystalsRes, equippedRes, onChainAnchorCount] =
         await Promise.all([
           supabase.from("x402_payments").select("amount, status, created_at").eq("status", "completed"),
           supabase.from("agent_memory").select("id", { count: "exact", head: true }),
@@ -163,6 +187,7 @@ export async function GET(request: NextRequest) {
           supabase.from("agent_memory").select("id", { count: "exact", head: true }).eq("source", "anchor"),
           supabase.from("memory_crystals").select("id, xp, star_rating, is_legendary", { count: "exact" }),
           supabase.from("memory_crystals").select("id", { count: "exact", head: true }).not("equipped_by", "is", null),
+          onChainAnchorCountP,
         ]);
 
       // x402 stats
@@ -197,10 +222,13 @@ export async function GET(request: NextRequest) {
         ? (crystalRows.reduce((sum: number, c: { star_rating?: number }) => sum + (c.star_rating || 1), 0) / crystalRows.length).toFixed(1)
         : "0";
 
+      const supabaseAnchorCount = anchorsRes.count || 0;
       soulStats = {
         totalMemories: memoryRes.count || 0,
         totalAssociations: assocRes.count || 0,
-        totalAnchors: anchorsRes.count || 0,
+        totalAnchors: supabaseAnchorCount,
+        onChainAnchors: onChainAnchorCount,
+        anchorsSynced: supabaseAnchorCount === onChainAnchorCount,
         recentDreams: (dreamsRes.data || []).map((d: { category: string; confidence: number; created_at: string }) => ({
           category: d.category,
           confidence: d.confidence,

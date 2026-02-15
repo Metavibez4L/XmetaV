@@ -2,6 +2,7 @@ import { supabase } from "./supabase.js";
 import { anchorMemory, isAnchoringEnabled, MemoryCategory } from "./memory-anchor.js";
 import type { MemoryCategoryType } from "./memory-anchor.js";
 import { processNewMemory } from "./soul/index.js";
+import { createCrystal } from "./memory-crystal.js";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -294,12 +295,31 @@ async function anchorIfSignificant(
   if (result) {
     console.log(`[anchor] ✓ IPFS: ${result.ipfsCid} | TX: ${result.txHash}`);
     // Write a memory noting the anchor
-    await writeMemory({
+    const anchorMemoryResult = await writeMemory({
       agent_id: agentId,
       kind: "fact",
       content: `Memory anchored on-chain: ipfs://${result.ipfsCid} (tx: ${result.txHash})`,
       source: "anchor",
       ttl_hours: null, // permanent
     });
+
+    // Auto-create a memory crystal from the anchor
+    const crystalName = `${categoryNames[category!]} — ${task.slice(0, 40)}`;
+    try {
+      await createCrystal({
+        memoryId: anchorMemoryResult || undefined,
+        anchorTxHash: result.txHash,
+        ipfsCid: result.ipfsCid,
+        agentId,
+        name: crystalName,
+        description: summary.slice(0, 200),
+        category: category!,
+      });
+    } catch (crystalErr) {
+      console.warn(
+        `[anchor] Crystal creation failed (non-fatal):`,
+        (crystalErr as Error).message
+      );
+    }
   }
 }

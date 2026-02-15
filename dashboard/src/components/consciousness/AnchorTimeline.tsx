@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import type { AnchorEntry } from "@/hooks/useConsciousness";
-import { ExternalLink, Link2 } from "lucide-react";
+import { ExternalLink, Link2, CheckCircle, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+
+interface AnchorSyncStatus {
+  onChainCount: number;
+  supabaseCount: number;
+  synced: boolean;
+  syncDelta: number;
+  contractConfigured: boolean;
+}
 
 interface Props {
   anchors: AnchorEntry[];
@@ -23,7 +31,35 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
   anchors,
 }: Props) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<AnchorSyncStatus | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch sync status from dedicated anchors API
+  const fetchSyncStatus = useCallback(async () => {
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/anchors?count=0");
+      if (res.ok) {
+        const data = await res.json();
+        setSyncStatus({
+          onChainCount: data.onChainCount,
+          supabaseCount: data.supabaseCount,
+          synced: data.synced,
+          syncDelta: data.syncDelta,
+          contractConfigured: data.contractConfigured,
+        });
+      }
+    } catch {
+      // Non-fatal
+    } finally {
+      setSyncLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSyncStatus();
+  }, [fetchSyncStatus]);
 
   const handleClick = useCallback(
     (anchor: AnchorEntry) => {
@@ -45,6 +81,7 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
           >
             ON-CHAIN ANCHORS
           </h2>
+          {syncStatus && <SyncBadge status={syncStatus} loading={syncLoading} onRefresh={fetchSyncStatus} />}
         </div>
         <div className="text-center py-8">
           <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
@@ -53,6 +90,12 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
           <div className="text-[9px] font-mono mt-1" style={{ color: "#4a6a8a66" }}>
             Significant milestones, decisions, and incidents will appear here.
           </div>
+          {syncStatus && syncStatus.onChainCount > 0 && (
+            <div className="text-[9px] font-mono mt-2 px-2 py-1 rounded inline-block"
+              style={{ color: "#f59e0b", background: "#f59e0b10", border: "1px solid #f59e0b20" }}>
+              {syncStatus.onChainCount} anchor(s) found on-chain but missing from database
+            </div>
+          )}
         </div>
       </div>
     );
@@ -69,13 +112,22 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
           >
             ON-CHAIN ANCHORS
           </h2>
+          {syncStatus && <SyncBadge status={syncStatus} loading={syncLoading} onRefresh={fetchSyncStatus} />}
         </div>
-        <span
-          className="text-[9px] font-mono px-2 py-0.5 rounded"
-          style={{ color: "#39ff14", border: "1px solid #39ff1433", background: "#39ff1408" }}
-        >
-          {anchors.length} ANCHORED
-        </span>
+        <div className="flex items-center gap-2">
+          {syncStatus && syncStatus.contractConfigured && (
+            <span className="text-[8px] font-mono px-1.5 py-0.5 rounded"
+              style={{ color: "#00f0ff66", border: "1px solid #00f0ff15" }}>
+              Chain: {syncStatus.onChainCount} | DB: {syncStatus.supabaseCount}
+            </span>
+          )}
+          <span
+            className="text-[9px] font-mono px-2 py-0.5 rounded"
+            style={{ color: "#39ff14", border: "1px solid #39ff1433", background: "#39ff1408" }}
+          >
+            {anchors.length} ANCHORED
+          </span>
+        </div>
       </div>
 
       {/* Timeline */}
@@ -173,3 +225,60 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
     </div>
   );
 });
+
+/* ── Sync Badge ─────────────────────────────────────────── */
+
+function SyncBadge({
+  status,
+  loading,
+  onRefresh,
+}: {
+  status: AnchorSyncStatus;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  if (!status.contractConfigured) {
+    return (
+      <span
+        className="text-[8px] font-mono px-1.5 py-0.5 rounded"
+        style={{ color: "#4a6a8a", background: "#ffffff06", border: "1px solid #ffffff08" }}
+      >
+        Contract not configured
+      </span>
+    );
+  }
+
+  if (status.synced) {
+    return (
+      <button
+        onClick={onRefresh}
+        className="flex items-center gap-1 text-[8px] font-mono px-1.5 py-0.5 rounded transition-colors hover:bg-[#39ff1410]"
+        style={{ color: "#39ff14", background: "#39ff1408", border: "1px solid #39ff1420" }}
+        title="On-chain and database are in sync"
+      >
+        {loading ? (
+          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+        ) : (
+          <CheckCircle className="h-2.5 w-2.5" />
+        )}
+        SYNCED
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={onRefresh}
+      className="flex items-center gap-1 text-[8px] font-mono px-1.5 py-0.5 rounded transition-colors hover:bg-[#f59e0b10]"
+      style={{ color: "#f59e0b", background: "#f59e0b08", border: "1px solid #f59e0b20" }}
+      title={`Delta: ${status.syncDelta > 0 ? "+" : ""}${status.syncDelta} (chain: ${status.onChainCount}, db: ${status.supabaseCount})`}
+    >
+      {loading ? (
+        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+      ) : (
+        <AlertTriangle className="h-2.5 w-2.5" />
+      )}
+      OUT OF SYNC ({Math.abs(status.syncDelta)})
+    </button>
+  );
+}
