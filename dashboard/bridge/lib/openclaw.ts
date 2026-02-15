@@ -6,6 +6,7 @@ import { existsSync } from "fs";
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set([
   "main",
+  "soul",
   "sentinel",
   "briefing",
   "oracle",
