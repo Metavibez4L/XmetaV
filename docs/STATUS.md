@@ -428,10 +428,11 @@ ERC-20 token on Base Mainnet with tiered discounts for x402 endpoints.
 | Tier | Min Balance | Discount | Daily Limit |
 |------|-------------|----------|-------------|
 | None | 0 | 0% | $5 |
-| Bronze | 1,000 | 10% | $25 |
-| Silver | 10,000 | 20% | $100 |
-| Gold | 100,000 | 35% | $500 |
-| Diamond | 1,000,000 | 50% | $2,000 |
+| Starter | 100 | 10% | $25 |
+| Bronze | 1,000 | 15% | $50 |
+| Silver | 10,000 | 25% | $200 |
+| Gold | 100,000 | 50% | $1,000 |
+| Diamond | 1,000,000 | 75% | $5,000 |
 
 ### Environment
 

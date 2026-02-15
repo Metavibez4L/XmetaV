@@ -197,7 +197,7 @@ Native utility token on Base Mainnet providing tiered discounts on x402-gated en
 
 - **Contract**: `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` (ERC-20, OpenZeppelin Ownable)
 - **Supply**: 1,000,000,000 (1B) fixed — all minted to deployer at construction
-- **Tiers**: None → Bronze (10%) → Silver (20%) → Gold (35%) → Diamond (50% discount)
+- **Tiers**: None → Starter (10%) → Bronze (15%) → Silver (25%) → Gold (50%) → Diamond (75% discount)
 - **Integration**: x402 server middleware reads `balanceOf()` on-chain to apply tier discount
 - **Dashboard**: `/token` page, balance + tier badge on `/identity` and `/payments`
 - **API**: `/api/token?wallet=0x...` returns balance, tier, discount

@@ -59,10 +59,11 @@ Callers holding `$XMETAV` (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) get aut
 | Tier | Min Balance | Discount | Daily Limit |
 |------|------------|----------|-------------|
 | None | 0 | 0% | $5 |
-| Bronze | 1,000 | 10% | $25 |
-| Silver | 10,000 | 20% | $100 |
-| Gold | 100,000 | 35% | $500 |
-| Diamond | 1,000,000 | 50% | $2,000 |
+| Starter | 100 | 10% | $25 |
+| Bronze | 1,000 | 15% | $50 |
+| Silver | 10,000 | 25% | $200 |
+| Gold | 100,000 | 50% | $1,000 |
+| Diamond | 1,000,000 | 75% | $5,000 |
 
 ---
 
@@ -125,11 +126,12 @@ Returns $XMETAV token contract details and discount tier table.
     "chainId": 8453
   },
   "tiers": [
-    { "name": "None",    "minBalance": 0,       "discount": "0%",  "dailyLimit": "$5"    },
-    { "name": "Bronze",  "minBalance": 1000,    "discount": "10%", "dailyLimit": "$25"   },
-    { "name": "Silver",  "minBalance": 10000,   "discount": "20%", "dailyLimit": "$100"  },
-    { "name": "Gold",    "minBalance": 100000,  "discount": "35%", "dailyLimit": "$500"  },
-    { "name": "Diamond", "minBalance": 1000000, "discount": "50%", "dailyLimit": "$2000" }
+    { "name": "None",      "minBalance": 0,       "discount": "0%",  "dailyLimit": "$5"    },
+    { "name": "Starter",   "minBalance": 100,     "discount": "10%", "dailyLimit": "$25"   },
+    { "name": "Bronze",    "minBalance": 1000,    "discount": "15%", "dailyLimit": "$50"   },
+    { "name": "Silver",    "minBalance": 10000,   "discount": "25%", "dailyLimit": "$200"  },
+    { "name": "Gold",      "minBalance": 100000,  "discount": "50%", "dailyLimit": "$1000" },
+    { "name": "Diamond",   "minBalance": 1000000, "discount": "75%", "dailyLimit": "$5000" }
   ],
   "enabled": true,
   "timestamp": "2026-02-14T04:23:33.421Z"
