@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v19
+Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v20
 
 ```
  ___   ___                    __           ___   ___
@@ -46,6 +46,8 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v19
 - **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
 - **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 15s auto-refresh from Supabase
 - **Dreamscape Visualization** — Canvas-based dream session renderer: hexagonal memory shards with glow, diamond insight crystals by category, curved synaptic bridges with flowing data particles, mouse-interactive repulsion, ambient data motes, and insight ticker strip
+- **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification: living crystals with XP/levels/star ratings (1-6★), class evolution (anchor→godhand), fusion recipes (FF7-style), memory summons with animated rituals, limit breaks spawning legendary 6★ crystals, explorable Memory Cosmos world map, achievements, and daily quests
+- **Memory Cosmos World** — Pannable/zoomable explorable memory landscape at `/memory-cosmos`: golden-spiral island layout with terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, star parallax background, hover info panels
 - **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
@@ -92,9 +94,9 @@ XmetaV/
 |   |   |   |-- arena/        # XMETAV HQ isometric office visualization (standalone)
 |   |   |   |-- auth/         # Login page
 |   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
-|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, Consciousness, etc.
+|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, Consciousness, Crystals, etc.
 |   |   |   +-- arena/        # PixiJS renderers (iso, background, office, avatars, effects)
-|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms, consciousness)
+|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms, consciousness, crystals)
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
@@ -530,6 +532,7 @@ cd dashboard/bridge && npm install && npm start
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
 | `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
 | `/consciousness` | **Consciousness** -- Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
+| `/memory-cosmos` | **Memory Cosmos** -- Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable world, achievements, quests |
 | `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
 
@@ -539,6 +542,7 @@ cd dashboard/bridge && npm install && npm start
 - **Bridge Controls** -- Start/stop the local bridge daemon from the dashboard
 - **Real-time** -- All data updates live via Supabase Realtime (no polling)
 - **Cyberpunk UI** -- Neon blue/dark hacker aesthetic with glitch effects, scanlines, and animated elements
+- **Memory Crystal System** -- FF-style crystal materia with XP, fusion, summons, limit breaks, and an explorable Memory Cosmos world
 
 **Architecture:** `Browser (Vercel) <-> Supabase (command bus) <-> Bridge Daemon (WSL) <-> OpenClaw CLI <-> Agents`
 
@@ -800,6 +804,22 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
+### 2026-02-14 (v20) — Cyber-Neural Memory Evolution (Crystal Materia System)
+- **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification with 7 interconnected subsystems:
+  - **Living Memory Crystals** — Crystals with XP, 30 levels, star ratings (1-6★), and class evolution (anchor → mage → knight → sage → rogue → summoner → ninja → godhand)
+  - **Crystal Fusion (FF7 Style)** — 5 fusion recipes (Nexus, Prophecy, Storm, Phantom, Infinity) with animated 4-phase fusion chamber (idle → orbit → collide → birth)
+  - **Memory Summons** — Keyword-triggered crystal summoning with triple concentric summoning circle animation, converging particles, and crystal materialization
+  - **Limit Breaks** — Triggered at 10+ crystals with 500+ total XP; creates legendary 6★ godhand crystal with golden lightning banner
+  - **Memory Cosmos World** — Pannable/zoomable explorable memory landscape: golden-spiral island layout, 3 terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, parallax stars
+  - **Achievements** — 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers and progress tracking
+  - **Daily Quests** — Auto-generated daily quests with type-based objectives and XP rewards
+- **6 New Supabase Tables** — `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests` with 3 custom enums, RLS policies, Realtime, and `crystal_level_thresholds` view
+- **Bridge Crystal Engine** — `bridge/lib/memory-crystal.ts` (~530 lines): full game logic for XP curves, class evolution, fusion recipes, summon scoring, limit break detection, quest generation
+- **7 Dashboard Components** — CrystalCard (canvas-animated), CrystalInventory (filterable grid), FusionChamber (4-phase animation), SummonOverlay (summoning circle modal), LimitBreakBanner (golden lightning), MemoryCosmos (world explorer), QuestTracker (achievements + quests)
+- **`/memory-cosmos` Page** — Full page assembling all crystal components with stats row, world explorer, inventory, fusion chamber, and quest tracker
+- **`useMemoryCrystals` Hook** — Supabase queries + realtime subscriptions on `memory_crystals` and `limit_breaks`, 12s auto-refresh, crystal action methods
+- **Sidebar** — Added Gem icon with Memory Cosmos nav entry
+
 ### 2026-02-15 (v18) — Consciousness Tab + Swap Execution + Streaming v2
 - **Consciousness Tab** — New `/consciousness` route with 6-panel awareness dashboard: Unified Awareness (Main↔Soul split view), Memory Graph (force-directed canvas with drag/zoom), Anchor Timeline (on-chain anchors with BaseScan links), Context Metrics (4 metric cards + injections feed), Dream Mode Status (6hr idle threshold + insights), Mini Arena (stylized agent positions with realtime subscription). Brain icon in sidebar at position 03 (Ctrl+3). `useConsciousness` hook fetches from 6 Supabase tables with 15s auto-refresh
 - **Swap Execution System** — Agent-initiated token swaps via `bridge/src/swap-executor.ts`. `/api/swap` POST endpoint. `agent_swaps` Supabase table for swap history. Gas balance and token balance pre-checks before submission. Clean viem error messages with failed status in chat
@@ -1013,5 +1033,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution</sub>
 </p>

@@ -23,6 +23,7 @@ flowchart TB
         TBL_RESP["agent_responses"]
         TBL_CTRL["agent_controls"]
         TBL_MEM["agent_memory"]
+        TBL_CRYSTAL["memory_crystals"]
         TBL_SRUN["swarm_runs"]
         TBL_STASK["swarm_tasks"]
         TBL_X402["x402_payments"]
@@ -128,7 +129,7 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs, Consciousness, Memory Cosmos
 
 ### XMETAV HQ — Isometric Office Visualization (PixiJS)
 
@@ -150,7 +151,7 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
 ### Bridge Daemon (Node.js)
@@ -215,6 +216,23 @@ A dedicated agent that sits between task dispatch and agent execution, curating 
 - **Arena**: Surveillance desk with mini fleet-monitor screens that mirror every agent's screen state; observer seat at meetings (195°)
 - **ERC-8004**: Listed in `fleet.agents` with 5 soul-specific capabilities
 - **Location**: `dashboard/bridge/lib/soul/`, `dashboard/scripts/setup-db-soul.sql`
+
+### Memory Crystal System (Cyber-Neural Memory Evolution)
+
+A Final-Fantasy-inspired memory gamification layer at `/memory-cosmos` with 7 interconnected subsystems.
+
+- **Crystal Materia**: Living memory crystals with XP, 30 levels, star ratings (1-6★), and class evolution (anchor → mage → knight → sage → rogue → summoner → ninja → godhand)
+- **Crystal Fusion**: 5 FF7-style fusion recipes (Nexus, Prophecy, Storm, Phantom, Infinity) with animated 4-phase fusion chamber
+- **Memory Summons**: Keyword-triggered crystal summoning with animated triple summoning circles
+- **Limit Breaks**: Triggered at 10+ crystals with 500+ total XP; creates legendary 6★ godhand crystal
+- **Memory Cosmos**: Pannable/zoomable explorable world map with golden-spiral island layout, 3 terrain types, neon highway bridges with data particles
+- **Achievements**: 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers
+- **Daily Quests**: Auto-generated daily quests with type-based objectives and XP rewards
+- **Bridge Engine**: `dashboard/bridge/lib/memory-crystal.ts` — full game logic (~530 lines)
+- **DB Tables**: `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests` (3 custom enums, `crystal_level_thresholds` view)
+- **Hook**: `useMemoryCrystals` — Supabase queries + realtime subscriptions, 12s auto-refresh
+- **Components**: CrystalCard (canvas), CrystalInventory, FusionChamber, SummonOverlay, LimitBreakBanner, MemoryCosmos, QuestTracker
+- **Location**: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCrystals.ts`, `dashboard/bridge/lib/memory-crystal.ts`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`

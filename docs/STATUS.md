@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v19 (Cyberpunk Arena Evolution + Dreamscape + Neural Swarm Links)
+**XmetaV Version:** v20 (Cyber-Neural Memory Evolution — Crystal Materia + Fusion + Summons)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -336,6 +336,12 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `memory_queries` | Soul agent memory retrieval log | Authenticated: SELECT, INSERT |
 | `dream_insights` | Soul agent dream consolidation insights | Authenticated: SELECT, INSERT |
 | `agent_swaps` | Token swap execution log | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_crystals` | Living memory crystals (materia system) | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_fusions` | Crystal fusion history (FF7-style) | Authenticated: SELECT, INSERT |
+| `memory_summons` | Memory summons log | Authenticated: SELECT, INSERT |
+| `limit_breaks` | Limit break event tracking | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_achievements` | Achievement/quest progression | Authenticated: SELECT, INSERT, UPDATE |
+| `daily_quests` | Daily quest generation | Authenticated: SELECT, INSERT, UPDATE |
 
 All tables have Realtime enabled for live updates.
 
@@ -353,6 +359,7 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 | `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
 | `/consciousness` | Consciousness | Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
+| `/memory-cosmos` | Memory Cosmos | Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable memory world, quests |
 | `/arena` | XMETAV HQ | Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | Live Logs | Real-time log streaming with severity/agent filters and search |
 
@@ -634,6 +641,78 @@ Memory orchestrator providing context curation, association building, dream cons
 | Supabase | Active | Registered in agent_controls |
 
 Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+
+---
+
+## Memory Crystal System (v20 — Cyber-Neural Memory Evolution)
+
+Final-Fantasy-inspired memory gamification at `/memory-cosmos` with 7 interconnected subsystems.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Memory Crystals (Materia) | Active | Crystals with XP, levels (1-30), star ratings (1-6★), class evolution |
+| Crystal Fusion (FF7 Style) | Active | 5 fusion recipes: Nexus, Prophecy, Storm, Phantom, Infinity |
+| Memory Summons | Active | Keyword-triggered crystal summoning with animated ritual |
+| Limit Breaks | Active | Triggered at 10+ crystals with 500+ total XP — creates legendary 6★ crystal |
+| Memory Cosmos (World) | Active | Pannable/zoomable explorable world with islands, bridges, terrain types |
+| Achievements | Active | 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers |
+| Daily Quests | Active | Auto-generated daily quests with XP rewards |
+
+### Database (6 tables + 1 view + 3 enums)
+
+| Table | Purpose |
+|-------|---------|
+| `memory_crystals` | Core crystal data: type, color, class, XP, level, star rating, equipped status |
+| `memory_fusions` | Fusion history: source crystal IDs + result crystal + recipe name |
+| `memory_summons` | Summon log: task context, keyword matched, crystal summoned |
+| `limit_breaks` | Limit break events: trigger, power boost, affected agents, resolution |
+| `memory_achievements` | Achievement definitions with tier, progress, unlock conditions |
+| `daily_quests` | Auto-generated daily quests with type-based objectives |
+
+Enums: `crystal_type` (milestone, decision, incident), `crystal_color` (cyan, magenta, gold, emerald, violet), `crystal_class` (anchor, mage, knight, sage, rogue, summoner, ninja, godhand)
+
+View: `crystal_level_thresholds` — XP required per level (1-30)
+
+### Crystal Class Evolution
+
+| Class | Star Req | Specialty |
+|-------|----------|----------|
+| anchor | ★ | Base class |
+| mage | ★★ | Memory amplification |
+| knight | ★★★ | Defensive anchoring |
+| sage | ★★★★ | Cross-agent wisdom |
+| rogue | ★★★★ | Fast context switching |
+| summoner | ★★★★★ | Crystal summoning power |
+| ninja | ★★★★★ | Stealth memory injection |
+| godhand | ★★★★★★ | Legendary — all abilities |
+
+### Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| CrystalCard | `crystals/CrystalCard.tsx` | Animated canvas crystal card with shape/particles/XP bar |
+| CrystalInventory | `crystals/CrystalInventory.tsx` | Filterable/sortable grid with stats |
+| FusionChamber | `crystals/FusionChamber.tsx` | Two-slot fusion UI with 4-phase animation |
+| SummonOverlay | `crystals/SummonOverlay.tsx` | Modal with concentric summoning circles |
+| LimitBreakBanner | `crystals/LimitBreakBanner.tsx` | Golden lightning banner for active limit breaks |
+| MemoryCosmos | `crystals/MemoryCosmos.tsx` | Pannable/zoomable explorable world map |
+| QuestTracker | `crystals/QuestTracker.tsx` | Achievement + daily quest progress display |
+
+### Bridge Engine
+
+`dashboard/bridge/lib/memory-crystal.ts` — Full game engine (~530 lines):
+- `createCrystal()`, `awardXP()`, `equipCrystal()`, `unequipCrystal()`
+- `findFusionRecipe()`, `fuseCrystals()` — 5 recipes with ingredient matching
+- `summonCrystal()` — keyword relevance scoring for auto-selection
+- `checkLimitBreak()`, `resolveLimitBreak()` — legendary crystal creation
+- `ensureDailyQuests()`, `getDailyQuests()` — auto-generation
+- 30-level XP curve, star ratings 1-6★, class evolution system
+
+### Hook
+
+`useMemoryCrystals` — React hook with Supabase queries + realtime subscriptions on `memory_crystals` and `limit_breaks` tables. 12s auto-refresh. Exposes `fuseCrystals()`, `summonCrystal()`, `equipCrystal()`, `unequipCrystal()`, `refresh()` actions.
+
+Files: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCrystals.ts`, `dashboard/bridge/lib/memory-crystal.ts`
 
 ---
 
