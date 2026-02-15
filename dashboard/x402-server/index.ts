@@ -132,42 +132,98 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     }
     // ---- Midas endpoint_analytics tracking ----
     trackEndpointAnalytics(endpoint, amount, callerAddress);
+
+    // ---- A/B pricing experiment tracking ----
+    const numAmt = parseFloat(amount.replace("$", ""));
+    // Randomly assign variant (50/50 split); "control" uses current price
+    const variant = Math.random() < 0.5 ? "control" : "premium";
+    trackABExperiment(endpoint, variant, true, numAmt);
   } catch { /* best effort */ }
 }
 
 // ---- Midas per-endpoint revenue tracking ----
-async function trackEndpointAnalytics(endpoint: string, amount: string, callerAddress?: string) {
+async function trackEndpointAnalytics(endpoint: string, amount: string, _callerAddress?: string) {
   if (!supabase) return;
   try {
     const numericAmount = parseFloat(amount.replace("$", ""));
-    const today = new Date().toISOString().slice(0, 10);
-    // Upsert: increment call_count and total_revenue for this endpoint+date
+    // Upsert: increment total_calls and revenue for this endpoint
     const { data: existing } = await supabase
       .from("endpoint_analytics")
-      .select("id, call_count, total_revenue")
-      .eq("endpoint", endpoint)
-      .eq("period_start", today)
+      .select("id, total_calls, paid_calls, avg_payment_usd, revenue_7d, revenue_30d")
+      .eq("endpoint_path", endpoint)
       .maybeSingle();
     if (existing) {
+      const newTotal = (existing.total_calls || 0) + 1;
+      const newPaid = (existing.paid_calls || 0) + 1;
+      const newRevenue7d = parseFloat(existing.revenue_7d || "0") + numericAmount;
+      const newRevenue30d = parseFloat(existing.revenue_30d || "0") + numericAmount;
       await supabase.from("endpoint_analytics").update({
-        call_count: existing.call_count + 1,
-        total_revenue: parseFloat(existing.total_revenue) + numericAmount,
-        avg_revenue_per_call: (parseFloat(existing.total_revenue) + numericAmount) / (existing.call_count + 1),
-        updated_at: new Date().toISOString(),
+        total_calls: newTotal,
+        paid_calls: newPaid,
+        avg_payment_usd: newRevenue30d / newPaid,
+        revenue_7d: newRevenue7d,
+        revenue_30d: newRevenue30d,
+        last_called_at: new Date().toISOString(),
       }).eq("id", existing.id);
     } else {
       await supabase.from("endpoint_analytics").insert({
-        endpoint,
-        period_start: today,
-        period_end: today,
-        call_count: 1,
-        total_revenue: numericAmount,
-        avg_revenue_per_call: numericAmount,
-        unique_callers: callerAddress ? 1 : 0,
-        growth_rate: 0,
+        endpoint_path: endpoint,
+        total_calls: 1,
+        paid_calls: 1,
+        free_calls: 0,
+        conversion_rate: 100,
+        avg_payment_usd: numericAmount,
+        revenue_7d: numericAmount,
+        revenue_30d: numericAmount,
+        growth_trend: "up",
+        last_called_at: new Date().toISOString(),
       });
     }
   } catch { /* best-effort analytics */ }
+}
+
+// ---- A/B Pricing Experiment Tracking ----
+async function trackABExperiment(endpoint: string, variant: string, converted: boolean, amount: number) {
+  if (!supabase) return;
+  try {
+    const { data: exp } = await supabase
+      .from("pricing_experiments")
+      .select("id, impressions, conversions, revenue_usd")
+      .eq("endpoint_path", endpoint)
+      .eq("variant_name", variant)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (exp) {
+      const newImpressions = (exp.impressions || 0) + 1;
+      const newConversions = (exp.conversions || 0) + (converted ? 1 : 0);
+      const newRevenue = parseFloat(exp.revenue_usd || "0") + (converted ? amount : 0);
+      await supabase.from("pricing_experiments").update({
+        impressions: newImpressions,
+        conversions: newConversions,
+        revenue_usd: newRevenue,
+        conversion_rate: newImpressions > 0 ? (newConversions / newImpressions) * 100 : 0,
+        avg_revenue_per_impression: newImpressions > 0 ? newRevenue / newImpressions : 0,
+      }).eq("id", exp.id);
+    }
+  } catch { /* best-effort */ }
+}
+
+// ---- Swarm Spawn Billing ----
+async function billSwarmSpawns(swarmId: string, agents: string[], payerAddress?: string) {
+  if (!supabase) return;
+  const SPAWN_PRICE = 0.02; // $0.02 per sub-agent spawn
+  try {
+    const rows = agents.map(agent => ({
+      swarm_id: swarmId,
+      agent_id: agent,
+      spawn_price_usd: SPAWN_PRICE,
+      status: "billed",
+      payer_address: payerAddress || null,
+    }));
+    await supabase.from("swarm_spawn_billing").insert(rows);
+    // Track total spawn revenue in endpoint analytics
+    trackEndpointAnalytics("/swarm/spawns", `$${(SPAWN_PRICE * agents.length).toFixed(2)}`);
+  } catch { /* best-effort */ }
 }
 
 // ---- Token tier middleware: adds X-Token-Tier and X-Token-Discount headers ----
@@ -614,9 +670,22 @@ app.post("/swarm", async (req, res) => {
 
     await supabase.from("swarm_tasks").insert(taskRows);
 
+    // Per-spawn billing: charge $0.02 per sub-agent
+    const spawnAgents = tasks.map((t: { agent: string }) => t.agent);
+    const callerAddr = req.headers["x-caller-address"] as string | undefined;
+    billSwarmSpawns(run.id, spawnAgents, callerAddr);
+
+    // A/B tracking
+    trackABExperiment("/swarm", "control", true, 0.50);
+
     res.json({
       swarm: run,
       tasks: taskRows.length,
+      spawnBilling: {
+        agentsSpawned: spawnAgents.length,
+        costPerSpawn: "$0.02",
+        totalSpawnCost: `$${(0.02 * spawnAgents.length).toFixed(2)}`,
+      },
       note: "Swarm queued — the bridge daemon will orchestrate execution.",
       timestamp: new Date().toISOString(),
     });
@@ -697,7 +766,22 @@ app.post("/neural-swarm", async (req, res) => {
     }));
     await supabase.from("swarm_tasks").insert(taskRows);
 
-    res.json({ swarm: run, agents: targetAgents, taskCount: taskRows.length, note: "Neural swarm dispatched.", timestamp: new Date().toISOString() });
+    // Per-spawn billing for neural swarm
+    const callerAddr = req.headers["x-caller-address"] as string | undefined;
+    billSwarmSpawns(run.id, targetAgents, callerAddr);
+
+    res.json({
+      swarm: run,
+      agents: targetAgents,
+      taskCount: taskRows.length,
+      spawnBilling: {
+        agentsSpawned: targetAgents.length,
+        costPerSpawn: "$0.02",
+        totalSpawnCost: `$${(0.02 * targetAgents.length).toFixed(2)}`,
+      },
+      note: "Neural swarm dispatched.",
+      timestamp: new Date().toISOString(),
+    });
   } else {
     res.json({ accepted: true, goal, agents: targetAgents, note: "Supabase not connected", timestamp: new Date().toISOString() });
   }

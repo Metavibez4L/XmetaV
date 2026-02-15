@@ -128,6 +128,73 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ recommendations: data || [] });
       }
 
+      // ---- Phase 2: A/B Pricing Experiments ----
+      case "experiments": {
+        const { data } = await supabase
+          .from("pricing_experiments")
+          .select("*")
+          .order("endpoint_path", { ascending: true })
+          .order("variant_name", { ascending: true });
+
+        const experiments = data || [];
+        // Compute summary per endpoint
+        const byEndpoint: Record<string, { control: typeof experiments[0] | null; premium: typeof experiments[0] | null }> = {};
+        for (const exp of experiments) {
+          if (!byEndpoint[exp.endpoint_path]) byEndpoint[exp.endpoint_path] = { control: null, premium: null };
+          if (exp.variant_name === "control") byEndpoint[exp.endpoint_path].control = exp;
+          else byEndpoint[exp.endpoint_path].premium = exp;
+        }
+
+        const summary = Object.entries(byEndpoint).map(([endpoint, variants]) => {
+          const c = variants.control;
+          const p = variants.premium;
+          return {
+            endpoint,
+            controlPrice: c?.price_usd,
+            premiumPrice: p?.price_usd,
+            controlConversionRate: c?.conversion_rate || 0,
+            premiumConversionRate: p?.conversion_rate || 0,
+            controlRevenue: c?.revenue_usd || 0,
+            premiumRevenue: p?.revenue_usd || 0,
+            winner: (c?.conversion_rate || 0) >= (p?.conversion_rate || 0) ? "control" : "premium",
+          };
+        });
+
+        return NextResponse.json({
+          experiments,
+          summary,
+          totalExperiments: experiments.length,
+          activeExperiments: experiments.filter(e => e.is_active).length,
+        });
+      }
+
+      // ---- Phase 2: Swarm Spawn Billing ----
+      case "spawn-billing": {
+        const { data } = await supabase
+          .from("swarm_spawn_billing")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        const bills = data || [];
+        const totalSpawnRevenue = bills
+          .filter(b => b.status === "billed")
+          .reduce((sum, b) => sum + (b.spawn_price_usd || 0), 0);
+        const uniqueSwarms = new Set(bills.map(b => b.swarm_id)).size;
+        const agentSpawnCounts: Record<string, number> = {};
+        for (const b of bills) {
+          agentSpawnCounts[b.agent_id] = (agentSpawnCounts[b.agent_id] || 0) + 1;
+        }
+
+        return NextResponse.json({
+          recentBills: bills.slice(0, 50),
+          totalSpawnRevenue: totalSpawnRevenue.toFixed(4),
+          totalSpawns: bills.length,
+          uniqueSwarms,
+          agentSpawnCounts,
+        });
+      }
+
       default:
         return NextResponse.json(
           { error: `Unknown action: ${action}` },
