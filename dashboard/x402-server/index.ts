@@ -67,11 +67,12 @@ interface TokenTier {
 }
 
 const TIERS: TokenTier[] = [
-  { name: "None",    minBalance: 0,         discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
-  { name: "Bronze",  minBalance: 1_000,     discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
-  { name: "Silver",  minBalance: 10_000,    discount: 0.20, dailyLimit: 100,  color: "#c0c0c0" },
-  { name: "Gold",    minBalance: 100_000,   discount: 0.35, dailyLimit: 500,  color: "#ffd700" },
-  { name: "Diamond", minBalance: 1_000_000, discount: 0.50, dailyLimit: 2000, color: "#b9f2ff" },
+  { name: "None",      minBalance: 0,           discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
+  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
+  { name: "Bronze",    minBalance: 1_000,       discount: 0.15, dailyLimit: 50,   color: "#cd7f32" },
+  { name: "Silver",    minBalance: 10_000,      discount: 0.25, dailyLimit: 200,  color: "#c0c0c0" },
+  { name: "Gold",      minBalance: 100_000,     discount: 0.50, dailyLimit: 1000, color: "#ffd700" },
+  { name: "Diamond",   minBalance: 1_000_000,   discount: 0.75, dailyLimit: 5000, color: "#b9f2ff" },
 ];
 
 function getTier(balance: number): TokenTier {
@@ -129,7 +130,44 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     if (error?.message?.includes("metadata")) {
       await supabase.from("x402_payments").insert(row);
     }
+    // ---- Midas endpoint_analytics tracking ----
+    trackEndpointAnalytics(endpoint, amount, callerAddress);
   } catch { /* best effort */ }
+}
+
+// ---- Midas per-endpoint revenue tracking ----
+async function trackEndpointAnalytics(endpoint: string, amount: string, callerAddress?: string) {
+  if (!supabase) return;
+  try {
+    const numericAmount = parseFloat(amount.replace("$", ""));
+    const today = new Date().toISOString().slice(0, 10);
+    // Upsert: increment call_count and total_revenue for this endpoint+date
+    const { data: existing } = await supabase
+      .from("endpoint_analytics")
+      .select("id, call_count, total_revenue")
+      .eq("endpoint", endpoint)
+      .eq("period_start", today)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from("endpoint_analytics").update({
+        call_count: existing.call_count + 1,
+        total_revenue: parseFloat(existing.total_revenue) + numericAmount,
+        avg_revenue_per_call: (parseFloat(existing.total_revenue) + numericAmount) / (existing.call_count + 1),
+        updated_at: new Date().toISOString(),
+      }).eq("id", existing.id);
+    } else {
+      await supabase.from("endpoint_analytics").insert({
+        endpoint,
+        period_start: today,
+        period_end: today,
+        call_count: 1,
+        total_revenue: numericAmount,
+        avg_revenue_per_call: numericAmount,
+        unique_callers: callerAddress ? 1 : 0,
+        growth_rate: 0,
+      });
+    }
+  } catch { /* best-effort analytics */ }
 }
 
 // ---- Token tier middleware: adds X-Token-Tier and X-Token-Discount headers ----
@@ -264,6 +302,55 @@ app.use(
         description: "Launch a multi-agent swarm orchestration",
         mimeType: "application/json",
       },
+      // ---- Value-Based Premium Endpoints ----
+      "POST /memory-crystal": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.05",  // Unique memory crystal summon
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Summon a memory crystal from the agent's memory cosmos",
+        mimeType: "application/json",
+      },
+      "POST /neural-swarm": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.10",  // Complex multi-agent delegation
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Delegate a task across the neural swarm network",
+        mimeType: "application/json",
+      },
+      "POST /fusion-chamber": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.15",  // Rare memory fusion operation
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Fuse memory crystals in the Materia chamber",
+        mimeType: "application/json",
+      },
+      "POST /cosmos-explore": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.20",  // Experiential memory cosmos exploration
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Explore the Memory Cosmos world — islands, highways, crystals",
+        mimeType: "application/json",
+      },
       ...(openai
         ? {
             "POST /voice/transcribe": {
@@ -315,7 +402,7 @@ app.post("/agent-task", async (req, res) => {
     return;
   }
 
-  const validAgents = ["main", "akua", "akua_web", "basedintern", "basedintern_web"];
+  const validAgents = ["main", "sentinel", "soul", "briefing", "oracle", "alchemist", "midas", "web3dev", "akua", "akua_web", "basedintern", "basedintern_web"];
   if (!validAgents.includes(agent)) {
     res.status(400).json({ error: `Invalid agent. Choose from: ${validAgents.join(", ")}` });
     return;
@@ -423,9 +510,11 @@ app.get("/fleet-status", async (_req, res) => {
     const fleet = [
       { id: "main", name: "Main (Orchestrator)", workspace: "~/.openclaw/workspace" },
       { id: "sentinel", name: "Sentinel (Fleet Ops)", workspace: "/home/manifest/sentinel" },
+      { id: "soul", name: "Soul (Memory Orchestrator)", workspace: "/home/manifest/soul" },
       { id: "briefing", name: "Briefing (Context Curator)", workspace: "/home/manifest/briefing" },
       { id: "oracle", name: "Oracle (On-Chain Intel)", workspace: "/home/manifest/oracle" },
       { id: "alchemist", name: "Alchemist (Tokenomics)", workspace: "/home/manifest/alchemist" },
+      { id: "midas", name: "Midas (Revenue & Growth)", workspace: "/home/manifest/midas" },
       { id: "web3dev", name: "Web3Dev (Blockchain Dev)", workspace: "/home/manifest/web3dev" },
       { id: "akua", name: "Akua (Solidity/Base)", workspace: "/home/manifest/akua" },
       { id: "basedintern", name: "BasedIntern (TypeScript)", workspace: "/home/manifest/basedintern" },
@@ -451,9 +540,11 @@ app.get("/fleet-status", async (_req, res) => {
       fleet: [
         { id: "main", name: "Main (Orchestrator)", status: "unknown" },
         { id: "sentinel", name: "Sentinel (Fleet Ops)", status: "unknown" },
+        { id: "soul", name: "Soul (Memory Orchestrator)", status: "unknown" },
         { id: "briefing", name: "Briefing (Context Curator)", status: "unknown" },
         { id: "oracle", name: "Oracle (On-Chain Intel)", status: "unknown" },
         { id: "alchemist", name: "Alchemist (Tokenomics)", status: "unknown" },
+        { id: "midas", name: "Midas (Revenue & Growth)", status: "unknown" },
         { id: "web3dev", name: "Web3Dev (Blockchain Dev)", status: "unknown" },
         { id: "akua", name: "Akua (Solidity/Base)", status: "unknown" },
         { id: "basedintern", name: "BasedIntern (TypeScript)", status: "unknown" },
@@ -537,6 +628,170 @@ app.post("/swarm", async (req, res) => {
       note: "Supabase not connected — swarm logged but not dispatched",
       timestamp: new Date().toISOString(),
     });
+  }
+});
+
+// ---- Value-Based Premium Endpoints ----
+
+/**
+ * POST /memory-crystal — summon a memory crystal from agent memory
+ * Body: { query: "...", agent?: "soul" }
+ */
+app.post("/memory-crystal", async (req, res) => {
+  logPayment("/memory-crystal", "$0.05", req);
+  const { query, agent } = req.body;
+  if (!query) { res.status(400).json({ error: "query is required" }); return; }
+
+  if (supabase) {
+    // Find matching memories and return as crystal
+    const { data: memories } = await supabase
+      .from("agent_memory")
+      .select("id, agent_id, content, memory_type, importance, created_at")
+      .ilike("content", `%${query}%`)
+      .order("importance", { ascending: false })
+      .limit(5);
+
+    const crystal = {
+      type: "memory-crystal",
+      query,
+      fragments: memories || [],
+      crystalClass: (memories?.length || 0) >= 3 ? "rare" : "common",
+      xp: Math.floor(Math.random() * 50) + 10,
+      timestamp: new Date().toISOString(),
+    };
+    res.json(crystal);
+  } else {
+    res.json({ type: "memory-crystal", query, fragments: [], note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /neural-swarm — delegate a complex task across multiple agents
+ * Body: { goal: "...", agents?: ["oracle", "alchemist"] }
+ */
+app.post("/neural-swarm", async (req, res) => {
+  logPayment("/neural-swarm", "$0.10", req);
+  const { goal, agents: requestedAgents } = req.body;
+  if (!goal) { res.status(400).json({ error: "goal is required" }); return; }
+
+  const targetAgents = requestedAgents || ["oracle", "alchemist", "web3dev"];
+  if (supabase) {
+    const manifest = {
+      mode: "collab",
+      source: "x402-neural-swarm",
+      tasks: targetAgents.map((a: string, i: number) => ({
+        taskId: `neural-${i}`,
+        agent: a,
+        message: `[Neural Swarm] ${goal}`,
+      })),
+    };
+    const { data: run, error } = await supabase
+      .from("swarm_runs")
+      .insert({ name: `Neural Swarm: ${goal.slice(0, 50)}`, mode: "collab", status: "pending", manifest })
+      .select("id, mode, status, created_at")
+      .single();
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    const taskRows = targetAgents.map((a: string, i: number) => ({
+      swarm_id: run.id, task_id: `neural-${i}`, agent_id: a, message: `[Neural Swarm] ${goal}`, status: "pending",
+    }));
+    await supabase.from("swarm_tasks").insert(taskRows);
+
+    res.json({ swarm: run, agents: targetAgents, taskCount: taskRows.length, note: "Neural swarm dispatched.", timestamp: new Date().toISOString() });
+  } else {
+    res.json({ accepted: true, goal, agents: targetAgents, note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /fusion-chamber — fuse memory crystals together
+ * Body: { memoryIds: ["id1", "id2"], catalyst?: "dream" }
+ */
+app.post("/fusion-chamber", async (req, res) => {
+  logPayment("/fusion-chamber", "$0.15", req);
+  const { memoryIds, catalyst } = req.body;
+  if (!Array.isArray(memoryIds) || memoryIds.length < 2) {
+    res.status(400).json({ error: "At least 2 memoryIds required for fusion" }); return;
+  }
+
+  if (supabase) {
+    const { data: memories } = await supabase
+      .from("agent_memory")
+      .select("id, content, memory_type, importance")
+      .in("id", memoryIds);
+
+    if (!memories || memories.length < 2) {
+      res.status(404).json({ error: "Could not find enough memories to fuse" }); return;
+    }
+
+    // Create a fused memory association
+    const fusedContent = memories.map(m => m.content).join(" ⟷ ");
+    const maxImportance = Math.max(...memories.map(m => m.importance || 0));
+    const { data: association } = await supabase
+      .from("memory_associations")
+      .insert({
+        source_memory_id: memories[0].id,
+        target_memory_id: memories[1].id,
+        association_type: catalyst || "fusion",
+        strength: Math.min(1.0, (maxImportance / 10) + 0.3),
+        context: `Fused via x402 chamber: ${fusedContent.slice(0, 200)}`,
+      })
+      .select("id, association_type, strength, created_at")
+      .single();
+
+    res.json({
+      type: "fusion-result",
+      inputMemories: memoryIds.length,
+      catalyst: catalyst || "standard",
+      association,
+      crystalClass: maxImportance >= 8 ? "legendary" : maxImportance >= 5 ? "epic" : "rare",
+      xp: Math.floor(maxImportance * 15) + 25,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ type: "fusion-result", inputMemories: memoryIds.length, note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /cosmos-explore — explore the Memory Cosmos world
+ * Body: { region?: "city"|"wasteland"|"forest", depth?: number }
+ */
+app.post("/cosmos-explore", async (req, res) => {
+  logPayment("/cosmos-explore", "$0.20", req);
+  const { region, depth } = req.body;
+  const targetRegion = region || "city";
+  const exploreDepth = Math.min(depth || 3, 10);
+
+  if (supabase) {
+    // Pull recent memories, associations, and dream insights
+    const [memRes, assocRes, dreamRes] = await Promise.all([
+      supabase.from("agent_memory").select("id, agent_id, content, memory_type, importance, created_at")
+        .order("created_at", { ascending: false }).limit(exploreDepth * 5),
+      supabase.from("memory_associations").select("id, source_memory_id, target_memory_id, association_type, strength")
+        .order("strength", { ascending: false }).limit(exploreDepth * 3),
+      supabase.from("dream_insights").select("id, category, insight, confidence, created_at")
+        .order("created_at", { ascending: false }).limit(exploreDepth),
+    ]);
+
+    const islands = (memRes.data || []).reduce((acc: Record<string, number>, m) => {
+      acc[m.agent_id] = (acc[m.agent_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      type: "cosmos-exploration",
+      region: targetRegion,
+      depth: exploreDepth,
+      islands: Object.entries(islands).map(([agent, count]) => ({ agent, memoryCount: count, terrain: targetRegion })),
+      highways: (assocRes.data || []).map(a => ({ from: a.source_memory_id, to: a.target_memory_id, type: a.association_type, strength: a.strength })),
+      dreams: dreamRes.data || [],
+      totalMemories: memRes.data?.length || 0,
+      totalConnections: assocRes.data?.length || 0,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ type: "cosmos-exploration", region: targetRegion, note: "Supabase not connected", timestamp: new Date().toISOString() });
   }
 });
 
@@ -658,6 +913,10 @@ app.get("/health", (_req, res) => {
         "POST /intent": "$0.05 — resolve a goal into commands",
         "GET /fleet-status": "$0.01 — live agent fleet status",
         "POST /swarm": "$0.50 — launch multi-agent swarm",
+        "POST /memory-crystal": "$0.05 — summon memory crystal",
+        "POST /neural-swarm": "$0.10 — neural swarm delegation",
+        "POST /fusion-chamber": "$0.15 — fuse memory crystals",
+        "POST /cosmos-explore": "$0.20 — explore Memory Cosmos",
         ...(openai
           ? {
               "POST /voice/transcribe": "$0.05 — speech-to-text (Whisper)",
@@ -747,6 +1006,10 @@ app.listen(port, () => {
   console.log(`    POST /intent           $0.05   Resolve goal → commands`);
   console.log(`    GET  /fleet-status     $0.01   Live fleet status`);
   console.log(`    POST /swarm            $0.50   Multi-agent swarm`);
+  console.log(`    POST /memory-crystal   $0.05   Memory crystal summon`);
+  console.log(`    POST /neural-swarm     $0.10   Neural swarm delegation`);
+  console.log(`    POST /fusion-chamber   $0.15   Fuse memory crystals`);
+  console.log(`    POST /cosmos-explore   $0.20   Explore Memory Cosmos`);
   if (openai) {
     console.log(`    POST /voice/transcribe $0.05   Speech-to-text (Whisper)`);
     console.log(`    POST /voice/synthesize $0.08   Text-to-speech (TTS HD)`);
