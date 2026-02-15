@@ -149,9 +149,10 @@ A standalone fullscreen page (`/arena`) rendering an isometric cyberpunk office 
 
 Supabase acts as the communication layer between the remote dashboard and the local bridge daemon.
 
-- **Database**: Postgres with RLS policies for all tables
+- **Database**: Postgres with RLS policies for all tables (authenticated SELECT on all user-facing tables; dream tables have both authenticated SELECT and service-role ALL)
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
 - **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Indexes**: `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` composite
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
 ### Bridge Daemon (Node.js)
@@ -162,6 +163,8 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
+- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, sets session offline, removes PID file
+- **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next
 - **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
 - **Location**: `dashboard/bridge/`
 
@@ -546,3 +549,25 @@ This repo provides scripts and runbooks to make these problems quick to detect a
 
 - **Agent limit exceeded**: MAX_AGENTS guard prevents runaway self-spawning (default: 10). Increase with `MAX_AGENTS=20` env var.
 - **Duplicate agent**: `create-agent.sh` is idempotent — running twice with the same ID updates rather than duplicates.
+
+## API Security Architecture
+
+All dashboard API routes are protected with a shared auth guard pattern.
+
+- **Auth Utility**: `dashboard/src/lib/api-auth.ts` — shared helpers for API route security
+  - `requireAuth()` — reads Supabase session from SSR cookies, returns `{ user }` or `{ error: NextResponse(401) }`
+  - `isValidUUID(s)` — regex validation for UUID params (prevents injection)
+  - `clampLimit(raw, defaultVal, maxVal)` — safe parseInt with bounds (prevents unbounded result sets)
+- **Protected Routes**: `/api/soul`, `/api/agents/memory`, `/api/midas`, `/api/erc8004/identity`, `/api/anchors`
+- **Already Protected**: `/api/terminal` (uses `createClient()` + `getUser()` directly)
+- **Pattern**: Every handler starts with `const auth = await requireAuth(); if (auth.error) return auth.error;`
+- **Admin Client**: Routes that need cross-user data use `createAdminClient()` (service_role key) but still require an authenticated session first
+
+## Performance Architecture
+
+- **Explicit Column Selection**: All Supabase queries use explicit column lists instead of `SELECT *` to minimize payload size
+- **Query Bounds**: All unbounded queries have `.limit()` caps (dream cycle: 500, manifestation stats: 1000, consciousness hook: 30-500 per table)
+- **Batch Queries**: Dream proposal engine collects all memory IDs across clusters and executes a single batched association query instead of per-cluster N+1
+- **Polling Intervals**: Dashboard consciousness hook polls at 30s (previously 15s), arena syncs at 10s
+- **Canvas Optimization**: Force simulations use Map lookups for O(1) edge resolution; `setTransform()` prevents cumulative scaling; `document.hidden` stops rendering in backgrounded tabs
+- **Build**: `optimizePackageImports` for lucide-react tree-shaking; `serverExternalPackages` for pg to prevent client bundling

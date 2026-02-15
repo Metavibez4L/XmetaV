@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v22
+Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
 
 ```
  ___   ___                    __           ___   ___
@@ -45,7 +45,7 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v22
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.05-$0.08 per request)
 - **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
 - **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
-- **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 15s auto-refresh from Supabase
+- **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 30s auto-refresh from Supabase
 - **Dreamscape Visualization** — Canvas-based dream session renderer: hexagonal memory shards with glow, diamond insight crystals by category, curved synaptic bridges with flowing data particles, mouse-interactive repulsion, ambient data motes, and insight ticker strip
 - **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification: living crystals with XP/levels/star ratings (1-6★), class evolution (anchor→godhand), fusion recipes (FF7-style), memory summons with animated rituals, limit breaks spawning legendary 6★ crystals, explorable Memory Cosmos world map, achievements, and daily quests
 - **Memory Cosmos World** — Pannable/zoomable explorable memory landscape at `/memory-cosmos`: golden-spiral island layout with terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, star parallax background, hover info panels
@@ -835,6 +835,15 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-15 (v23) — Optimization Pass (Security + Performance + Build)
+- **API Security Hardening** — Auth guards (`requireAuth()`) on all 5 data API routes (`/api/soul`, `/api/agents/memory`, `/api/midas`, `/api/erc8004/identity`, `/api/anchors`). UUID validation and limit clamping on user-supplied params. New shared utility `src/lib/api-auth.ts` with `requireAuth()`, `isValidUUID()`, `clampLimit()`
+- **RLS Policies on Dream Tables** — Added authenticated SELECT policies to `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` (were service-role only). Added DB indexes on `agent_memory(source)` and `memory_associations(memory_id, related_memory_id)`
+- **Query Performance** — Replaced all `SELECT *` with explicit column lists across dream.ts, retrieval.ts, useConsciousness.ts, dream-proposals.ts. Bounded dream cycle queries (`.limit(500)`). Batched N+1 association queries in dream-proposals (single query across all clusters). Batched upserts in `executeManifest`. `getManifestationStats` bounded with `.limit(1000)`
+- **Polling Reduction** — `useConsciousness` polling interval 15s → 30s (50% reduction in dashboard Supabase load)
+- **Bridge Hardening** — `await` on `processPendingCommands` loop (was fire-and-forget). Proper SIGTERM handler with graceful shutdown (channel unsubscribe, session teardown, PID cleanup)
+- **Canvas Optimizations** — MemoryGraph: `ctx.setTransform()` replaces stacking `ctx.scale()` (prevents cumulative scaling bug), Map lookup for O(1) edge node resolution. DreamscapeView: `document.hidden` check skips rendering when tab is backgrounded
+- **Build Config** — `optimizePackageImports` for lucide-react, `serverExternalPackages` for pg in next.config.ts. Type fix in `getManifestationStats`
 
 ### 2026-02-15 (v22) — Midas Revenue Agent + Anchor Sync + DB Consolidation
 - **Midas Revenue Agent** — New revenue & growth intelligence agent (`midas`). Arena seat 165° (between Oracle 150° and Alchemist 180°). Color: Gold (`#f59e0b`). Skills: `revenue`, `pricing`, `growth`, `forecast`

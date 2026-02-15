@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v22 (Midas Revenue Agent + Anchor Sync + DB Consolidation)
+**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -337,9 +337,9 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `memory_associations` | Soul agent memory association graph | Authenticated: SELECT, INSERT |
 | `memory_queries` | Soul agent memory retrieval log | Authenticated: SELECT, INSERT |
 | `dream_insights` | Soul agent dream consolidation insights | Authenticated: SELECT, INSERT |
-| `soul_dream_manifestations` | Lucid dream proposals and actions | Service role: ALL |
-| `soul_dream_sessions` | Dream session tracking and stats | Service role: ALL |
-| `soul_association_modifications` | Self-modification audit trail | Service role: ALL |
+| `soul_dream_manifestations` | Lucid dream proposals and actions | Authenticated: SELECT + Service role: ALL |
+| `soul_dream_sessions` | Dream session tracking and stats | Authenticated: SELECT + Service role: ALL |
+| `soul_association_modifications` | Self-modification audit trail | Authenticated: SELECT + Service role: ALL |
 | `agent_swaps` | Token swap execution log | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_crystals` | Living memory crystals (materia system) | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_fusions` | Crystal fusion history (FF7-style) | Authenticated: SELECT, INSERT |
@@ -1116,6 +1116,45 @@ Workarounds:
 ## Build Hardening (v21)
 
 Comprehensive fix of pre-existing TypeScript build errors across the codebase. All resolved to pass `npx next build` clean.
+
+## Optimization Pass (v23)
+
+Comprehensive security, performance, and build audit applied across the full dashboard + bridge codebase.
+
+### Security
+
+| Fix | Files | Impact |
+|-----|-------|--------|
+| Auth guards (`requireAuth()`) on all API routes | `api/soul`, `api/agents/memory`, `api/midas`, `api/erc8004/identity`, `api/anchors` | Prevents unauthenticated access to data endpoints |
+| UUID validation on user-supplied params | `api/soul`, `api/agents/memory` | Blocks injection via malformed UUIDs |
+| Limit clamping (`clampLimit()`) | `api/soul`, `api/agents/memory` | Prevents unbounded result sets via limit param abuse |
+| RLS policies on dream tables | `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` | Authenticated SELECT policies added (were service-role only) |
+| DB indexes | `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` | Query performance for common access patterns |
+| Shared auth utility | `src/lib/api-auth.ts` (new) | `requireAuth()`, `isValidUUID()`, `clampLimit()` — DRY auth for all routes |
+
+### Performance
+
+| Fix | Files | Impact |
+|-----|-------|--------|
+| Explicit column lists (no `SELECT *`) | `dream.ts`, `retrieval.ts`, `useConsciousness.ts`, `dream-proposals.ts` | Reduced payload size, lower Supabase egress |
+| Bounded dream cycle queries (`.limit(500)`) | `dream.ts` | Prevents unbounded memory scan |
+| Batched N+1 association queries | `dream-proposals.ts` | Single query across all clusters instead of per-cluster |
+| Batched upserts in `executeManifest` | `dream-proposals.ts` | Batch insert instead of per-pair loop |
+| `getManifestationStats` bounded (`.limit(1000)`) | `dream-proposals.ts` | Prevents full table scan |
+| Polling interval 15s → 30s | `useConsciousness.ts` | 50% reduction in dashboard polling load |
+| `await` on `processPendingCommands` loop | `bridge/src/index.ts` | Commands execute sequentially (was fire-and-forget) |
+| Proper SIGTERM handler with graceful shutdown | `bridge/src/index.ts` | Clean session teardown, channel unsubscribe, PID cleanup |
+
+### Build / Canvas
+
+| Fix | Files | Impact |
+|-----|-------|--------|
+| `ctx.setTransform()` replaces stacking `ctx.scale()` | `MemoryGraph.tsx` | Prevents cumulative scaling bug on resize |
+| Map lookup for edge node resolution | `MemoryGraph.tsx` | O(1) vs O(n) `.find()` per edge |
+| `document.hidden` skip in animation loop | `DreamscapeView.tsx` | Saves GPU/CPU when tab is backgrounded |
+| `optimizePackageImports` for lucide-react | `next.config.ts` | Faster builds, smaller bundles |
+| `serverExternalPackages` for pg | `next.config.ts` | Prevents pg from being bundled into client |
+| Type fix in `getManifestationStats` | `dream-proposals.ts` | Clean build (Record<string,number> cast) |
 
 | File | Issue | Fix |
 |------|-------|-----|
