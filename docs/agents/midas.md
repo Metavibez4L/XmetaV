@@ -106,6 +106,10 @@ Midas is the fleet's revenue intelligence agent. Positioned between Oracle (mark
 | `pricing` | Endpoint pricing analysis, tier optimization, dynamic pricing |
 | `growth` | Growth opportunity pipeline, ROI scoring, R&D prioritization |
 | `forecast` | Linear projection models for 7d/30d/90d revenue |
+| `gas` | Current Ethereum gas prices, transaction costs, fee estimation |
+| `standards` | Ethereum token & protocol standards — ERC-20, ERC-721, ERC-4337, ERC-8004 |
+| `addresses` | Verified contract addresses for major protocols (anti-hallucination) |
+| `concepts` | Essential mental models for building onchain — composability, MEV, etc. |
 
 ## Troubleshooting
 

@@ -399,6 +399,6 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/midas",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
-    skills: ["revenue", "pricing", "growth", "forecast"],
+    skills: ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"],
   },
 ];
