@@ -179,7 +179,7 @@ export async function getLatestAnchor(agentId: number) {
       args: [BigInt(agentId)],
     });
 
-    if (count === 0n) return null;
+    if (count === BigInt(0)) return null;
 
     const anchor = await client.readContract({
       address: ANCHOR_ADDRESS,
