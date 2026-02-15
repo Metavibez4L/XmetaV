@@ -50,6 +50,7 @@ export interface AgentInfo {
   tools: string;
   model: string;
   status: AgentStatus;
+  skills?: string[];
 }
 
 // ============================================================
@@ -338,6 +339,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "~/.openclaw/workspace",
     tools: "full",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["wallets"],
   },
   {
     id: "akua",
@@ -366,6 +368,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/oracle",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["gas", "l2s"],
   },
   {
     id: "alchemist",
@@ -380,6 +383,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/web3dev",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"],
   },
   {
     id: "soul",
@@ -387,5 +391,6 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/soul",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["recall", "dream", "inject"],
   },
 ];

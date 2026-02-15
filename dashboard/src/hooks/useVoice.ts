@@ -612,7 +612,7 @@ export function useVoice(): UseVoiceReturn {
               };
               sourceBuffer.addEventListener("updateend", onDone);
               sourceBuffer.addEventListener("error", onErr);
-              sourceBuffer.appendBuffer(chunk);
+              sourceBuffer.appendBuffer(new Uint8Array(chunk).buffer as ArrayBuffer);
             });
           };
 

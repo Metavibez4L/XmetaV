@@ -8,6 +8,23 @@ Web3Dev is the fleet's hands-on blockchain engineer. While `alchemist` analyzes 
 
 > Build and ship smart contracts. Tests first, deploy second.
 
+## EthSkills (10 installed)
+
+| Skill | Description |
+|-------|-------------|
+| `tools` | Hardhat, Foundry, Tenderly, Etherscan verification |
+| `l2s` | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
+| `orchestration` | Multi-contract deploy scripts, upgrade patterns, proxy factories |
+| `addresses` | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `concepts` | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
+| `security` | Reentrancy, flash loans, oracle manipulation, access control |
+| `standards` | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
+| `frontend-ux` | Wallet connection, transaction UX, error handling, mobile |
+| `frontend-playbook` | wagmi/viem integration, RainbowKit, WalletConnect |
+| `building-blocks` | OpenZeppelin patterns, diamond proxy, minimal proxy |
+
+Installed at `~/.openclaw/workspace/skills/`. Verify: `openclaw skills list`
+
 ## Responsibilities
 
 | Duty | Description |

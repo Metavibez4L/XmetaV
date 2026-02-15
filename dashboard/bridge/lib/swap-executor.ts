@@ -234,7 +234,7 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
   if (from.symbol === to.symbol) return fail("Cannot swap token to itself");
 
   const amountIn = parseUnits(amount, from.decimals);
-  if (amountIn <= 0n) return fail("Amount must be positive");
+  if (amountIn <= BigInt(0)) return fail("Amount must be positive");
 
   // TODO: Add USD price check against MAX_SWAP_USD when price oracle is wired
   console.log(`[swap] ${amount} ${from.symbol} → ${to.symbol} (slippage ${slippage}%)`);
@@ -256,7 +256,7 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
 
   // ── Pre-flight: check ETH balance for gas ──
   const ethBalance = await publicClient.getBalance({ address: walletAddress });
-  const MIN_GAS_ETH = 4_000_000_000_000n; // ~0.000004 ETH minimum for gas
+  const MIN_GAS_ETH = BigInt("4000000000000"); // ~0.000004 ETH minimum for gas
   console.log(`[swap] Wallet ETH balance: ${formatUnits(ethBalance, 18)} ETH`);
 
   if (isFromETH) {
@@ -270,7 +270,7 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
   } else {
     // Swapping tokens — need ETH only for gas
     // Estimate ~0.005 ETH for approve + swap on Base
-    const gasEstimate = 5_000_000_000_000_000n; // 0.005 ETH
+    const gasEstimate = BigInt("5000000000000000"); // 0.005 ETH
     if (ethBalance < gasEstimate) {
       const have = formatUnits(ethBalance, 18);
       return fail(`Insufficient ETH for gas. Have ${have} ETH, need ~0.005 ETH. Send ETH to ${walletAddress} first.`);
@@ -321,7 +321,7 @@ export async function executeSwap(params: SwapParams): Promise<SwapResult> {
     }
 
     const expectedOut = amountsOut[amountsOut.length - 1];
-    const minOut = (expectedOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
+    const minOut = (expectedOut * BigInt(Math.floor((100 - slippage) * 100))) / BigInt(10000);
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 min
 
     console.log(`[swap] Quote: ${formatUnits(amountIn, from.decimals)} ${from.symbol} → ${formatUnits(expectedOut, to.decimals)} ${to.symbol}`);
@@ -473,7 +473,7 @@ const VOICE_ALIASES: Record<string, string> = {
   // "DAI" misheard
   die: "DAI", dye: "DAI", day: "DAI",
   // "AERO" misheard
-  arrow: "AERO", aero: "AERO", "air oh": "AERO", "arrow": "AERO",
+  arrow: "AERO", aero: "AERO", "air oh": "AERO",
   // connectors misheard
   "2": "to", "two": "to", "too": "to", "in the": "to", "into the": "to",
   "4": "for", "four": "for",

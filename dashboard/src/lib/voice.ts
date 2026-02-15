@@ -47,7 +47,7 @@ export async function transcribeAudio(
   filename = "audio.webm",
   model: string = DEFAULT_STT_MODEL
 ): Promise<string> {
-  const file = new File([audioBuffer], filename, {
+  const file = new File([new Uint8Array(audioBuffer)], filename, {
     type: getMimeType(filename),
   });
 

@@ -8,6 +8,15 @@ The Oracle monitors blockchain data, gas markets, token prices, protocol activit
 
 > Watches the chain so the fleet can build.
 
+## EthSkills
+
+| Skill | Description |
+|-------|-------------|
+| `gas` | Transaction cost economics: L1 vs L2, blob gas, priority fees, estimation strategies |
+| `l2s` | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea — bridging, sequencers, fees |
+
+Installed at `~/.openclaw/workspace/skills/`. Verify: `openclaw skills list`
+
 ## Responsibilities
 
 | Duty | Description |

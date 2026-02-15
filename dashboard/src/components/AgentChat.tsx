@@ -380,10 +380,12 @@ export function AgentChat() {
 
       // Fetch actual command status from DB to correctly mark failed swaps
       const sb = createClient();
-      sb.from("agent_commands")
-        .select("status")
-        .eq("id", completedId)
-        .single()
+      Promise.resolve(
+        sb.from("agent_commands")
+          .select("status")
+          .eq("id", completedId)
+          .single()
+      )
         .then(({ data: cmd }) => {
           const finalStatus: "completed" | "failed" =
             cmd?.status === "failed" ? "failed" : "completed";

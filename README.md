@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v20
+Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v21
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,8 @@ Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v20
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  11 (+ dynamic)                      |
+ |   agents:  11 (+ dynamic)                     |
+ |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
@@ -52,6 +53,7 @@ Last updated: **2026-02-14** | OpenClaw 2026.2.1 | XmetaV Command Center v20
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
+- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle). Skills displayed as badges in Fleet table and Identity page
 - Multi-agent management (11 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
@@ -174,7 +176,7 @@ XmetaV/
 
 | Requirement | Version | Check Command |
 |-------------|---------|---------------|
-| OpenClaw CLI | 2026.2.1+ | `openclaw --version` |
+| OpenClaw CLI | 2026.2.14+ | `openclaw --version` |
 | Node.js | 22.x | `node --version` |
 | Ollama | Latest (native install) | `ollama --version` |
 | NVIDIA GPU | CUDA support | `nvidia-smi` |
@@ -313,6 +315,7 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 | Model | `ollama/kimi-k2.5:cloud` (256k context) |
 | Workspace | `~/.openclaw/workspace` |
 | Tools | `full` (fs, runtime, web, browser, sessions, automation) |
+| Skills | `wallets` (EOAs, Safe multisig, EIP-7702, ERC-4337) |
 | Role | **Orchestrator** — agent factory + swarm + command center |
 
 ```bash
@@ -349,6 +352,7 @@ See [docs/agents/briefing.md](docs/agents/briefing.md) for full documentation.
 | **Workspace** | `/home/manifest/oracle` |
 | **Tools** | `coding` (exec, read, write) |
 | **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `gas` (tx costs, L1 vs L2), `l2s` (Arbitrum, Optimism, Base, zkSync) |
 | **Role** | Monitor gas, prices, chain activity, protocol intel, crypto sentiment |
 
 Provides real-time market intelligence via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports and surfaces alerts before anyone has to ask.
@@ -395,6 +399,7 @@ See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
 | **Workspace** | `/home/manifest/web3dev` |
 | **Tools** | `coding` (exec, process, read, write) |
 | **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `tools`, `l2s`, `orchestration`, `addresses`, `concepts`, `security`, `standards`, `frontend-ux`, `frontend-playbook`, `building-blocks` (10 ethskills) |
 | **Role** | Smart contract dev, security auditor, deployment engineer, x402 maintainer |
 
 Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Static security audits, gas/size analysis, and production-ready contract scaffolding (ERC-20, staking, vesting, escrow).
@@ -804,6 +809,20 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
+### 2026-02-15 (v21) — EthSkills + Dashboard Skills UI + Build Hardening
+- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents via `openclaw skills install`:
+  - **main**: `wallets` (EOAs, Safe multisig, EIP-7702, ERC-4337, key safety)
+  - **web3dev**: `tools`, `l2s`, `orchestration`, `addresses`, `concepts`, `security`, `standards`, `frontend-ux`, `frontend-playbook`, `building-blocks` (10 skills)
+  - **oracle**: `gas` (L1 vs L2 tx costs), `l2s` (Arbitrum, Optimism, Base, zkSync, Scroll, Linea)
+- **Agent Identity Updates** — Updated IDENTITY.md files for main (created from scratch + SOUL.md), web3dev, and oracle to include Skills sections
+- **ERC-8004 Metadata Update** — 13 new capabilities added to on-chain metadata (ethereum-wallet-management, eip-7702-smart-eoas, safe-multisig, erc-4337-account-abstraction, l2-deployment, cross-chain-bridging, gas-economics, defi-composability, solidity-security-patterns, ethereum-standards, dapp-orchestration, frontend-ux, verified-contract-addresses, dev-tooling). Per-agent `skills` arrays added to `fleet.agents`. AgentMemoryAnchor contract added
+- **Dashboard Skills UI** — Skills badges displayed per agent in Fleet table (purple #e879f9 badges) and Identity page fleet roster grid. New `isSkill` color category for skill-related capabilities
+- **Oracle Identity Scouting** — Automated on-chain identity discovery: `bridge/lib/oracle/identity-scout.ts`, `/api/oracle/discovery` endpoint, `/oracle` dashboard page, `useOracleDiscovery` hook (10 new files)
+- **Arena Optimizations** — Performance audit of ~3,600 line arena codebase: particle pool (object reuse), position hash diffs (skip redundant calculations), lastKnownStatus cache (prevent duplicate transitions), throttled ResizeObserver (prevent layout thrashing)
+- **Alchemy RPC** — Switched all 11 files from default Base RPC to Alchemy (`BASE_RPC_URL`) for reliability
+- **Build Hardening** — Fixed 14 pre-existing TypeScript build errors: BigInt literals (`0n` → `BigInt(0)` for ES2017 target), PromiseLike `.catch()`, SpeechRecognition types, Buffer/Uint8Array conversions, template literal types, duplicate object keys, unused directives. Installed missing `@x402/fetch` and `@x402/evm` dependencies. Clean `npx next build` passing
+- **OpenClaw Updated** — 2026.2.12 → 2026.2.14
+
 ### 2026-02-14 (v20) — Cyber-Neural Memory Evolution (Crystal Materia System)
 - **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification with 7 interconnected subsystems:
   - **Living Memory Crystals** — Crystals with XP, 30 levels, star ratings (1-6★), and class evolution (anchor → mage → knight → sage → rogue → summoner → ninja → godhand)
@@ -1033,5 +1052,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
 </p>

@@ -34,6 +34,28 @@ For per-agent runbooks, see `docs/agents/`:
 - **ERC-8004 identity**: See `capabilities/erc8004-identity.md`
 - **$XMETAV token**: See `capabilities/xmetav-token.md`
 - **Dashboard token page**: http://localhost:3000/token (balance, tiers, discounts)
+- **EthSkills**: `openclaw skills list` (12 blockchain/Ethereum skills installed)
+
+## EthSkills (installed)
+
+12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) are installed across fleet agents:
+
+| Skill | Agent(s) | Description |
+|-------|----------|-------------|
+| `wallets` | main | EOAs, Safe multisig, EIP-7702, ERC-4337, key safety |
+| `tools` | web3dev | Hardhat, Foundry, Tenderly, Etherscan verification |
+| `l2s` | web3dev, oracle | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
+| `orchestration` | web3dev | Multi-contract deploy scripts, upgrade patterns, proxy factories |
+| `addresses` | web3dev | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `concepts` | web3dev | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
+| `security` | web3dev | Reentrancy, flash loans, oracle manipulation, access control |
+| `standards` | web3dev | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
+| `frontend-ux` | web3dev | Wallet connection, transaction UX, error handling, mobile |
+| `frontend-playbook` | web3dev | wagmi/viem integration, RainbowKit, WalletConnect |
+| `building-blocks` | web3dev | OpenZeppelin patterns, diamond proxy, minimal proxy |
+| `gas` | oracle | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
+
+Skills are stored at `~/.openclaw/workspace/skills/` and verified with `openclaw skills list`.
 
 ## How agent routing works
 

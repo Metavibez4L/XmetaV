@@ -149,7 +149,7 @@ async function transcribe(audioPath: string): Promise<string> {
 
   const response = await openai.audio.transcriptions.create({
     model: "whisper-1",
-    // @ts-expect-error - ReadStream works as file input
+    // @ts-ignore - ReadStream works as file input
     file,
     language: "en",
   });

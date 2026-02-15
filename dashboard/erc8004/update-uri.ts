@@ -102,7 +102,7 @@ async function main() {
   const ethBalance = Number(balance) / 1e18;
   console.log(`  Balance:  ${ethBalance.toFixed(6)} ETH`);
 
-  if (balance === 0n) {
+  if (balance === BigInt(0)) {
     console.error("\n  ERROR: Wallet has no ETH on Base. Fund it first.");
     process.exit(1);
   }

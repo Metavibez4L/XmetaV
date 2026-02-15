@@ -35,6 +35,7 @@ interface FleetAgent {
   id: string;
   role: string;
   room: string;
+  skills?: string[];
 }
 
 interface FleetData {
@@ -598,6 +599,15 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
                         <span className="text-[8px] font-mono px-1 rounded" style={{ color: "#4a6a8a", background: "#ffffff06" }}>{agent.room}</span>
                       </div>
                       <div className="text-[9px] font-mono truncate" style={{ color: "#4a6a8a" }}>{agent.role}</div>
+                      {agent.skills && agent.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {agent.skills.map((skill) => (
+                            <span key={skill} className="text-[8px] font-mono px-1 py-px rounded" style={{ color: `${color}99`, background: `${color}08`, border: `1px solid ${color}12` }}>
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -639,7 +649,8 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
                 const isSoul = cap.includes("soul") || cap.includes("dream") || cap.includes("memory-association") || cap.includes("context-packet") || cap.includes("memory-retrieval");
                 const isSwap = cap.includes("swap") || cap.includes("dex") || cap.includes("trading");
                 const isWeb3 = cap.includes("contract") || cap.includes("solidity") || cap.includes("audit") || cap.includes("gas-optimization");
-                const capColor = isSoul ? "#ff006e" : isSwap ? "#39ff14" : isWeb3 ? "#f97316" : "#00f0ff";
+                const isSkill = cap.includes("l2-") || cap.includes("defi-") || cap.includes("frontend-") || cap.includes("ethereum-") || cap.includes("dev-tooling") || cap.includes("cross-chain") || cap.includes("security-patterns") || cap.includes("dapp-orchestration") || cap.includes("verified-contract");
+                const capColor = isSoul ? "#ff006e" : isSwap ? "#39ff14" : isWeb3 ? "#f97316" : isSkill ? "#e879f9" : "#00f0ff";
                 return (
                   <span key={cap} className="text-[10px] font-mono px-2 py-0.5 rounded"
                     style={{ color: `${capColor}88`, background: `${capColor}08`, border: `1px solid ${capColor}15` }}>

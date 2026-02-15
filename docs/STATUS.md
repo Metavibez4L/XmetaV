@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v20 (Cyber-Neural Memory Evolution — Crystal Materia + Fusion + Summons)
+**XmetaV Version:** v21 (EthSkills + Dashboard Skills UI + Build Hardening)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -18,7 +18,7 @@ This file captures the **known-good** runtime settings for this machine and the 
 
 # Verify OpenClaw
 openclaw health
-openclaw --version  # Expected: 2026.2.1
+openclaw --version  # Expected: 2026.2.14
 
 # Supabase tables sanity (service role / admin only)
 # - agent_memory is the persistent memory bus used by the bridge
@@ -33,7 +33,7 @@ openclaw --version  # Expected: 2026.2.1
 
 ## Versions
 
-- OpenClaw: `openclaw --version` (expected: 2026.2.1)
+- OpenClaw: `openclaw --version` (expected: 2026.2.14)
 - Node: `node --version` (expected: 22.x)
 - Ollama: `ollama --version` (native install recommended; snap often breaks CUDA)
 
@@ -588,6 +588,49 @@ Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unre
 
 ---
 
+## EthSkills (v21)
+
+12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents via `openclaw skills install`.
+
+### Installed Skills
+
+| Skill | Agent(s) | Description |
+|-------|----------|-------------|
+| `wallets` | main | EOAs, Safe multisig, EIP-7702 smart EOAs, ERC-4337 account abstraction, key safety |
+| `tools` | web3dev | Hardhat, Foundry, Tenderly, Etherscan verification |
+| `l2s` | web3dev, oracle | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
+| `orchestration` | web3dev | Multi-contract deploy scripts, upgrade patterns, proxy factories |
+| `addresses` | web3dev | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `concepts` | web3dev | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
+| `security` | web3dev | Reentrancy, flash loans, oracle manipulation, access control |
+| `standards` | web3dev | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
+| `frontend-ux` | web3dev | Wallet connection, transaction UX, error handling, mobile |
+| `frontend-playbook` | web3dev | wagmi/viem integration, RainbowKit, WalletConnect |
+| `building-blocks` | web3dev | OpenZeppelin patterns, diamond proxy, minimal proxy |
+| `gas` | oracle | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
+
+### Dashboard Integration
+
+- **Fleet Table** (`/fleet`): Skills badges per agent in purple (#e879f9) badges
+- **Identity Page** (`/identity`): Skills shown in fleet roster grid per agent
+- **ERC-8004 Metadata**: 13 new capabilities added to on-chain metadata; per-agent `skills` arrays in `fleet.agents`
+
+### Verification
+
+```bash
+# List all installed skills
+openclaw skills list
+
+# Check skill files
+ls ~/.openclaw/workspace/skills/
+
+# Expected: wallets/ tools/ l2s/ orchestration/ addresses/ concepts/
+#           security/ standards/ frontend-ux/ frontend-playbook/
+#           building-blocks/ gas/ (plus agent-factory/ swarm/ dispatch/ supabase/ web/)
+```
+
+---
+
 ## Bug Fixes and Hardening (v13)
 
 ### Arena sync race condition
@@ -641,6 +684,52 @@ Memory orchestrator providing context curation, association building, dream cons
 | Supabase | Active | Registered in agent_controls |
 
 Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+
+---
+
+## Oracle Identity Scouting (v21)
+
+Automated on-chain identity discovery system enabling the Oracle agent to scout and catalog ERC-8004 registered agents on Base mainnet.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Scout Library | Active | `bridge/lib/oracle/identity-scout.ts` — range scanning, metadata fetching |
+| Bridge Integration | Active | `bridge/lib/oracle/index.ts` — exports scout functions |
+| API Route | Active | `/api/oracle/discovery` — HTTP endpoint for scouting |
+| Dashboard Page | Active | `/oracle` — discovery dashboard with agent cards |
+| Hook | Active | `useOracleDiscovery.ts` — React hook for scouting state |
+| Sidebar | Active | Oracle Discovery nav entry |
+| Types | Active | `OracleDiscoveryResult`, `DiscoveredAgent` in types.ts |
+
+### Capabilities
+
+- Scan agent ID ranges on ERC-8004 IdentityRegistry
+- Fetch and parse agent metadata (capabilities, services, fleet)
+- Display discovered agents with registration details
+- Filter by capabilities and services
+
+---
+
+## Arena Optimizations (v21)
+
+Performance audit and optimization of the ~3,600 line arena codebase.
+
+| Optimization | File | Impact |
+|-------------|------|--------|
+| Particle Pool | `effects.ts` | Object reuse eliminates GC pressure from particle creation |
+| Position Hash Diffs | `avatars.ts` | Skip redundant position calculations when state unchanged |
+| lastKnownStatus Cache | `avatars.ts` | Prevent duplicate status transitions |
+| Throttled ResizeObserver | `ArenaCanvas.tsx` | Debounced canvas resize prevents layout thrashing |
+
+---
+
+## Alchemy RPC (v21)
+
+All on-chain reads switched from default Base RPC to **Alchemy** for better reliability and rate limits.
+
+- RPC URL: `https://base-mainnet.g.alchemy.com/v2/...` (via `BASE_RPC_URL` env)
+- Files updated: 11 files across bridge, erc8004, x402-server, and API routes
+- Previous: Default Base public RPC (rate-limited, unreliable)
 
 ---
 
@@ -991,3 +1080,28 @@ With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes 
 Workarounds:
 - Use the deterministic `openclaw browser ...` CLI for browser automation.
 - Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
+
+---
+
+## Build Hardening (v21)
+
+Comprehensive fix of pre-existing TypeScript build errors across the codebase. All resolved to pass `npx next build` clean.
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `bridge/lib/swap-executor.ts` | BigInt literals (`0n`, `4_000_000_000_000n`) | `BigInt()` function calls |
+| `bridge/lib/swap-executor.ts` | Duplicate `"arrow"` key in voice aliases | Removed duplicate |
+| `erc8004/lib/client.ts` | BigInt literals (`0n`) | `BigInt(0)` |
+| `erc8004/register.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `erc8004/update-uri.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `token/scripts/deploy.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `scripts/voice-cli.ts` | Unused `@ts-expect-error` directive | `@ts-ignore` |
+| `src/components/AgentChat.tsx` | `.catch()` on `PromiseLike` | `Promise.resolve()` wrapper |
+| `src/hooks/useVoice.ts` | `Uint8Array` not assignable to `BufferSource` | `.buffer as ArrayBuffer` |
+| `src/hooks/useWakeWord.ts` | Missing `SpeechRecognition` type | `any` type annotations |
+| `src/lib/voice.ts` | `Buffer` not assignable to `BlobPart` | `new Uint8Array()` wrapper |
+| `x402-server/index.ts` | `string` not assignable to template literal type | `as` cast |
+| `x402-server/index.ts` | `Buffer` not assignable to `BlobPart` | `new Uint8Array()` wrapper |
+| Missing deps | `@x402/fetch`, `@x402/evm` | `npm install` |
+
+**Root cause**: `tsconfig.json` targets ES2017, which doesn't support BigInt literal syntax (`0n`). All BigInt values must use `BigInt()` function calls.
