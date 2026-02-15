@@ -1,7 +1,7 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of specialized agents across intel, development, and operations — including on-chain intelligence (oracle), tokenomics analysis (alchemist), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
@@ -86,7 +86,11 @@
     "dapp-orchestration",
     "frontend-ux",
     "verified-contract-addresses",
-    "dev-tooling"
+    "dev-tooling",
+    "revenue-analytics",
+    "endpoint-pricing",
+    "growth-optimization",
+    "revenue-forecasting"
   ],
   "fleet": {
     "agents": [
@@ -95,13 +99,14 @@
       { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
       { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
       { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel" },
+      { "id": "midas", "role": "Revenue & growth optimizer — pricing, forecasts, endpoint analytics", "room": "intel", "skills": ["revenue", "pricing", "growth", "forecast"] },
       { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
       { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
       { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
     ],
     "model": "ollama/kimi-k2.5:cloud",
-    "meetingCapacity": 7,
+    "meetingCapacity": 8,
     "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul"]
   },
   "contracts": {
@@ -145,7 +150,9 @@
       "GET /fleet-status": "$0.01",
       "POST /swarm": "$0.50",
       "POST /voice/transcribe": "$0.05",
-      "POST /voice/synthesize": "$0.08"
+      "POST /voice/synthesize": "$0.08",
+      "GET /midas/dashboard": "$0.02",
+      "GET /midas/report": "$0.05"
     },
     "tokenDiscounts": {
       "token": "$XMETAV",
