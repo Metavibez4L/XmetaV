@@ -7,6 +7,8 @@ import type {
   AgentCommand,
   AgentResponse,
   AgentControl,
+  SwarmRun,
+  SwarmTask,
 } from "@/lib/types";
 
 export interface ArenaHandlers {
@@ -19,6 +21,9 @@ export interface ArenaHandlers {
     status: "completed" | "failed",
   ) => void;
   onControl: (agentId: string, enabled: boolean) => void;
+  onSwarmStart?: (runId: string, agentIds: string[], mode: string) => void;
+  onSwarmTaskUpdate?: (runId: string, agentId: string, status: string) => void;
+  onSwarmEnd?: (runId: string) => void;
 }
 
 /**
@@ -194,6 +199,86 @@ export function useArenaEvents(
       )
       .subscribe();
 
+    // -- Swarm realtime subscriptions ---------------------------------
+    const swarmRunsChannel = supabase
+      .channel("arena-swarm-runs")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "swarm_runs" },
+        (payload) => {
+          const row = payload.new as SwarmRun;
+          if (!row?.id) return;
+          if (row.status === "running") {
+            // Extract agent IDs from manifest tasks
+            const manifest = row.manifest as { tasks?: { agent?: string }[] };
+            const agentIds = (manifest?.tasks ?? [])
+              .map((t) => t.agent)
+              .filter((a): a is string => !!a);
+            if (agentIds.length > 0) {
+              handlersRef.current?.onSwarmStart?.(row.id, agentIds, row.mode);
+            }
+          } else if (
+            row.status === "completed" ||
+            row.status === "failed" ||
+            row.status === "cancelled"
+          ) {
+            handlersRef.current?.onSwarmEnd?.(row.id);
+          }
+        },
+      )
+      .subscribe();
+
+    const swarmTasksChannel = supabase
+      .channel("arena-swarm-tasks")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "swarm_tasks" },
+        (payload) => {
+          const row = payload.new as SwarmTask;
+          if (!row?.swarm_id || !row?.agent_id) return;
+          handlersRef.current?.onSwarmTaskUpdate?.(
+            row.swarm_id,
+            row.agent_id,
+            row.status,
+          );
+        },
+      )
+      .subscribe();
+
+    // Fetch currently running swarms on init
+    (async () => {
+      const { data: runningSwarms } = await supabase
+        .from("swarm_runs")
+        .select("*")
+        .eq("status", "running")
+        .limit(10);
+      if (runningSwarms) {
+        for (const run of runningSwarms as SwarmRun[]) {
+          const manifest = run.manifest as { tasks?: { agent?: string }[] };
+          const agentIds = (manifest?.tasks ?? [])
+            .map((t) => t.agent)
+            .filter((a): a is string => !!a);
+          if (agentIds.length > 0) {
+            handlersRef.current?.onSwarmStart?.(run.id, agentIds, run.mode);
+          }
+          // Also fetch task statuses
+          const { data: tasks } = await supabase
+            .from("swarm_tasks")
+            .select("*")
+            .eq("swarm_id", run.id);
+          if (tasks) {
+            for (const t of tasks as SwarmTask[]) {
+              handlersRef.current?.onSwarmTaskUpdate?.(
+                t.swarm_id,
+                t.agent_id,
+                t.status,
+              );
+            }
+          }
+        }
+      }
+    })();
+
     // -- Periodic sync (safety net for dropped realtime events) ----------
     const syncInterval = setInterval(async () => {
       if (!initialFetchDone.current) return;
@@ -220,6 +305,8 @@ export function useArenaEvents(
       supabase.removeChannel(commandsChannel);
       supabase.removeChannel(responsesChannel);
       supabase.removeChannel(controlsChannel);
+      supabase.removeChannel(swarmRunsChannel);
+      supabase.removeChannel(swarmTasksChannel);
     };
   }, [supabase, handlersRef]);
 }

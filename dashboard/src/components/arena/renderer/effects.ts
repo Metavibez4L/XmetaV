@@ -13,6 +13,9 @@ export interface EffectsApi {
   failureGlitch(agentId: string): void;
   meetingStart(agentIds: string[]): void;
   meetingEnd(): void;
+  swarmStart(runId: string, agentIds: string[], mode: string): void;
+  swarmTaskUpdate(runId: string, agentId: string, status: string): void;
+  swarmEnd(runId: string): void;
   destroy(): void;
 }
 
@@ -69,6 +72,19 @@ interface MeetingState {
   glitchArtifacts: Graphics;
   agentIds: string[];
   fadeIn: number; // 0→1 fade
+}
+
+interface SwarmLinkState {
+  runId: string;
+  mode: string; // parallel | pipeline | collaborative
+  agentIds: string[];
+  taskStatuses: Map<string, string>; // agentId → pending|running|completed|failed
+  container: Container;
+  links: Graphics;
+  dataParticles: Graphics;
+  statusRings: Map<string, Graphics>;
+  fadeIn: number;
+  active: boolean;
 }
 
 // -- Helpers ----------------------------------------------------------
@@ -140,6 +156,23 @@ export function initEffects(
   // Meeting state (persistent while meeting is active)
   let meeting: MeetingState | null = null;
   let meetingTime = 0;
+
+  // Swarm neural link state
+  const activeSwarms = new Map<string, SwarmLinkState>();
+  let swarmTime = 0;
+
+  const SWARM_COLORS: Record<string, number> = {
+    parallel: 0x39ff14,      // neon green
+    pipeline: 0xf59e0b,      // amber
+    collaborative: 0xa855f7,  // purple
+  };
+  const TASK_STATUS_COLORS: Record<string, number> = {
+    pending: 0x4a6a8a,
+    running: 0x00f0ff,
+    completed: 0x39ff14,
+    failed: 0xff2d5e,
+    skipped: 0x4a6a8a,
+  };
 
   // -- Ticker ---------------------------------------------------------
 
@@ -279,6 +312,170 @@ export function initEffects(
           gl.y + (Math.random() - 0.5) * 35,
         );
       }
+    }
+
+    // -- Neural swarm links ----
+    swarmTime += dt;
+    for (const [runId, swarm] of activeSwarms) {
+      // Fade in/out
+      if (swarm.active && swarm.fadeIn < 1) {
+        swarm.fadeIn = Math.min(1, swarm.fadeIn + dt * 1.5);
+      } else if (!swarm.active) {
+        swarm.fadeIn -= dt * 2;
+        if (swarm.fadeIn <= 0) {
+          swarm.container.destroy({ children: true });
+          activeSwarms.delete(runId);
+          continue;
+        }
+      }
+
+      const alpha = swarm.fadeIn;
+      const swarmColor = SWARM_COLORS[swarm.mode] ?? 0x00f0ff;
+
+      // Redraw neural links between agents
+      swarm.links.clear();
+      swarm.dataParticles.clear();
+
+      const positions: { id: string; x: number; y: number }[] = [];
+      for (const id of swarm.agentIds) {
+        const pos = nodesApi.getPosition(id);
+        if (pos) positions.push({ id, x: pos.x, y: pos.y });
+      }
+
+      if (positions.length >= 2) {
+        // Draw neural link topology based on mode
+        if (swarm.mode === "pipeline") {
+          // Pipeline: sequential chain A→B→C
+          for (let i = 0; i < positions.length - 1; i++) {
+            const a = positions[i];
+            const b = positions[i + 1];
+            const taskStatus = swarm.taskStatuses.get(a.id) ?? "pending";
+            const linkColor = TASK_STATUS_COLORS[taskStatus] ?? swarmColor;
+            const pulse = 0.2 + Math.sin(swarmTime * 3 + i) * 0.1;
+
+            // Main link line
+            swarm.links.moveTo(a.x, a.y);
+            swarm.links.lineTo(b.x, b.y);
+            swarm.links.stroke({
+              color: linkColor,
+              width: 1.2,
+              alpha: alpha * pulse,
+            });
+
+            // Chromatic ghost line
+            swarm.links.moveTo(a.x + 1.5, a.y);
+            swarm.links.lineTo(b.x + 1.5, b.y);
+            swarm.links.stroke({
+              color: 0xff006e,
+              width: 0.5,
+              alpha: alpha * pulse * 0.3,
+            });
+
+            // Flowing data particle along link
+            if (taskStatus === "running") {
+              const t = (swarmTime * 0.8 + i * 0.3) % 1;
+              const px = a.x + (b.x - a.x) * t;
+              const py = a.y + (b.y - a.y) * t;
+              swarm.dataParticles.circle(px, py, 2.5).fill({
+                color: linkColor,
+                alpha: alpha * 0.7,
+              });
+              swarm.dataParticles.circle(px, py, 5).fill({
+                color: linkColor,
+                alpha: alpha * 0.15,
+              });
+            }
+          }
+        } else {
+          // Parallel / Collaborative: hub-and-spoke from meeting center
+          for (const p of positions) {
+            const taskStatus = swarm.taskStatuses.get(p.id) ?? "pending";
+            const linkColor = TASK_STATUS_COLORS[taskStatus] ?? swarmColor;
+            const pulse = 0.15 + Math.sin(swarmTime * 2.5 + p.x * 0.1) * 0.1;
+
+            // Link to hub
+            swarm.links.moveTo(meetingCenter.x, meetingCenter.y - 10);
+            swarm.links.lineTo(p.x, p.y);
+            swarm.links.stroke({
+              color: linkColor,
+              width: 1,
+              alpha: alpha * pulse,
+            });
+
+            // Chromatic ghost
+            swarm.links.moveTo(meetingCenter.x - 1.5, meetingCenter.y - 10);
+            swarm.links.lineTo(p.x - 1.5, p.y);
+            swarm.links.stroke({
+              color: 0xff006e,
+              width: 0.4,
+              alpha: alpha * pulse * 0.25,
+            });
+
+            // Data flow particles (bidirectional for collaborative)
+            if (taskStatus === "running") {
+              const t1 = (swarmTime * 0.6 + p.y * 0.02) % 1;
+              const px1 = meetingCenter.x + (p.x - meetingCenter.x) * t1;
+              const py1 = (meetingCenter.y - 10) + (p.y - meetingCenter.y + 10) * t1;
+              swarm.dataParticles.circle(px1, py1, 2).fill({
+                color: linkColor,
+                alpha: alpha * 0.6,
+              });
+              swarm.dataParticles.circle(px1, py1, 4.5).fill({
+                color: linkColor,
+                alpha: alpha * 0.12,
+              });
+
+              if (swarm.mode === "collaborative") {
+                // Reverse flow particle
+                const t2 = (swarmTime * 0.5 + p.x * 0.02 + 0.5) % 1;
+                const px2 = p.x + (meetingCenter.x - p.x) * t2;
+                const py2 = p.y + (meetingCenter.y - 10 - p.y) * t2;
+                swarm.dataParticles.circle(px2, py2, 1.5).fill({
+                  color: 0xa855f7,
+                  alpha: alpha * 0.5,
+                });
+              }
+            }
+          }
+
+          // Hub pulse ring
+          const hubPulse = 0.3 + Math.sin(swarmTime * 2) * 0.15;
+          swarm.links.circle(meetingCenter.x, meetingCenter.y - 10, 8 + Math.sin(swarmTime) * 2).stroke({
+            color: swarmColor,
+            width: 1.5,
+            alpha: alpha * hubPulse,
+          });
+        }
+      }
+
+      // Update per-agent status rings
+      for (const p of positions) {
+        const ring = swarm.statusRings.get(p.id);
+        if (!ring) continue;
+        const taskStatus = swarm.taskStatuses.get(p.id) ?? "pending";
+        const statusColor = TASK_STATUS_COLORS[taskStatus] ?? 0x4a6a8a;
+
+        ring.clear();
+        const ringPulse = taskStatus === "running"
+          ? 0.4 + Math.sin(swarmTime * 4 + p.x) * 0.2
+          : taskStatus === "completed" ? 0.3 : 0.1;
+        ring.circle(0, 0, 18).stroke({
+          color: statusColor,
+          width: taskStatus === "running" ? 1.5 : 0.8,
+          alpha: alpha * ringPulse,
+        });
+        // Outer glow for running tasks
+        if (taskStatus === "running") {
+          ring.circle(0, 0, 22).stroke({
+            color: statusColor,
+            width: 0.5,
+            alpha: alpha * ringPulse * 0.4,
+          });
+        }
+        ring.position.set(p.x, p.y);
+      }
+
+      swarm.container.alpha = alpha;
     }
 
     // -- Meeting holographic effects ----
@@ -660,6 +857,64 @@ export function initEffects(
     meetingEnd() {
       if (meeting) {
         meeting.active = false; // Triggers fade-out in ticker
+      }
+    },
+
+    swarmStart(runId, agentIds, mode) {
+      // Don't duplicate
+      if (activeSwarms.has(runId)) {
+        const existing = activeSwarms.get(runId)!;
+        existing.agentIds = [...agentIds];
+        existing.active = true;
+        return;
+      }
+
+      const container = new Container();
+      layer.addChild(container);
+
+      const links = new Graphics();
+      container.addChild(links);
+
+      const dataParticles = new Graphics();
+      container.addChild(dataParticles);
+
+      // Per-agent status ring overlays
+      const statusRings = new Map<string, Graphics>();
+      for (const id of agentIds) {
+        const ring = new Graphics();
+        container.addChild(ring);
+        statusRings.set(id, ring);
+      }
+
+      const taskStatuses = new Map<string, string>();
+      for (const id of agentIds) {
+        taskStatuses.set(id, "pending");
+      }
+
+      activeSwarms.set(runId, {
+        runId,
+        mode,
+        agentIds: [...agentIds],
+        taskStatuses,
+        container,
+        links,
+        dataParticles,
+        statusRings,
+        fadeIn: 0,
+        active: true,
+      });
+    },
+
+    swarmTaskUpdate(runId, agentId, status) {
+      const swarm = activeSwarms.get(runId);
+      if (!swarm) return;
+      swarm.taskStatuses.set(agentId, status);
+    },
+
+    swarmEnd(runId) {
+      const swarm = activeSwarms.get(runId);
+      if (swarm) {
+        swarm.active = false; // Triggers fade-out in ticker
       }
     },
 

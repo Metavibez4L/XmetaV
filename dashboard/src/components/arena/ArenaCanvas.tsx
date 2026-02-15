@@ -308,6 +308,25 @@ export default function ArenaCanvas() {
         lastEvent: `${agentId} ${enabled ? "enabled" : "disabled"}`,
       }));
     },
+    onSwarmStart(runId, agentIds, mode) {
+      console.log("[arena] swarmStart:", runId.slice(0, 8), agentIds, mode);
+      effectsApiRef.current?.swarmStart(runId, agentIds, mode);
+      setHudStats((s) => ({
+        ...s,
+        lastEvent: `SWARM ${mode.toUpperCase()}: ${agentIds.length} agents`,
+      }));
+    },
+    onSwarmTaskUpdate(runId, agentId, status) {
+      effectsApiRef.current?.swarmTaskUpdate(runId, agentId, status);
+    },
+    onSwarmEnd(runId) {
+      console.log("[arena] swarmEnd:", runId.slice(0, 8));
+      effectsApiRef.current?.swarmEnd(runId);
+      setHudStats((s) => ({
+        ...s,
+        lastEvent: "Swarm completed",
+      }));
+    },
   };
 
   // Connect to Supabase realtime

@@ -8,6 +8,7 @@ import {
   ContextMetrics,
   DreamModeStatus,
   DreamscapeView,
+  SwarmNetwork,
   MiniArena,
 } from "@/components/consciousness";
 import { Brain, RefreshCw, Loader2 } from "lucide-react";
@@ -127,6 +128,9 @@ export default function ConsciousnessPage() {
         memories={memories}
         associations={associations}
       />
+
+      {/* 7: Neural Swarm Network (full width) */}
+      <SwarmNetwork />
     </div>
   );
 }
