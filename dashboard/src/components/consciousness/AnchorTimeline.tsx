@@ -57,9 +57,20 @@ export const AnchorTimeline = React.memo(function AnchorTimeline({
     }
   }, []);
 
+  // Auto-refresh sync status every 30s + when anchors change
+  const prevAnchorLen = useRef(anchors.length);
   useEffect(() => {
     fetchSyncStatus();
+    const iv = setInterval(fetchSyncStatus, 30_000);
+    return () => clearInterval(iv);
   }, [fetchSyncStatus]);
+
+  useEffect(() => {
+    if (anchors.length !== prevAnchorLen.current) {
+      prevAnchorLen.current = anchors.length;
+      fetchSyncStatus();
+    }
+  }, [anchors.length, fetchSyncStatus]);
 
   const handleClick = useCallback(
     (anchor: AnchorEntry) => {

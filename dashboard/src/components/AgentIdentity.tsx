@@ -191,6 +191,9 @@ export const AgentIdentity = React.memo(function AgentIdentity() {
 
   useEffect(() => {
     fetchIdentity();
+    // Auto-refresh every 30s to keep anchor counts in sync
+    const iv = setInterval(() => fetchIdentity(false), 30_000);
+    return () => clearInterval(iv);
   }, [fetchIdentity]);
 
   const copyToClipboard = useCallback((text: string, label: string) => {

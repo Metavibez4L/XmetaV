@@ -226,11 +226,31 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
     mountedRef.current = true;
     fetchAll();
     const iv = setInterval(fetchAll, REFRESH_INTERVAL);
+
+    // Realtime subscription — instantly picks up new anchors
+    const channel = supabase
+      .channel("anchor-sync")
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agent_memory",
+          filter: "source=eq.anchor",
+        },
+        () => {
+          // New anchor landed — refresh immediately
+          if (mountedRef.current) fetchAll();
+        }
+      )
+      .subscribe();
+
     return () => {
       mountedRef.current = false;
       clearInterval(iv);
+      supabase.removeChannel(channel);
     };
-  }, [fetchAll]);
+  }, [fetchAll, supabase]);
 
   return { ...data, refresh: fetchAll };
 }
