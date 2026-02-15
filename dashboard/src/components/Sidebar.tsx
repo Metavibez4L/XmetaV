@@ -4,7 +4,7 @@ import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords, Brain, Gem } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Users, LogOut, Hexagon, X, Network, Zap, Wallet, Fingerprint, Coins, Terminal, Swords, Brain, Gem, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -16,10 +16,11 @@ const NAV_ITEMS = [
   { href: "/fleet", label: "Fleet", icon: Users, shortcut: "06", key: "6" },
   { href: "/payments", label: "Payments", icon: Wallet, shortcut: "07", key: "7" },
   { href: "/identity", label: "Identity", icon: Fingerprint, shortcut: "08", key: "8" },
-  { href: "/token", label: "$XMETAV", icon: Coins, shortcut: "09", key: "9" },
-  { href: "/logs", label: "Logs", icon: Terminal, shortcut: "10", key: "0" },
-  { href: "/arena", label: "Arena", icon: Swords, shortcut: "11" },
-  { href: "/memory-cosmos", label: "Memory Cosmos", icon: Gem, shortcut: "12" },
+  { href: "/oracle", label: "Oracle", icon: Eye, shortcut: "09", key: "9" },
+  { href: "/token", label: "$XMETAV", icon: Coins, shortcut: "10", key: "0" },
+  { href: "/logs", label: "Logs", icon: Terminal, shortcut: "11" },
+  { href: "/arena", label: "Arena", icon: Swords, shortcut: "12" },
+  { href: "/memory-cosmos", label: "Memory Cosmos", icon: Gem, shortcut: "13" },
 ];
 
 interface SidebarProps {
