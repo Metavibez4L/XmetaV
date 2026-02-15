@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v18
+Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v19
 
 ```
  ___   ___                    __           ___   ___
@@ -32,6 +32,8 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v18
 
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
 - **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table with seat-based agent meetings, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events with periodic sync
+- **Cyberpunk Arena Evolution** — Neon aura rings with chromatic aberration on avatars, hex rain data torrents for streaming, RGB-split failure glitches, holographic meeting ring with scanlines, distant city skyline parallax, and perspective neon grid floor
+- **Neural Swarm Links** — Real-time neural data links between agents during swarm runs: pipeline chains, hub-and-spoke topology, per-agent status rings, flowing data particles, chromatic ghost lines — all driven by Supabase Realtime on swarm_runs/swarm_tasks
 - **Live Log Streaming** — Real-time log viewer with severity filters, agent filters, search, and auto-scroll
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
@@ -43,6 +45,8 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.1 | XmetaV Command Center v18
 - **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
 - **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
 - **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 15s auto-refresh from Supabase
+- **Dreamscape Visualization** — Canvas-based dream session renderer: hexagonal memory shards with glow, diamond insight crystals by category, curved synaptic bridges with flowing data particles, mouse-interactive repulsion, ambient data motes, and insight ticker strip
+- **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
