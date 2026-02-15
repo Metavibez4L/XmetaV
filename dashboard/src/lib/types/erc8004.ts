@@ -132,3 +132,85 @@ export interface DiscoveryStats {
   lastScanAt: string | null;
   recentRegistrations: number;
 }
+
+// ============================================================
+// Memory-Similarity Scanning
+// ============================================================
+
+/** XmetaV memory architecture keywords for similarity matching */
+export const MEMORY_KEYWORDS = [
+  // Core memory concepts
+  "memory", "memories", "recall", "remember", "remembrance",
+  "context", "context-window", "long-term-memory", "short-term-memory",
+  // Consciousness / soul
+  "consciousness", "conscious", "soul", "sentience", "awareness",
+  "self-awareness", "introspection", "metacognition",
+  // Persistence / anchoring
+  "anchor", "anchoring", "anchored", "persistence", "persistent",
+  "on-chain-memory", "onchain-memory", "immutable-memory",
+  // IPFS / decentralised storage
+  "ipfs", "pinata", "arweave", "filecoin", "decentralized-storage",
+  // Dreams / associations
+  "dream", "dreaming", "lucid-dream", "association", "associative",
+  "crystal", "materia", "crystallize",
+  // Agent fleet / swarm intelligence
+  "swarm", "fleet", "multi-agent", "agent-network",
+  // Identity & reputation
+  "erc-8004", "erc8004", "identity-registry", "reputation",
+  "agent-identity", "on-chain-identity",
+  // Skills & capabilities
+  "skill", "capability", "evolve", "self-evolve", "self-improve",
+  "learning", "adaptation",
+] as const;
+
+/** Category groupings for memory similarity scoring */
+export interface MemoryScoreBreakdown {
+  memory: number;       // core memory concepts
+  consciousness: number; // soul / awareness
+  persistence: number;   // anchoring / on-chain storage
+  storage: number;       // IPFS / decentralised storage
+  dreams: number;        // dream / association / crystal
+  fleet: number;         // swarm / multi-agent
+  identity: number;      // ERC-8004 / reputation
+  skills: number;        // capabilities / evolution
+}
+
+/** Result of memory-similarity analysis for a single agent */
+export interface MemorySimilarityMatch {
+  agentId: number;
+  owner: string;
+  agentWallet: string;
+  metadataUri: string;
+  agentName: string | null;
+  agentType: string | null;
+  /** 0-1 overall similarity score */
+  similarityScore: number;
+  /** Per-category breakdown */
+  breakdown: MemoryScoreBreakdown;
+  /** Exact keywords matched */
+  matchedKeywords: string[];
+  /** Auto-generated tags based on matches */
+  autoTags: string[];
+  /** Capabilities listed in metadata */
+  capabilities: string[];
+  /** Raw metadata snippet (truncated) */
+  metadataPreview: string;
+}
+
+/** Full result of a memory-similarity scan */
+export interface MemoryScanResult {
+  /** Agents that matched memory keywords (sorted by score desc) */
+  matches: MemorySimilarityMatch[];
+  /** Total agents scanned */
+  totalScanned: number;
+  /** Total agents with metadata */
+  totalWithMetadata: number;
+  /** Total that matched at least one keyword */
+  totalMatched: number;
+  /** Scan duration in ms */
+  durationMs: number;
+  /** Block range scanned (for event-based scan) */
+  blockRange?: { from: string; to: string };
+  /** Agent ID range scanned (for range-based scan) */
+  idRange?: { from: number; to: number };
+}

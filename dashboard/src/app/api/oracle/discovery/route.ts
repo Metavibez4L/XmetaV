@@ -14,6 +14,7 @@ import {
   setRelationship,
   addTags,
   getScanHistory,
+  scanForMemoryAgents,
 } from "@/lib/agent-discovery";
 import type { AgentSearchFilters } from "@/lib/types/erc8004";
 
@@ -137,13 +138,15 @@ export async function GET(request: NextRequest) {
  * POST /api/oracle/discovery
  *
  * Body JSON:
- *   action: "scan_range" | "scan_events" | "refresh" | "set_relationship" | "add_tags"
+ *   action: "scan_range" | "scan_events" | "refresh" | "set_relationship" | "add_tags" | "scan_memory"
  *
  *   scan_range:  { from: number, to: number, fetchMetadata?: bool, fetchReputation?: bool }
  *   scan_events: { fromBlock?: number }
  *   refresh:     { agentId: number }
  *   set_relationship: { agentId: number, relationship: string, notes?: string }
  *   add_tags:    { agentId: number, tags: string[] }
+ *   scan_memory: { fromId?: number, toId?: number, fromBlock?: number, toBlock?: number,
+ *                  minScore?: number, autoTag?: bool, maxAgents?: number }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -230,6 +233,25 @@ export async function POST(request: NextRequest) {
         }
         await addTags(supabase, agentId, tags);
         return NextResponse.json({ action: "add_tags", ok: true });
+      }
+
+      case "scan_memory": {
+        const {
+          fromId, toId, fromBlock, toBlock,
+          minScore, autoTag, maxAgents,
+        } = body;
+
+        const result = await scanForMemoryAgents(supabase, {
+          fromId: fromId !== undefined ? Number(fromId) : undefined,
+          toId: toId !== undefined ? Number(toId) : undefined,
+          fromBlock: fromBlock !== undefined ? BigInt(fromBlock) : undefined,
+          toBlock: toBlock !== undefined ? BigInt(toBlock) : undefined,
+          minScore: minScore !== undefined ? Number(minScore) : undefined,
+          autoTag: autoTag !== undefined ? Boolean(autoTag) : true,
+          maxAgents: maxAgents !== undefined ? Number(maxAgents) : undefined,
+        });
+
+        return NextResponse.json({ action: "scan_memory", ...result });
       }
 
       default:

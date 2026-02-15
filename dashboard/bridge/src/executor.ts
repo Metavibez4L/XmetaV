@@ -4,6 +4,7 @@ import { createStreamer } from "./streamer.js";
 import { captureCommandOutcome } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
+import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -120,6 +121,77 @@ export async function executeCommand(command: {
       // Clean error for display
       const cleanMsg = msg.length > 300 ? msg.slice(0, 300) + "..." : msg;
       streamer.write(`\n❌ **Swap error**\n\n${cleanMsg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
+    // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
+
+  // ── Oracle memory-scan interception ────────────────────────────
+  // If oracle (or main delegating to oracle) sends a memory-scan
+  // command, execute it directly via the dashboard API.
+  if (
+    (agent_id === "oracle" || agent_id === "main") &&
+    isMemoryScanCommand(message)
+  ) {
+    console.log(`[executor] Memory-scan command detected for "${agent_id}"`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    streamer.write(`\n🔍 **Oracle ERC-8004 Memory-Similarity Scan starting...**\n\n`);
+    streamer.write(`⏳ Scanning Base Mainnet for agents with memory/consciousness metadata...\n\n`);
+
+    try {
+      const result = await executeMemoryScan(message);
+
+      streamer.write(result.markdown);
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+
+      // Capture to memory
+      captureCommandOutcome(
+        agent_id,
+        message,
+        result.markdown,
+        result.success ? 0 : 1
+      ).catch((err) =>
+        console.error(`[executor] Memory capture failed (non-fatal):`, err)
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      streamer.write(`\n❌ **Memory scan error**\n\n${msg}\n`);
       await streamer.end(1);
 
       await supabase
