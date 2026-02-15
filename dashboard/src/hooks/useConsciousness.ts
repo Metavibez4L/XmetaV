@@ -84,7 +84,7 @@ export interface ConsciousnessData {
   error: string | null;
 }
 
-const REFRESH_INTERVAL = 15_000; // 15s auto-refresh
+const REFRESH_INTERVAL = 30_000; // 30s auto-refresh
 
 /* ── Hook ──────────────────────────────────────────────────── */
 
@@ -121,32 +121,32 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
       ] = await Promise.all([
         supabase
           .from("agent_sessions")
-          .select("*")
+          .select("id, agent_id, status, started_at, last_active, last_heartbeat, tasks_completed, errors")
           .in("agent_id", ["main", "soul"]),
         supabase
           .from("agent_memory")
-          .select("*")
+          .select("id, agent_id, kind, content, source, created_at")
           .order("created_at", { ascending: false })
           .limit(200),
         supabase
           .from("memory_associations")
-          .select("*")
+          .select("id, memory_id, related_memory_id, association_type, strength, created_at")
           .order("created_at", { ascending: false })
           .limit(500),
         supabase
           .from("agent_memory")
-          .select("*")
+          .select("id, agent_id, kind, content, source, created_at")
           .eq("source", "anchor")
           .order("created_at", { ascending: true })
           .limit(100),
         supabase
           .from("memory_queries")
-          .select("*")
+          .select("id, agent_id, task_keywords, retrieved_memory_ids, relevance_scores, query_time")
           .order("query_time", { ascending: false })
           .limit(50),
         supabase
           .from("dream_insights")
-          .select("*")
+          .select("id, insight, source_memories, category, confidence, generated_at")
           .order("generated_at", { ascending: false })
           .limit(30),
       ]);

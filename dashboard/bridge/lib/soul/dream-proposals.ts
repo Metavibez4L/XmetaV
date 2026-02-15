@@ -223,20 +223,41 @@ async function analyzeAssociationOpportunities(
 ): Promise<DreamManifestation[]> {
   const proposals: DreamManifestation[] = [];
 
-  for (const cluster of clusters) {
-    if (cluster.memories.length < 3) continue;
+  // Batch: collect all memory IDs across clusters for a single query
+  const eligibleClusters = clusters.filter((c) => c.memories.length >= 3);
+  const allMemIds = new Set<string>();
+  for (const cluster of eligibleClusters) {
+    for (const m of cluster.memories.slice(0, 10)) {
+      allMemIds.add(m.id);
+    }
+  }
+  if (allMemIds.size === 0) return proposals;
 
-    // Check for memories in the same cluster that lack associations
+  // Single batched query instead of per-cluster N+1
+  let allExisting: MemoryAssociation[] = [];
+  try {
+    const { data } = await supabase
+      .from("memory_associations")
+      .select("memory_id, related_memory_id, strength")
+      .in("memory_id", Array.from(allMemIds).slice(0, 100));
+    allExisting = (data ?? []) as MemoryAssociation[];
+  } catch {
+    return proposals;
+  }
+
+  const globalPairSet = new Set(
+    allExisting.map((a) => `${a.memory_id}:${a.related_memory_id}`)
+  );
+
+  for (const cluster of eligibleClusters) {
     const memIds = cluster.memories.map((m) => m.id);
 
     try {
-      const { data: existing } = await supabase
-        .from("memory_associations")
-        .select("memory_id, related_memory_id, strength")
-        .in("memory_id", memIds.slice(0, 10));
-
+      // Filter existing associations for this cluster's IDs
+      const clusterIdSet = new Set(memIds.slice(0, 10));
+      const existing = allExisting.filter((a) => clusterIdSet.has(a.memory_id));
       const existingPairs = new Set(
-        (existing ?? []).map((a: MemoryAssociation) => `${a.memory_id}:${a.related_memory_id}`)
+        existing.map((a) => `${a.memory_id}:${a.related_memory_id}`)
       );
 
       // Find unlinked pairs within the cluster
@@ -704,17 +725,21 @@ async function executeManifest(manifest: DreamManifestation): Promise<boolean> {
     switch (action.type) {
       case "create_associations": {
         const pairs = (action.memory_pairs as string[][]) ?? [];
-        for (const [memA, memB] of pairs) {
+        if (pairs.length > 0) {
+          // Batch upsert all pairs at once
+          const rows = pairs.map(([memA, memB]) => ({
+            memory_id: memA,
+            related_memory_id: memB,
+            association_type: "related",
+            strength: 0.5,
+          }));
           await supabase.from("memory_associations").upsert(
-            {
-              memory_id: memA,
-              related_memory_id: memB,
-              association_type: "related",
-              strength: 0.5,
-            },
+            rows,
             { onConflict: "memory_id,related_memory_id" }
           );
-          await logModification(manifest.id!, memA, memB, "create", undefined, 0.5);
+          for (const [memA, memB] of pairs) {
+            await logModification(manifest.id!, memA, memB, "create", undefined, 0.5);
+          }
         }
         return true;
       }
@@ -946,14 +971,18 @@ export async function getManifestationStats(): Promise<{
   try {
     const { data } = await supabase
       .from("soul_dream_manifestations")
-      .select("status, category");
+      .select("status, category")
+      .limit(1000);
 
     if (!data) return stats;
 
     stats.total = data.length;
+    const countKeys = new Set(["proposed", "executed", "auto_executed", "rejected", "expired"]);
     for (const row of data) {
-      const s = row.status as ManifestationStatus;
-      if (s in stats) (stats as Record<string, number>)[s]++;
+      const s = row.status as string;
+      if (countKeys.has(s)) {
+        (stats as unknown as Record<string, number>)[s]++;
+      }
       stats.by_category[row.category] = (stats.by_category[row.category] ?? 0) + 1;
     }
   } catch {

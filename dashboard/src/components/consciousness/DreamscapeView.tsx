@@ -198,6 +198,11 @@ export const DreamscapeView = React.memo(function DreamscapeView({
     const H = canvas.height;
 
     const animate = () => {
+      // Skip rendering when tab is hidden to save CPU/GPU
+      if (document.hidden) {
+        animRef.current = requestAnimationFrame(animate);
+        return;
+      }
       timeRef.current += 0.016;
       const t = timeRef.current;
 

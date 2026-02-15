@@ -75,7 +75,7 @@ async function processPendingCommands() {
   if (data && data.length > 0) {
     console.log(`[bridge] Found ${data.length} pending command(s) to process`);
     for (const cmd of data) {
-      executeCommand(cmd);
+      await executeCommand(cmd);
     }
   } else {
     console.log("[bridge] No pending commands");
@@ -114,4 +114,19 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-process.on("SIGTERM", () => process.emit("SIGINT" as any));
+process.on("SIGTERM", async () => {
+  console.log("\n[bridge] SIGTERM received, shutting down...");
+  stopHeartbeat();
+  healthServer.close();
+  try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
+  supabase.removeChannel(channel);
+  supabase.removeChannel(swarmChannel);
+  supabase.removeChannel(intentChannel);
+  await supabase
+    .from("agent_sessions")
+    .upsert(
+      { agent_id: "bridge", status: "offline", last_heartbeat: new Date().toISOString() },
+      { onConflict: "agent_id" }
+    );
+  process.exit(0);
+});

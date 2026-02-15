@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { requireAuth, isValidUUID, clampLimit } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -10,16 +11,16 @@ export const runtime = "nodejs";
  * and manifestation lifecycle.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const action = request.nextUrl.searchParams.get("action") ?? "proposals";
   const admin = createAdminClient();
 
   switch (action) {
     /* ── Active Proposals ───────────────────────── */
     case "proposals": {
-      const limit = parseInt(
-        request.nextUrl.searchParams.get("limit") || "20",
-        10
-      );
+      const limit = clampLimit(request.nextUrl.searchParams.get("limit"), 20, 100);
       const status = request.nextUrl.searchParams.get("status") ?? "proposed";
 
       const { data, error } = await admin
@@ -38,10 +39,7 @@ export async function GET(request: NextRequest) {
 
     /* ── All Manifestations (recent) ───────────── */
     case "all": {
-      const limit = parseInt(
-        request.nextUrl.searchParams.get("limit") || "50",
-        10
-      );
+      const limit = clampLimit(request.nextUrl.searchParams.get("limit"), 50, 200);
       const { data, error } = await admin
         .from("soul_dream_manifestations")
         .select("*")
@@ -90,10 +88,7 @@ export async function GET(request: NextRequest) {
 
     /* ── Recent Dream Sessions ─────────────────── */
     case "sessions": {
-      const limit = parseInt(
-        request.nextUrl.searchParams.get("limit") || "10",
-        10
-      );
+      const limit = clampLimit(request.nextUrl.searchParams.get("limit"), 10, 50);
       const { data, error } = await admin
         .from("soul_dream_sessions")
         .select("*")
@@ -127,10 +122,7 @@ export async function GET(request: NextRequest) {
 
     /* ── Modification Log ──────────────────────── */
     case "modifications": {
-      const limit = parseInt(
-        request.nextUrl.searchParams.get("limit") || "30",
-        10
-      );
+      const limit = clampLimit(request.nextUrl.searchParams.get("limit"), 30, 100);
       const { data, error } = await admin
         .from("soul_association_modifications")
         .select("*")
@@ -156,6 +148,9 @@ export async function GET(request: NextRequest) {
  * Body: { action: "approve" | "reject" | "trigger_dream", id?, reason? }
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const body = await request.json();
   const { action, id, reason } = body;
 
@@ -164,8 +159,8 @@ export async function POST(request: NextRequest) {
   switch (action) {
     /* ── Approve a Proposal ────────────────────── */
     case "approve": {
-      if (!id) {
-        return NextResponse.json({ error: "id required" }, { status: 400 });
+      if (!id || !isValidUUID(id)) {
+        return NextResponse.json({ error: "Valid UUID id required" }, { status: 400 });
       }
 
       // Fetch
@@ -205,8 +200,8 @@ export async function POST(request: NextRequest) {
 
     /* ── Reject a Proposal ─────────────────────── */
     case "reject": {
-      if (!id) {
-        return NextResponse.json({ error: "id required" }, { status: 400 });
+      if (!id || !isValidUUID(id)) {
+        return NextResponse.json({ error: "Valid UUID id required" }, { status: 400 });
       }
 
       const { error } = await admin

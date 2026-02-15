@@ -129,9 +129,10 @@ async function runDreamCycle(sessionId: string): Promise<{
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: memories, error } = await supabase
     .from("agent_memory")
-    .select("*")
+    .select("id, content, kind, agent_id, created_at")
     .gte("created_at", cutoff)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(500);
 
   if (error || !memories || memories.length < 3) {
     console.log("[soul] Not enough recent memories to dream about.");
@@ -335,7 +336,7 @@ export async function getRelevantInsights(
   try {
     const { data, error } = await supabase
       .from("dream_insights")
-      .select("*")
+      .select("id, insight, source_memories, category, confidence, generated_at")
       .gte("confidence", 0.4)
       .order("generated_at", { ascending: false })
       .limit(20);

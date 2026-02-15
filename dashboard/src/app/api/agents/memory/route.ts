@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { requireAuth, isValidUUID, clampLimit } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -8,8 +9,11 @@ export const runtime = "nodejs";
  * Fetch recent memory entries for an agent (or all agents if no agent_id).
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const agentId = request.nextUrl.searchParams.get("agent_id");
-  const limit = parseInt(request.nextUrl.searchParams.get("limit") || "30", 10);
+  const limit = clampLimit(request.nextUrl.searchParams.get("limit"), 30, 200);
 
   const admin = createAdminClient();
 
@@ -37,6 +41,9 @@ export async function GET(request: NextRequest) {
  * Write a memory entry. Body: { agent_id, kind, content, source?, ttl_hours? }
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const body = await request.json();
   const { agent_id, kind, content, source, ttl_hours } = body;
 
@@ -77,10 +84,13 @@ export async function POST(request: NextRequest) {
  * Delete a specific memory entry.
  */
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const id = request.nextUrl.searchParams.get("id");
 
-  if (!id) {
-    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!id || !isValidUUID(id)) {
+    return NextResponse.json({ error: "Valid UUID id is required" }, { status: 400 });
   }
 
   const admin = createAdminClient();

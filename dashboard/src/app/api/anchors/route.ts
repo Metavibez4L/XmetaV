@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { requireAuth } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,9 @@ const CATEGORY_NAMES = ["milestone", "decision", "incident"] as const;
  *  - onChainAnchors: (if contract configured) raw on-chain anchor structs
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const agentIdParam = request.nextUrl.searchParams.get("agentId") || String(AGENT_ID);
   const from = Number(request.nextUrl.searchParams.get("from") || "0");
   const count = Math.min(Number(request.nextUrl.searchParams.get("count") || "50"), 100);

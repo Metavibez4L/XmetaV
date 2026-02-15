@@ -95,7 +95,7 @@ export async function retrieveRelevantMemories(
   // Fetch a wider window than the old RECENT_LIMIT to score from
   const { data, error } = await supabase
     .from("agent_memory")
-    .select("*")
+    .select("id, agent_id, kind, content, source, created_at")
     .in("agent_id", [agentId, "_shared"])
     .order("created_at", { ascending: false })
     .limit(config.associationScanWindow);

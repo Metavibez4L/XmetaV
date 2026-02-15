@@ -128,7 +128,7 @@ export const MemoryGraph = React.memo(function MemoryGraph({
       canvas.height = containerRef.current.clientHeight * devicePixelRatio;
       canvas.style.width = containerRef.current.clientWidth + "px";
       canvas.style.height = containerRef.current.clientHeight + "px";
-      ctx?.scale(devicePixelRatio, devicePixelRatio);
+      ctx?.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     }
     resize();
     const ro = new ResizeObserver(resize);
@@ -163,10 +163,11 @@ export const MemoryGraph = React.memo(function MemoryGraph({
         }
       }
 
-      // Spring for edges
+      // Spring for edges — use Map for O(1) lookup
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
       for (const edge of edges) {
-        const src = nodes.find((n) => n.id === edge.source);
-        const tgt = nodes.find((n) => n.id === edge.target);
+        const src = nodeMap.get(edge.source);
+        const tgt = nodeMap.get(edge.target);
         if (!src || !tgt) continue;
         const dx = tgt.x - src.x;
         const dy = tgt.y - src.y;
@@ -205,8 +206,8 @@ export const MemoryGraph = React.memo(function MemoryGraph({
 
       // Edges
       for (const edge of edges) {
-        const src = nodes.find((n) => n.id === edge.source);
-        const tgt = nodes.find((n) => n.id === edge.target);
+        const src = nodeMap.get(edge.source);
+        const tgt = nodeMap.get(edge.target);
         if (!src || !tgt) continue;
         ctx.beginPath();
         ctx.moveTo(src.x, src.y);

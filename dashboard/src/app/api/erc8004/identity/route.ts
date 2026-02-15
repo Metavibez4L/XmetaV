@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { requireAuth } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,9 @@ const viemClient = createPublicClient({
  * Read on-chain agent identity, reputation, and core stats from ERC-8004 on Base mainnet.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
   const agentIdParam = request.nextUrl.searchParams.get("agentId");
 
   if (!agentIdParam) {
