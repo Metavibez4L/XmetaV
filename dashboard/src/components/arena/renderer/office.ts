@@ -203,7 +203,7 @@ export function initOffice(
 
   // ── WORKSTATION DESKS — Intel + Dev Floor agents ───────────────
   const workstationAgents = [
-    "briefing", "oracle", "alchemist",                                  // Intel room
+    "briefing", "oracle", "alchemist", "midas",                         // Intel room
     "web3dev", "akua", "akua_web", "basedintern", "basedintern_web",  // Dev floor
   ];
   for (const agentId of workstationAgents) {
