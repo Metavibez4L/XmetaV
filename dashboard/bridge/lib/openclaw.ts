@@ -11,6 +11,7 @@ const ALLOWED_AGENTS = new Set([
   "briefing",
   "oracle",
   "alchemist",
+  "midas",
   "web3dev",
   "akua",
   "akua_web",

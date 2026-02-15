@@ -176,6 +176,7 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["main", "briefing"],
   ["main", "oracle"],
   ["main", "alchemist"],
+  ["main", "midas"],
   // Intel internal
   ["oracle", "briefing"],
   ["oracle", "alchemist"],

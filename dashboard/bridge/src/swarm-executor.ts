@@ -475,7 +475,7 @@ async function executeIntentTask(
     const cursor = new CursorClient(apiKey);
 
     const intentPrompt = `You are the Intent Layer for the XmetaV agent orchestration system.
-Available agents: main, basedintern, akua.
+Available agents: main, basedintern, akua, web3dev, oracle, alchemist, briefing, midas, soul, sentinel.
 Output ONLY a JSON array of command objects: [{"agent": "...", "message": "...", "description": "..."}]
 
 Goal: ${message}`;
