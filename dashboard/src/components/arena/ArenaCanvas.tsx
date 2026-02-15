@@ -183,10 +183,17 @@ export default function ArenaCanvas() {
 
   // -- Arena event handlers (updated every render via ref assignment) --
   const handlersRef = useRef<ArenaHandlers | null>(null);
+  /** Tracks the last hudStats.online count to skip identical setHudStats calls */
+  const lastOnlineRef = useRef(-1);
 
   // Assign fresh handlers on every render so closures stay current
   handlersRef.current = {
     onStatus(agentId, status) {
+      // Quick bail: if the state hasn’t changed, skip all downstream work.
+      // This eliminates the bulk of unnecessary React re-renders from the
+      // 10s periodic sync and duplicate realtime events.
+      if (nodeStatesRef.current.get(agentId) === status) return;
+
       // If this agent has an active command, don't let session sync
       // override its busy state — the command is the source of truth
       const hasActiveCommand = Array.from(activeCommandsRef.current).length > 0 &&
@@ -224,11 +231,16 @@ export default function ArenaCanvas() {
       const online = Array.from(nodeStatesRef.current.values()).filter(
         (s) => s !== "offline",
       ).length;
-      setHudStats((s) => ({
-        ...s,
-        online,
-        lastEvent: `${agentId} ${status}`,
-      }));
+
+      // Only update React state if online count or event text changed
+      if (online !== lastOnlineRef.current) {
+        lastOnlineRef.current = online;
+        setHudStats((s) => ({
+          ...s,
+          online,
+          lastEvent: `${agentId} ${status}`,
+        }));
+      }
 
       // Don't let session sync noise end meetings prematurely
       if (!meetingActiveRef.current || status === "busy") {
@@ -420,15 +432,19 @@ export default function ArenaCanvas() {
       }
       updateLabels();
 
-      // Resize handler
+      // Resize handler (throttled to avoid excessive re-renders)
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
       const ro = new ResizeObserver(() => {
         if (destroyed) return;
-        const newOff = getSceneOffset(
-          app.screen.width,
-          app.screen.height,
-        );
-        scene.position.set(newOff.x, newOff.y);
-        updateLabels();
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const newOff = getSceneOffset(
+            app.screen.width,
+            app.screen.height,
+          );
+          scene.position.set(newOff.x, newOff.y);
+          updateLabels();
+        }, 100);
       });
       ro.observe(el);
 

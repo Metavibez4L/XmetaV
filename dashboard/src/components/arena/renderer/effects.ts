@@ -146,6 +146,40 @@ export function initEffects(
   const bursts: BurstEntry[] = [];
   const glitches: GlitchEntry[] = [];
 
+  // -- Particle pool (recycles Graphics objects to reduce GC pressure) --
+  const PARTICLE_POOL_MAX = 200;
+  const MAX_ACTIVE_PARTICLES = 120;
+  const particlePool: Graphics[] = [];
+
+  function acquireParticle(): Graphics {
+    const g = particlePool.pop();
+    if (g) {
+      g.clear();
+      g.alpha = 1;
+      g.visible = true;
+      return g;
+    }
+    return new Graphics();
+  }
+
+  function releaseParticle(g: Graphics): void {
+    g.visible = false;
+    layer.removeChild(g);
+    if (particlePool.length < PARTICLE_POOL_MAX) {
+      particlePool.push(g);
+    } else {
+      g.destroy();
+    }
+  }
+
+  // -- Meeting position cache (skip connection line redraw if static) --
+  let lastMeetingPosHash = "";
+
+  function hashPositions(positions: { x: number; y: number }[]): string {
+    // Round to nearest pixel — sub-pixel diffs don't matter visually
+    return positions.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join("|");
+  }
+
   // Partition center (gateway between boss office and workstations)
   const partitionCenter = toScreen(4.5, 3);
   const meetingCenter = toScreen(
@@ -181,12 +215,15 @@ export function initEffects(
 
     // -- Streaming particles (rise from desk) ----
     // Cyberpunk: hex rain data torrents — code fragments + hex characters
+    // Capped to MAX_ACTIVE_PARTICLES to prevent runaway GC pressure
     for (const agentId of streamingAgents) {
+      if (particles.length >= MAX_ACTIVE_PARTICLES) break;
       const pos = nodesApi.getPosition(agentId);
       if (!pos) continue;
       // Emit 2-3 data-torrent particles per frame
       for (let i = 0; i < 2 + (Math.random() > 0.6 ? 1 : 0); i++) {
-        const g = new Graphics();
+        if (particles.length >= MAX_ACTIVE_PARTICLES) break;
+        const g = acquireParticle();
         const isHex = Math.random() > 0.4;
         if (isHex) {
           // Hex character fragment — tiny bright dots in a column
@@ -218,7 +255,7 @@ export function initEffects(
       const p = particles[i];
       p.life += dt;
       if (p.life >= p.maxLife) {
-        p.g.destroy();
+        releaseParticle(p.g);
         particles.splice(i, 1);
         continue;
       }
@@ -497,6 +534,7 @@ export function initEffects(
           for (const d of meeting.holoDiscs) d.destroy();
           meeting = null;
           meetingTime = 0;
+          lastMeetingPosHash = \"\";
           return; // skip the rest for this frame
         }
       }
@@ -565,45 +603,50 @@ export function initEffects(
       }
 
       // Connection lines between seated agents (cyberpunk neon links)
-      meeting.connectionLines.clear();
+      // Only redraw when agent positions have visually changed (>1px)
       const positions: { x: number; y: number }[] = [];
       for (const id of meeting.agentIds) {
         const pos = nodesApi.getPosition(id);
         if (pos) positions.push(pos);
       }
-      if (positions.length >= 2) {
-        // Draw neon lines from each agent to the table center
-        for (const pos of positions) {
-          // Core line
-          meeting.connectionLines.moveTo(pos.x, pos.y);
-          meeting.connectionLines.lineTo(meetingCenter.x, meetingCenter.y - 10);
-          meeting.connectionLines.stroke({
-            color: 0x00f0ff,
-            width: 1,
-            alpha: alpha * (0.2 + Math.sin(meetingTime * 2.5) * 0.1),
-          });
-          // Magenta ghost line (chromatic offset)
-          meeting.connectionLines.moveTo(pos.x + 1.5, pos.y + 0.5);
-          meeting.connectionLines.lineTo(
-            meetingCenter.x + 1.5,
-            meetingCenter.y - 9.5,
-          );
-          meeting.connectionLines.stroke({
-            color: 0xff006e,
-            width: 0.6,
-            alpha: alpha * 0.06,
-          });
-        }
-        // Subtle arcs between adjacent agents
-        for (let i = 0; i < positions.length; i++) {
-          const next = positions[(i + 1) % positions.length];
-          meeting.connectionLines.moveTo(positions[i].x, positions[i].y);
-          meeting.connectionLines.lineTo(next.x, next.y);
-          meeting.connectionLines.stroke({
-            color: 0x00f0ff,
-            width: 0.5,
-            alpha: alpha * 0.06,
-          });
+      const posHash = hashPositions(positions);
+      if (posHash !== lastMeetingPosHash) {
+        lastMeetingPosHash = posHash;
+        meeting.connectionLines.clear();
+        if (positions.length >= 2) {
+          // Draw neon lines from each agent to the table center
+          for (const pos of positions) {
+            // Core line
+            meeting.connectionLines.moveTo(pos.x, pos.y);
+            meeting.connectionLines.lineTo(meetingCenter.x, meetingCenter.y - 10);
+            meeting.connectionLines.stroke({
+              color: 0x00f0ff,
+              width: 1,
+              alpha: alpha * (0.2 + Math.sin(meetingTime * 2.5) * 0.1),
+            });
+            // Magenta ghost line (chromatic offset)
+            meeting.connectionLines.moveTo(pos.x + 1.5, pos.y + 0.5);
+            meeting.connectionLines.lineTo(
+              meetingCenter.x + 1.5,
+              meetingCenter.y - 9.5,
+            );
+            meeting.connectionLines.stroke({
+              color: 0xff006e,
+              width: 0.6,
+              alpha: alpha * 0.06,
+            });
+          }
+          // Subtle arcs between adjacent agents
+          for (let i = 0; i < positions.length; i++) {
+            const next = positions[(i + 1) % positions.length];
+            meeting.connectionLines.moveTo(positions[i].x, positions[i].y);
+            meeting.connectionLines.lineTo(next.x, next.y);
+            meeting.connectionLines.stroke({
+              color: 0x00f0ff,
+              width: 0.5,
+              alpha: alpha * 0.06,
+            });
+          }
         }
       }
     }

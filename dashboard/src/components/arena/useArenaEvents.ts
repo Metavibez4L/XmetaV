@@ -37,6 +37,8 @@ export function useArenaEvents(
   const supabase = useMemo(() => createClient(), []);
   const cmdAgentMap = useRef(new Map<string, string>());
   const initialFetchDone = useRef(false);
+  /** Cache last-known status per agent to skip no-op updates */
+  const lastKnownStatus = useRef(new Map<string, string>());
 
   useEffect(() => {
     // -- Initial fetch ------------------------------------------------
@@ -131,13 +133,13 @@ export function useArenaEvents(
         { event: "*", schema: "public", table: "agent_sessions" },
         (payload) => {
           const row = payload.new as AgentSession;
-          console.log("[arena-events] session realtime:", row?.agent_id, row?.status);
-          if (row?.agent_id) {
-            handlersRef.current?.onStatus(
-              row.agent_id,
-              (row.status as "idle" | "busy" | "offline") ?? "idle",
-            );
-          }
+          if (!row?.agent_id) return;
+          const status = (row.status as "idle" | "busy" | "offline") ?? "idle";
+          // Skip if status hasn't changed (prevents unnecessary React re-renders)
+          if (lastKnownStatus.current.get(row.agent_id) === status) return;
+          lastKnownStatus.current.set(row.agent_id, status);
+          console.log("[arena-events] session realtime:", row.agent_id, status);
+          handlersRef.current?.onStatus(row.agent_id, status);
         },
       )
       .subscribe();
@@ -280,22 +282,27 @@ export function useArenaEvents(
     })();
 
     // -- Periodic sync (safety net for dropped realtime events) ----------
+    // Only fires onStatus for agents whose status actually changed since
+    // last sync — prevents unnecessary React re-renders.
     const syncInterval = setInterval(async () => {
       if (!initialFetchDone.current) return;
       const { data: sessions } = await supabase
         .from("agent_sessions")
         .select("*");
-      if (sessions) {
-        for (const s of sessions as AgentSession[]) {
-          const HEARTBEAT_TIMEOUT = 60_000;
-          const stale =
-            Date.now() - new Date(s.last_heartbeat).getTime() >
-            HEARTBEAT_TIMEOUT;
-          const status = stale
-            ? "idle"
-            : ((s.status as "idle" | "busy" | "offline") ?? "idle");
-          handlersRef.current?.onStatus(s.agent_id, status);
-        }
+      if (!sessions) return;
+      for (const s of sessions as AgentSession[]) {
+        const HEARTBEAT_TIMEOUT = 60_000;
+        const stale =
+          Date.now() - new Date(s.last_heartbeat).getTime() >
+          HEARTBEAT_TIMEOUT;
+        const status = stale
+          ? "idle"
+          : ((s.status as "idle" | "busy" | "offline") ?? "idle");
+        // Skip unchanged — this is the key optimization; without it
+        // every 10s tick fires N onStatus → N setHudStats → N renders
+        if (lastKnownStatus.current.get(s.agent_id) === status) continue;
+        lastKnownStatus.current.set(s.agent_id, status);
+        handlersRef.current?.onStatus(s.agent_id, status);
       }
     }, 10_000);
 
