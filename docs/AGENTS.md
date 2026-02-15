@@ -46,14 +46,14 @@ For per-agent runbooks, see `docs/agents/`:
 | `tools` | web3dev | Hardhat, Foundry, Tenderly, Etherscan verification |
 | `l2s` | web3dev, oracle | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
 | `orchestration` | web3dev | Multi-contract deploy scripts, upgrade patterns, proxy factories |
-| `addresses` | web3dev, midas | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `addresses` | web3dev, midas, alchemist | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
 | `concepts` | web3dev, midas | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
 | `security` | web3dev | Reentrancy, flash loans, oracle manipulation, access control |
 | `standards` | web3dev, midas | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
 | `frontend-ux` | web3dev | Wallet connection, transaction UX, error handling, mobile |
 | `frontend-playbook` | web3dev | wagmi/viem integration, RainbowKit, WalletConnect |
 | `building-blocks` | web3dev | OpenZeppelin patterns, diamond proxy, minimal proxy |
-| `gas` | oracle, midas | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
+| `gas` | oracle, midas, alchemist | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
 
 Skills are stored at `~/.openclaw/workspace/skills/` and verified with `openclaw skills list`.
 

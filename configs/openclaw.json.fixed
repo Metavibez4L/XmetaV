@@ -170,6 +170,7 @@
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
         },
+        "skills": ["gas", "addresses"],
         "tools": {
           "profile": "coding",
           "allow": ["exec", "process", "read", "write"],

@@ -376,6 +376,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/alchemist",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["gas", "addresses"],
   },
   {
     id: "web3dev",

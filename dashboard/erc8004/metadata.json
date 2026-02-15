@@ -98,7 +98,7 @@
       { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
       { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
       { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
-      { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel" },
+      { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel", "skills": ["gas", "addresses"] },
       { "id": "midas", "role": "Revenue & growth optimizer — pricing, forecasts, endpoint analytics", "room": "intel", "skills": ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"] },
       { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
