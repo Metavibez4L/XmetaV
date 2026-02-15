@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
-import { createClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
     let soulStats = null;
     let crystalStats = null;
     try {
-      const supabase = await createClient();
+      const supabase = createAdminClient();
 
       // Run all Supabase queries in parallel
       // Also read on-chain anchor count in parallel
