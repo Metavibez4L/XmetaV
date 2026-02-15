@@ -72,16 +72,30 @@
     "memory-retrieval-learning",
     "token-swap-execution",
     "voice-swap-commands",
-    "dex-trading"
+    "dex-trading",
+    "ethereum-wallet-management",
+    "eip-7702-smart-eoas",
+    "safe-multisig",
+    "erc-4337-account-abstraction",
+    "l2-deployment",
+    "cross-chain-bridging",
+    "gas-economics",
+    "defi-composability",
+    "solidity-security-patterns",
+    "ethereum-standards",
+    "dapp-orchestration",
+    "frontend-ux",
+    "verified-contract-addresses",
+    "dev-tooling"
   ],
   "fleet": {
     "agents": [
-      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command" },
+      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command", "skills": ["wallets"] },
       { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
       { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
-      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel" },
+      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
       { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel" },
-      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab" },
+      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
       { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
       { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
@@ -105,6 +119,11 @@
     "reputation": {
       "address": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
       "standard": "ERC-8004",
+      "network": "eip155:8453"
+    },
+    "memoryAnchor": {
+      "address": "0x0D1F695ea1ca6b5Ba22E3bAf6190d8553D9c4D98",
+      "standard": "custom",
       "network": "eip155:8453"
     }
   },
