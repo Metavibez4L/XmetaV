@@ -13,6 +13,12 @@ import { supabase } from "../supabase.js";
 import { extractKeywords } from "./retrieval.js";
 import type { DreamInsight } from "./types.js";
 import { DEFAULT_CONFIG } from "./types.js";
+import {
+  startDreamSession,
+  endDreamSession,
+  generateProposals,
+  expireOldProposals,
+} from "./dream-proposals.js";
 
 let lastDreamTime = 0;
 let isDreaming = false;
@@ -47,19 +53,64 @@ export async function maybeStartDream(): Promise<void> {
 
   if (recentCmds && recentCmds.length > 0) return; // Recent activity
 
-  // Time to dream
+  // Time to dream (lucid mode)
+  await triggerDream("idle", hoursSinceLastDream);
+}
+
+/**
+ * Manually trigger a dream cycle (bypasses idle checks).
+ */
+export async function triggerManualDream(): Promise<{
+  sessionId: string;
+  proposals: number;
+  insights: number;
+}> {
+  if (isDreaming) {
+    return { sessionId: "busy", proposals: 0, insights: 0 };
+  }
+  return triggerDream("manual");
+}
+
+/**
+ * Run a lucid dream cycle with session tracking.
+ */
+async function triggerDream(
+  triggerType: "idle" | "manual" | "scheduled" = "idle",
+  idleHours?: number
+): Promise<{ sessionId: string; proposals: number; insights: number }> {
   isDreaming = true;
-  console.log("[soul] Dream mode starting — fleet idle, consolidating memories...");
+  console.log(`[soul] Lucid dream starting (${triggerType}) — consolidating + proposing...`);
+
+  const sessionId = await startDreamSession(triggerType, idleHours);
+  let proposalCount = 0;
+  let insightCount = 0;
 
   try {
-    await runDreamCycle();
+    const result = await runDreamCycle(sessionId);
+    proposalCount = result.proposals;
+    insightCount = result.insights;
     lastDreamTime = Date.now();
-    console.log("[soul] Dream mode complete.");
+
+    // Expire old proposals
+    const expired = await expireOldProposals();
+    if (expired > 0) console.log(`[soul] Expired ${expired} old proposals.`);
+
+    await endDreamSession(sessionId, {
+      proposals_created: proposalCount,
+      insights_generated: insightCount,
+    });
+
+    console.log(
+      `[soul] Lucid dream complete — ${insightCount} insights, ${proposalCount} proposals.`
+    );
   } catch (err) {
-    console.error("[soul] Dream mode error:", (err as Error).message);
+    console.error("[soul] Lucid dream error:", (err as Error).message);
+    await endDreamSession(sessionId, { status: "interrupted" });
   } finally {
     isDreaming = false;
   }
+
+  return { sessionId, proposals: proposalCount, insights: insightCount };
 }
 
 /**
@@ -67,9 +118,13 @@ export async function maybeStartDream(): Promise<void> {
  * 1. Fetch unprocessed recent memories
  * 2. Cluster by keyword overlap
  * 3. Generate insights from clusters
- * 4. Prune weak associations
+ * 4. Generate lucid dream proposals
+ * 5. Prune weak associations
  */
-async function runDreamCycle(): Promise<void> {
+async function runDreamCycle(sessionId: string): Promise<{
+  insights: number;
+  proposals: number;
+}> {
   // 1. Fetch memories from the last 48 hours
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: memories, error } = await supabase
@@ -80,14 +135,27 @@ async function runDreamCycle(): Promise<void> {
 
   if (error || !memories || memories.length < 3) {
     console.log("[soul] Not enough recent memories to dream about.");
-    return;
+    return { insights: 0, proposals: 0 };
   }
 
   console.log(`[soul] Dreaming about ${memories.length} memories...`);
 
+  // Update session stats
+  await supabase
+    .from("soul_dream_sessions")
+    .update({ memories_scanned: memories.length })
+    .eq("id", sessionId)
+    .then(() => {});
+
   // 2. Cluster memories by keyword overlap
   const clusters = clusterMemories(memories);
   console.log(`[soul] Found ${clusters.length} memory cluster(s).`);
+
+  await supabase
+    .from("soul_dream_sessions")
+    .update({ clusters_found: clusters.length })
+    .eq("id", sessionId)
+    .then(() => {});
 
   // 3. Generate insights from significant clusters
   const insights: DreamInsight[] = [];
@@ -116,8 +184,19 @@ async function runDreamCycle(): Promise<void> {
     }
   }
 
-  // 5. Prune weak associations
+  // 5. Generate lucid dream proposals (Phase 5)
+  let proposalCount = 0;
+  try {
+    const proposals = await generateProposals(clusters, insights, sessionId);
+    proposalCount = proposals.length;
+  } catch (err) {
+    console.error("[soul:lucid] Proposal generation failed:", (err as Error).message);
+  }
+
+  // 6. Prune weak associations
   await pruneWeakAssociations();
+
+  return { insights: insights.length, proposals: proposalCount };
 }
 
 interface MemoryCluster {

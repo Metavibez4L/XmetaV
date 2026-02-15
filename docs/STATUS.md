@@ -337,6 +337,9 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `memory_associations` | Soul agent memory association graph | Authenticated: SELECT, INSERT |
 | `memory_queries` | Soul agent memory retrieval log | Authenticated: SELECT, INSERT |
 | `dream_insights` | Soul agent dream consolidation insights | Authenticated: SELECT, INSERT |
+| `soul_dream_manifestations` | Lucid dream proposals and actions | Service role: ALL |
+| `soul_dream_sessions` | Dream session tracking and stats | Service role: ALL |
+| `soul_association_modifications` | Self-modification audit trail | Service role: ALL |
 | `agent_swaps` | Token swap execution log | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_crystals` | Living memory crystals (materia system) | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_fusions` | Crystal fusion history (FF7-style) | Authenticated: SELECT, INSERT |
@@ -670,14 +673,15 @@ ls ~/.openclaw/workspace/skills/
 
 ---
 
-## Soul Agent (v17)
+## Soul Agent (v18 — Lucid Dreaming)
 
-Memory orchestrator providing context curation, association building, dream consolidation, and fleet-wide memory retrieval learning.
+Memory orchestrator providing context curation, association building, dream consolidation, lucid dreaming (autonomous evolution), and fleet-wide memory retrieval learning.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, retrieval, types) |
-| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights` tables |
+| Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, dream-proposals, retrieval, types) |
+| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` tables |
+| Lucid Dreaming | Active | Phase 5 autonomous evolution — dream proposals, self-modification, meeting triggers |
 | Arena Presence | Active | Room: SOUL (private alcove), Color: Magenta (#ff006e) |
 | Arena Office | Active | L-shaped surveillance desk + arc of mini fleet-monitor screens |
 | Meeting Seat | Active | Observer position (195°) |
@@ -685,8 +689,26 @@ Memory orchestrator providing context curation, association building, dream cons
 | ERC-8004 | Active | Listed in `fleet.agents` + 5 soul capabilities in metadata |
 | Bridge | Active | Listed in ALLOWED_AGENTS |
 | Supabase | Active | Registered in agent_controls |
+| API Route | Active | `GET/POST /api/soul` — proposals, approval, rejection, manual dream trigger |
+| Dashboard | Active | LucidDreaming component on `/consciousness` page |
 
-Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+### Lucid Dreaming (Phase 5)
+
+During dream cycles, Soul generates actionable manifestations across 7 categories:
+
+| Category | Description | Auto-Executable |
+|----------|-------------|----------------|
+| `fusion` | Crystal fusion proposals | No |
+| `association` | Self-modify memory graph (reinforce/create links) | Yes (≥0.8 confidence) |
+| `pricing` | x402 endpoint pricing suggestions | No |
+| `skill` | Agent skill recommendations | No |
+| `meeting` | Autonomous meeting triggers (cross-agent patterns) | No |
+| `pattern` | Detected pattern worth highlighting | Yes (≥0.8 confidence) |
+| `correction` | Error pattern requiring intervention | No |
+
+Status flow: `proposed` → `approved`/`rejected` → `executed`/`expired` (72hr TTL)
+
+Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `lucid-dreaming`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
 
 ---
 
@@ -808,13 +830,13 @@ Files: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCryst
 
 ---
 
-## Consciousness Tab (v18)
+## Consciousness Tab (v19 — Lucid Dreaming)
 
-Dual-aspect awareness dashboard at `/consciousness` providing real-time visualization of memory, anchoring, context, and dream consolidation.
+Dual-aspect awareness dashboard at `/consciousness` providing real-time visualization of memory, anchoring, context, dream consolidation, and lucid dreaming proposals.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Consciousness Page | Active | `/consciousness` — 6-panel awareness visualization |
+| Consciousness Page | Active | `/consciousness` — 7-panel awareness visualization |
 | Sidebar Nav | Active | Brain icon at position 03 (Ctrl+3) |
 | useConsciousness Hook | Active | Parallel fetch from 6 Supabase tables, 15s auto-refresh |
 
@@ -827,6 +849,7 @@ Dual-aspect awareness dashboard at `/consciousness` providing real-time visualiz
 | Anchor Timeline | `AnchorTimeline.tsx` | Horizontal chain of on-chain anchors, click-to-BaseScan links |
 | Context Metrics | `ContextMetrics.tsx` | 4 metric cards + recent context injections feed |
 | Dream Mode | `DreamModeStatus.tsx` | 6hr idle threshold progress bar + insights feed |
+| Lucid Dreaming | `LucidDreaming.tsx` | Phase 5 proposal cards with approve/reject, dream trigger, session history |
 | Mini Arena | `MiniArena.tsx` | Stylized live agent positions with realtime subscription, focus toggle |
 
 Files: `dashboard/src/components/consciousness/`, `dashboard/src/hooks/useConsciousness.ts`

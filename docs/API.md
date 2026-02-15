@@ -547,6 +547,47 @@ Explore the Memory Cosmos world — islands, highways, and crystals.
 | $XMETAV Token (ERC-20) | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` | Base Mainnet |
 | USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Base Mainnet |
 
+---
+
+## Soul Lucid Dreaming API
+
+> **Base URL**: `http://localhost:3000/api/soul` (Dashboard internal API)
+
+### GET /api/soul?action=proposals
+
+Fetch pending dream proposals (manifestations).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `action` | string | `"proposals"` | `proposals`, `all`, `stats`, `sessions`, `modifications`, `manifest` |
+| `status` | string | `"proposed"` | Filter by status (for `action=proposals`) |
+| `limit` | integer | `20` | Max results |
+| `id` | string | — | Manifest ID (for `action=manifest`) |
+
+### POST /api/soul
+
+Execute soul actions.
+
+| Action | Body | Description |
+|--------|------|-------------|
+| `approve` | `{ action: "approve", id: "<uuid>" }` | Approve and execute a proposed manifestation |
+| `reject` | `{ action: "reject", id: "<uuid>", reason?: "..." }` | Reject a proposal |
+| `trigger_dream` | `{ action: "trigger_dream", reason?: "..." }` | Manually trigger a lucid dream cycle |
+
+### Manifestation Categories
+
+| Category | Description | Auto-Executable |
+|----------|-------------|----------------|
+| `fusion` | Crystal fusion | No |
+| `association` | Memory graph self-modification | Yes (≥0.8) |
+| `pricing` | x402 price suggestions | No |
+| `skill` | Agent skill recommendations | No |
+| `meeting` | Autonomous meeting triggers | No |
+| `pattern` | Detected patterns | Yes (≥0.8) |
+| `correction` | Error intervention | No |
+
+---
+
 ## SDKs
 
 ```bash

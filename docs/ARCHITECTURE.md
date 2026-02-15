@@ -151,7 +151,7 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
 ### Bridge Daemon (Node.js)
@@ -203,19 +203,22 @@ Native utility token on Base Mainnet providing tiered discounts on x402-gated en
 - **API**: `/api/token?wallet=0x...` returns balance, tier, discount
 - **Location**: `dashboard/token/` (Hardhat project), `dashboard/src/lib/token-tiers.ts`
 
-### Soul Agent (Memory Orchestrator)
+### Soul Agent (Memory Orchestrator + Lucid Dreaming)
 
-A dedicated agent that sits between task dispatch and agent execution, curating context, building memory associations, and consolidating memories during fleet idle periods.
+A dedicated agent that sits between task dispatch and agent execution, curating context, building memory associations, consolidating memories during fleet idle periods, and autonomously proposing evolution actions.
 
 - **Room**: SOUL (private magenta alcove in Arena, cols 0–1, rows 2–5)
-- **Bridge Library**: `dashboard/bridge/lib/soul/` — context building, memory retrieval, association building, dream mode, type definitions
-- **DB Tables**: `memory_associations` (causal/similar/sequential links with strength scores), `memory_queries` (context retrieval logs), `dream_insights` (idle consolidation patterns/recommendations)
+- **Bridge Library**: `dashboard/bridge/lib/soul/` — context building, memory retrieval, association building, dream mode, dream proposals, type definitions
+- **DB Tables**: `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`
 - **Dream Mode**: When all agents are idle, Soul consolidates recent memories into clusters, generates insights, and saves them for future context injection
+- **Lucid Dreaming (Phase 5)**: During dream cycles, Soul generates actionable manifestations (proposals) across 7 categories: fusion, association, pricing, skill, meeting, pattern, correction. High-confidence safe proposals auto-execute; others await user approval via `/api/soul` or the Consciousness page
 - **Association Building**: After each new memory entry, Soul automatically builds associations (causal, similar, sequential, related) with existing memories
+- **Self-Modification**: Soul can propose and auto-execute association reinforcements, creating new links or boosting weak ones based on dream analysis
 - **Context Packets**: Soul builds contextual memory packets injected into agent prompts at dispatch time
 - **Arena**: Surveillance desk with mini fleet-monitor screens that mirror every agent's screen state; observer seat at meetings (195°)
-- **ERC-8004**: Listed in `fleet.agents` with 5 soul-specific capabilities
-- **Location**: `dashboard/bridge/lib/soul/`, `dashboard/scripts/setup-db-soul.sql`
+- **API Route**: `GET/POST /api/soul` — proposals listing, stats, sessions, approve/reject, manual dream trigger
+- **ERC-8004**: Listed in `fleet.agents` with 6 soul-specific capabilities
+- **Location**: `dashboard/bridge/lib/soul/`, `dashboard/scripts/setup-db-soul.sql`, `dashboard/supabase/migrations/20260215220000_lucid_dreaming.sql`
 
 ### Memory Crystal System (Cyber-Neural Memory Evolution)
 

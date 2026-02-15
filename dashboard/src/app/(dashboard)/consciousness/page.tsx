@@ -8,6 +8,7 @@ import {
   ContextMetrics,
   DreamModeStatus,
   DreamscapeView,
+  LucidDreaming,
   SwarmNetwork,
   MiniArena,
 } from "@/components/consciousness";
@@ -122,14 +123,17 @@ export default function ConsciousnessPage() {
         />
       </div>
 
-      {/* 6: Dreamscape visualization (full width) */}
+      {/* 6: Lucid Dreaming — Phase 5 autonomous proposals */}
+      <LucidDreaming />
+
+      {/* 7: Dreamscape visualization (full width) */}
       <DreamscapeView
         dreamInsights={dreamInsights}
         memories={memories}
         associations={associations}
       />
 
-      {/* 7: Neural Swarm Network (full width) */}
+      {/* 8: Neural Swarm Network (full width) */}
       <SwarmNetwork />
     </div>
   );
