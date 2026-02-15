@@ -7,6 +7,7 @@ import {
   AnchorTimeline,
   ContextMetrics,
   DreamModeStatus,
+  DreamscapeView,
   MiniArena,
 } from "@/components/consciousness";
 import { Brain, RefreshCw, Loader2 } from "lucide-react";
@@ -119,6 +120,13 @@ export default function ConsciousnessPage() {
           memoryCount={memories.length}
         />
       </div>
+
+      {/* 6: Dreamscape visualization (full width) */}
+      <DreamscapeView
+        dreamInsights={dreamInsights}
+        memories={memories}
+        associations={associations}
+      />
     </div>
   );
 }

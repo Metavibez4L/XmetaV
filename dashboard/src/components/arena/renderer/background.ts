@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text } from "pixi.js";
+import { Application, Container, Graphics, Text, BlurFilter } from "pixi.js";
 import {
   GRID_COLS,
   GRID_ROWS,
@@ -30,6 +30,101 @@ export function initBackground(
   scanline.rect(0, 0, w, 1).fill({ color: 0x00f0ff, alpha: 0.04 });
   scanline.rect(0, -3, w, 7).fill({ color: 0x00f0ff, alpha: 0.01 });
   app.stage.addChildAt(scanline, 0);
+
+  // -- Distant city skyline (parallax background) ---------------------
+  const cityLayer = new Graphics();
+
+  // Dark gradient sky (bottom-up)
+  cityLayer.rect(0, 0, w, h).fill({ color: 0x020408, alpha: 0.95 });
+
+  // Distant building silhouettes
+  const skylineY = h * 0.22; // horizon line
+  const buildings = [
+    { x: 0.05, bw: 0.03, bh: 0.14 },
+    { x: 0.09, bw: 0.025, bh: 0.22 },
+    { x: 0.12, bw: 0.04, bh: 0.12 },
+    { x: 0.18, bw: 0.02, bh: 0.18 },
+    { x: 0.22, bw: 0.035, bh: 0.09 },
+    { x: 0.28, bw: 0.05, bh: 0.25 },
+    { x: 0.35, bw: 0.03, bh: 0.16 },
+    { x: 0.42, bw: 0.02, bh: 0.2 },
+    { x: 0.48, bw: 0.04, bh: 0.1 },
+    { x: 0.55, bw: 0.025, bh: 0.28 },
+    { x: 0.60, bw: 0.035, bh: 0.14 },
+    { x: 0.67, bw: 0.03, bh: 0.22 },
+    { x: 0.73, bw: 0.04, bh: 0.11 },
+    { x: 0.78, bw: 0.025, bh: 0.19 },
+    { x: 0.84, bw: 0.05, bh: 0.15 },
+    { x: 0.91, bw: 0.03, bh: 0.24 },
+    { x: 0.96, bw: 0.035, bh: 0.13 },
+  ];
+  for (const b of buildings) {
+    const bx = b.x * w;
+    const bw = b.bw * w;
+    const bh = b.bh * h;
+    cityLayer
+      .rect(bx, skylineY - bh, bw, bh)
+      .fill({ color: 0x060c18, alpha: 0.9 });
+    // Lit windows (sparse)
+    const winCols = Math.floor(bw / 4);
+    const winRows = Math.floor(bh / 5);
+    for (let wr = 0; wr < winRows; wr++) {
+      for (let wc = 0; wc < winCols; wc++) {
+        if (Math.random() < 0.25) {
+          const colors = [0x00f0ff, 0xff006e, 0xf97316, 0x39ff14, 0xffffff];
+          const winColor = colors[Math.floor(Math.random() * colors.length)];
+          cityLayer
+            .rect(
+              bx + 1 + wc * 4,
+              skylineY - bh + 2 + wr * 5,
+              2,
+              2.5,
+            )
+            .fill({ color: winColor, alpha: 0.15 + Math.random() * 0.2 });
+        }
+      }
+    }
+  }
+
+  // Horizon glow line
+  cityLayer
+    .rect(0, skylineY, w, 1.5)
+    .fill({ color: 0x00f0ff, alpha: 0.06 });
+  cityLayer
+    .rect(0, skylineY - 1, w, 4)
+    .fill({ color: 0xff006e, alpha: 0.015 });
+
+  const cityBlur = new BlurFilter({ strength: 1.2, quality: 2 });
+  cityLayer.filters = [cityBlur];
+  cityLayer.alpha = 0.7;
+  app.stage.addChildAt(cityLayer, 0);
+
+  // -- Neon grid floor (infinite perspective grid) --------------------
+  const neonGrid = new Graphics();
+  // Horizontal lines receding to horizon
+  for (let i = 0; i < 20; i++) {
+    const gy = skylineY + i * i * 1.8;
+    if (gy > h) break;
+    neonGrid.rect(0, gy, w, 0.5).fill({
+      color: 0x00f0ff,
+      alpha: 0.02 + (i / 20) * 0.03,
+    });
+  }
+  // Vertical lines radiating from center
+  const cx = w / 2;
+  for (let i = -12; i <= 12; i++) {
+    const topX = cx + i * 8;
+    const botX = cx + i * 50;
+    neonGrid.moveTo(topX, skylineY);
+    neonGrid.lineTo(botX, h);
+    neonGrid.stroke({
+      color: 0x00f0ff,
+      width: 0.4,
+      alpha: 0.015 + Math.abs(i) * 0.001,
+    });
+  }
+  neonGrid.alpha = 0.6;
+  app.stage.addChildAt(neonGrid, 1);
 
   // -- Floor tiles ----------------------------------------------------
   const floor = new Graphics();
@@ -255,6 +350,12 @@ export function initBackground(
     // Scanline sweep (viewport coords)
     scanline.position.y = ((time * 30) % (h + 20)) - 10;
 
+    // Neon grid pulse
+    neonGrid.alpha = 0.5 + Math.sin(time * 0.8) * 0.12;
+
+    // City skyline subtle parallax (very slow drift)
+    cityLayer.position.x = Math.sin(time * 0.05) * 1.5;
+
     // Particle drift
     for (const p of particles) {
       p.g.position.x += p.vx;
@@ -272,5 +373,7 @@ export function initBackground(
   return () => {
     app.ticker.remove(tick);
     scanline.destroy();
+    cityLayer.destroy();
+    neonGrid.destroy();
   };
 }

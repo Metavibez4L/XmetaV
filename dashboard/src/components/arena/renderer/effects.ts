@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, BlurFilter } from "pixi.js";
 import type { NodesApi } from "./avatars";
 import type { OfficeApi } from "./office";
 import { toScreen } from "./iso";
@@ -65,6 +65,8 @@ interface MeetingState {
   beam: Graphics;
   connectionLines: Graphics;
   holoDiscs: Graphics[];
+  scanlines: Graphics;
+  glitchArtifacts: Graphics;
   agentIds: string[];
   fadeIn: number; // 0→1 fade
 }
@@ -145,25 +147,35 @@ export function initEffects(
     const dt = ticker.deltaMS / 1000;
 
     // -- Streaming particles (rise from desk) ----
+    // Cyberpunk: hex rain data torrents — code fragments + hex characters
     for (const agentId of streamingAgents) {
       const pos = nodesApi.getPosition(agentId);
       if (!pos) continue;
-      // Emit 1-2 code-fragment particles per frame
-      for (let i = 0; i < 1 + (Math.random() > 0.5 ? 1 : 0); i++) {
+      // Emit 2-3 data-torrent particles per frame
+      for (let i = 0; i < 2 + (Math.random() > 0.6 ? 1 : 0); i++) {
         const g = new Graphics();
-        // Small horizontal line (code fragment)
-        const lw = 2 + Math.random() * 6;
-        g.rect(-lw / 2, 0, lw, 1).fill({ color: 0x00f0ff, alpha: 0.6 });
-        g.position.set(pos.x + (Math.random() - 0.5) * 20, pos.y);
+        const isHex = Math.random() > 0.4;
+        if (isHex) {
+          // Hex character fragment — tiny bright dots in a column
+          const cols = 1 + Math.floor(Math.random() * 3);
+          for (let h = 0; h < cols; h++) {
+            g.rect(0, h * 3, 2, 1.5).fill({ color: 0x00f0ff, alpha: 0.5 + Math.random() * 0.3 });
+          }
+        } else {
+          // Code fragment — horizontal line
+          const lw = 2 + Math.random() * 6;
+          g.rect(-lw / 2, 0, lw, 1).fill({ color: 0x00f0ff, alpha: 0.6 });
+        }
+        g.position.set(pos.x + (Math.random() - 0.5) * 24, pos.y);
         layer.addChild(g);
         particles.push({
           g,
-          x: pos.x + (Math.random() - 0.5) * 20,
+          x: pos.x + (Math.random() - 0.5) * 24,
           y: pos.y,
-          vx: (Math.random() - 0.5) * 8,
-          vy: -20 - Math.random() * 30,
+          vx: (Math.random() - 0.5) * 5,
+          vy: -25 - Math.random() * 35,
           life: 0,
-          maxLife: 0.5 + Math.random() * 0.5,
+          maxLife: 0.6 + Math.random() * 0.6,
         });
       }
     }
@@ -283,6 +295,8 @@ export function initEffects(
           meeting.ring.destroy();
           meeting.beam.destroy();
           meeting.connectionLines.destroy();
+          meeting.scanlines.destroy();
+          meeting.glitchArtifacts.destroy();
           for (const d of meeting.holoDiscs) d.destroy();
           meeting = null;
           meetingTime = 0;
@@ -292,26 +306,68 @@ export function initEffects(
 
       const alpha = meeting.fadeIn;
 
-      // Pulsing ring around table
-      const ringScale = 1 + Math.sin(meetingTime * 2) * 0.08;
+      // Pulsing ring with chromatic wobble
+      const ringScale = 1 + Math.sin(meetingTime * 2.5) * 0.06;
       meeting.ring.scale.set(ringScale);
-      meeting.ring.alpha = alpha * (0.4 + Math.sin(meetingTime * 3) * 0.15);
-
-      // Vertical beam pulse
-      meeting.beam.alpha = alpha * (0.15 + Math.sin(meetingTime * 1.5) * 0.08);
-
-      // Holographic floating discs (rotate slowly)
-      for (let i = 0; i < meeting.holoDiscs.length; i++) {
-        const disc = meeting.holoDiscs[i];
-        const angle = meetingTime * 0.5 + (i * Math.PI * 2) / meeting.holoDiscs.length;
-        disc.position.set(
-          meetingCenter.x + Math.cos(angle) * 22,
-          meetingCenter.y - 20 + Math.sin(angle) * 8,
-        );
-        disc.alpha = alpha * (0.3 + Math.sin(meetingTime * 2 + i) * 0.15);
+      meeting.ring.alpha =
+        alpha * (0.45 + Math.sin(meetingTime * 3) * 0.15);
+      // Subtle ring position glitch (occasional jitter)
+      if (Math.random() < 0.03) {
+        meeting.ring.position.x = (Math.random() - 0.5) * 2;
+      } else {
+        meeting.ring.position.x *= 0.9; // ease back
       }
 
-      // Connection lines between seated agents (redraw each frame)
+      // Vertical beam pulse
+      meeting.beam.alpha =
+        alpha * (0.18 + Math.sin(meetingTime * 1.5) * 0.1);
+
+      // Scanline sweep animation
+      meeting.scanlines.alpha =
+        alpha * (0.3 + Math.sin(meetingTime * 4) * 0.15);
+      meeting.scanlines.position.y =
+        Math.sin(meetingTime * 0.8) * 3;
+
+      // Glitch artifacts (random chromatic bars that flash briefly)
+      meeting.glitchArtifacts.clear();
+      if (Math.random() < 0.08) {
+        const gy = (Math.random() - 0.5) * 50;
+        const gw = 15 + Math.random() * 40;
+        meeting.glitchArtifacts
+          .rect(
+            meetingCenter.x - gw / 2 + 2,
+            meetingCenter.y - 8 + gy,
+            gw,
+            1.5,
+          )
+          .fill({ color: 0xff006e, alpha: 0.2 + Math.random() * 0.15 });
+        meeting.glitchArtifacts
+          .rect(
+            meetingCenter.x - gw / 2 - 2,
+            meetingCenter.y - 8 + gy + 1,
+            gw,
+            1.5,
+          )
+          .fill({ color: 0x0040ff, alpha: 0.15 + Math.random() * 0.1 });
+      }
+
+      // Holographic floating discs (varied orbits)
+      for (let i = 0; i < meeting.holoDiscs.length; i++) {
+        const disc = meeting.holoDiscs[i];
+        const angle =
+          meetingTime * (0.4 + i * 0.1) +
+          (i * Math.PI * 2) / meeting.holoDiscs.length;
+        const radius = 18 + i * 4;
+        disc.position.set(
+          meetingCenter.x + Math.cos(angle) * radius,
+          meetingCenter.y - 18 - i * 3 + Math.sin(angle) * (6 + i * 2),
+        );
+        disc.alpha =
+          alpha * (0.25 + Math.sin(meetingTime * 2.5 + i * 1.2) * 0.15);
+        disc.rotation = Math.sin(meetingTime * 0.3 + i) * 0.15;
+      }
+
+      // Connection lines between seated agents (cyberpunk neon links)
       meeting.connectionLines.clear();
       const positions: { x: number; y: number }[] = [];
       for (const id of meeting.agentIds) {
@@ -319,17 +375,29 @@ export function initEffects(
         if (pos) positions.push(pos);
       }
       if (positions.length >= 2) {
-        // Draw lines from each agent to the table center
+        // Draw neon lines from each agent to the table center
         for (const pos of positions) {
+          // Core line
           meeting.connectionLines.moveTo(pos.x, pos.y);
           meeting.connectionLines.lineTo(meetingCenter.x, meetingCenter.y - 10);
           meeting.connectionLines.stroke({
             color: 0x00f0ff,
-            width: 0.8,
-            alpha: alpha * (0.15 + Math.sin(meetingTime * 2) * 0.08),
+            width: 1,
+            alpha: alpha * (0.2 + Math.sin(meetingTime * 2.5) * 0.1),
+          });
+          // Magenta ghost line (chromatic offset)
+          meeting.connectionLines.moveTo(pos.x + 1.5, pos.y + 0.5);
+          meeting.connectionLines.lineTo(
+            meetingCenter.x + 1.5,
+            meetingCenter.y - 9.5,
+          );
+          meeting.connectionLines.stroke({
+            color: 0xff006e,
+            width: 0.6,
+            alpha: alpha * 0.06,
           });
         }
-        // Draw subtle arcs between adjacent agents
+        // Subtle arcs between adjacent agents
         for (let i = 0; i < positions.length; i++) {
           const next = positions[(i + 1) % positions.length];
           meeting.connectionLines.moveTo(positions[i].x, positions[i].y);
@@ -337,7 +405,7 @@ export function initEffects(
           meeting.connectionLines.stroke({
             color: 0x00f0ff,
             width: 0.5,
-            alpha: alpha * 0.08,
+            alpha: alpha * 0.06,
           });
         }
       }
@@ -430,10 +498,45 @@ export function initEffects(
       if (!pos) return;
 
       const rects: Graphics[] = [];
-      for (let j = 0; j < 5; j++) {
+
+      // ── Cyberpunk: chromatic split bars (RGB separated) ──
+      // Red-shifted glitch bars
+      for (let j = 0; j < 3; j++) {
         const r = new Graphics();
-        const rw = 8 + Math.random() * 20;
-        const rh = 2 + Math.random() * 5;
+        const rw = 12 + Math.random() * 25;
+        const rh = 1.5 + Math.random() * 3;
+        r.rect(-rw / 2, -rh / 2, rw, rh).fill({
+          color: 0xff0040,
+          alpha: 0.4 + Math.random() * 0.3,
+        });
+        r.position.set(
+          pos.x + 3 + (Math.random() - 0.5) * 55,
+          pos.y + (Math.random() - 0.5) * 40,
+        );
+        layer.addChild(r);
+        rects.push(r);
+      }
+      // Blue-shifted glitch bars
+      for (let j = 0; j < 3; j++) {
+        const r = new Graphics();
+        const rw = 12 + Math.random() * 25;
+        const rh = 1.5 + Math.random() * 3;
+        r.rect(-rw / 2, -rh / 2, rw, rh).fill({
+          color: 0x0040ff,
+          alpha: 0.3 + Math.random() * 0.25,
+        });
+        r.position.set(
+          pos.x - 3 + (Math.random() - 0.5) * 55,
+          pos.y + (Math.random() - 0.5) * 40,
+        );
+        layer.addChild(r);
+        rects.push(r);
+      }
+      // Digital decay blocks (original red + new scanline artifacts)
+      for (let j = 0; j < 4; j++) {
+        const r = new Graphics();
+        const rw = 6 + Math.random() * 18;
+        const rh = 1 + Math.random() * 4;
         r.rect(-rw / 2, -rh / 2, rw, rh).fill({
           color: 0xff2d5e,
           alpha: 0.5 + Math.random() * 0.3,
@@ -456,42 +559,85 @@ export function initEffects(
         return;
       }
 
-      // Create meeting holographic effects
+      // ── Cyberpunk holographic meeting ring ──
       const ring = new Graphics();
-      ring.circle(meetingCenter.x, meetingCenter.y - 8, 35).stroke({
+      // Outer neon ring
+      ring.circle(meetingCenter.x, meetingCenter.y - 8, 38).stroke({
         color: 0x00f0ff,
-        width: 1.5,
-        alpha: 0.5,
+        width: 2,
+        alpha: 0.6,
       });
-      ring.circle(meetingCenter.x, meetingCenter.y - 8, 28).stroke({
-        color: 0x00f0ff,
-        width: 0.8,
+      // Inner ring with chromatic offset
+      ring.circle(meetingCenter.x + 1, meetingCenter.y - 8, 30).stroke({
+        color: 0xff006e,
+        width: 1,
         alpha: 0.3,
       });
+      ring.circle(meetingCenter.x - 1, meetingCenter.y - 8, 30).stroke({
+        color: 0x0040ff,
+        width: 1,
+        alpha: 0.3,
+      });
+      // Core ring
+      ring.circle(meetingCenter.x, meetingCenter.y - 8, 30).stroke({
+        color: 0x00f0ff,
+        width: 0.8,
+        alpha: 0.4,
+      });
+      const ringBlur = new BlurFilter({ strength: 2.5, quality: 2 });
+      ring.filters = [ringBlur];
       layer.addChild(ring);
 
-      // Vertical holographic beam
+      // ── Holographic beam with glow layers ──
       const beam = new Graphics();
-      beam.rect(meetingCenter.x - 1, meetingCenter.y - 55, 2, 50).fill({
+      // Core beam
+      beam.rect(meetingCenter.x - 1, meetingCenter.y - 60, 2, 55).fill({
         color: 0x00f0ff,
-        alpha: 0.15,
+        alpha: 0.2,
       });
-      // Wider glow beam
-      beam.rect(meetingCenter.x - 4, meetingCenter.y - 45, 8, 40).fill({
+      // Wide glow beam
+      beam.rect(meetingCenter.x - 6, meetingCenter.y - 50, 12, 45).fill({
         color: 0x00f0ff,
-        alpha: 0.06,
+        alpha: 0.04,
+      });
+      // Magenta edge glow (left)
+      beam.rect(meetingCenter.x - 7, meetingCenter.y - 48, 2, 42).fill({
+        color: 0xff006e,
+        alpha: 0.03,
+      });
+      // Blue edge glow (right)
+      beam.rect(meetingCenter.x + 5, meetingCenter.y - 48, 2, 42).fill({
+        color: 0x0040ff,
+        alpha: 0.03,
       });
       layer.addChild(beam);
+
+      // ── Scanline overlay ──
+      const scanlines = new Graphics();
+      for (let sy = -40; sy < 40; sy += 4) {
+        scanlines
+          .rect(meetingCenter.x - 38, meetingCenter.y - 8 + sy, 76, 1)
+          .fill({ color: 0x00f0ff, alpha: 0.04 });
+      }
+      layer.addChild(scanlines);
+
+      // ── Glitch artifact overlay (updated per frame) ──
+      const glitchArtifacts = new Graphics();
+      layer.addChild(glitchArtifacts);
 
       // Connection lines (redrawn each frame)
       const connectionLines = new Graphics();
       layer.addChild(connectionLines);
 
-      // Floating holographic discs
+      // Floating holographic discs (more + varied)
       const holoDiscs: Graphics[] = [];
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const disc = new Graphics();
-        disc.rect(-6, -1.5, 12, 3).fill({ color: 0x00f0ff, alpha: 0.3 });
+        const w = 4 + Math.random() * 10;
+        disc.rect(-w / 2, -1, w, 2).fill({
+          color: i < 3 ? 0x00f0ff : 0xff006e,
+          alpha: 0.35,
+        });
         disc.position.set(meetingCenter.x, meetingCenter.y - 20);
         layer.addChild(disc);
         holoDiscs.push(disc);
@@ -503,6 +649,8 @@ export function initEffects(
         beam,
         connectionLines,
         holoDiscs,
+        scanlines,
+        glitchArtifacts,
         agentIds: [...agentIds],
         fadeIn: 0,
       };
