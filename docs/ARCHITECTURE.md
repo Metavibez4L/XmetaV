@@ -170,7 +170,7 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase CDP facilitator with JWT auth).
 
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
-- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08)
+- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08)
 - **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
 - **Discovery**: `GET /agent/:agentId/payment-info` — public ERC-8004 lookup with x402 detection
 - **Payment Logging**: Writes to `x402_payments` Supabase table (agent_id, payer/payee, network, metadata)

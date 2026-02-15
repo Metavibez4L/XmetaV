@@ -456,7 +456,7 @@ XmetaV v10 adds voice interaction with streaming TTS, push-to-talk, wake word de
 | Waveform Visualizer | Active | `VoiceWaveform` — canvas-based frequency bars during record/playback |
 | Settings Panel | Active | `VoiceSettings` — voice, model, speed, PTT, wake, continuous toggles |
 | Dashboard UI | Active | Voice toggle + gear icon in Agent Chat header |
-| x402 Gating | Active | Endpoints payment-gated: $0.005 (transcribe), $0.01 (synthesize) |
+| x402 Gating | Active | Endpoints payment-gated: $0.05 (transcribe), $0.08 (synthesize) |
 
 ### Usage
 
@@ -959,12 +959,16 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
-| `POST /agent-task` | $0.01 | Queue a task for any agent |
-| `POST /intent` | $0.005 | Create an intent resolution session |
-| `GET /fleet-status` | $0.001 | Get fleet status summary |
-| `POST /swarm` | $0.02 | Launch a multi-agent swarm |
-| `POST /voice/transcribe` | $0.005 | Speech-to-text (Whisper) |
-| `POST /voice/synthesize` | $0.01 | Text-to-speech (streaming TTS) |
+| `POST /agent-task` | $0.10 | Dispatch a task to any agent |
+| `POST /intent` | $0.05 | Resolve a goal into executable commands |
+| `GET /fleet-status` | $0.01 | Live agent fleet status |
+| `POST /swarm` | $0.50 | Launch multi-agent swarm orchestration |
+| `POST /memory-crystal` | $0.05 | Summon a memory crystal from cosmos |
+| `POST /neural-swarm` | $0.10 | Neural swarm delegation across agents |
+| `POST /fusion-chamber` | $0.15 | Fuse memory crystals in Materia chamber |
+| `POST /cosmos-explore` | $0.20 | Explore the Memory Cosmos world |
+| `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
 
 ### Free endpoints (x402-server)
 

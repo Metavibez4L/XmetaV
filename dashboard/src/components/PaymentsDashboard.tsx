@@ -244,51 +244,31 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /agent-task
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
+          {[
+            { ep: "POST /agent-task", price: "$0.10", desc: "Dispatch task to agent" },
+            { ep: "POST /intent", price: "$0.05", desc: "Goal → commands" },
+            { ep: "GET /fleet-status", price: "$0.01", desc: "Live agent fleet" },
+            { ep: "POST /swarm", price: "$0.50", desc: "Multi-agent swarm" },
+            { ep: "POST /memory-crystal", price: "$0.05", desc: "Memory crystal summon" },
+            { ep: "POST /neural-swarm", price: "$0.10", desc: "Neural swarm delegation" },
+            { ep: "POST /fusion-chamber", price: "$0.15", desc: "Fuse memory crystals" },
+            { ep: "POST /cosmos-explore", price: "$0.20", desc: "Explore Memory Cosmos" },
+            { ep: "POST /voice/transcribe", price: "$0.05", desc: "Speech-to-text" },
+            { ep: "POST /voice/synthesize", price: "$0.08", desc: "Text-to-speech" },
+          ].map(({ ep, price, desc }) => (
+            <div key={ep}>
+              <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+                {ep}
+              </div>
+              <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                {price}
+              </div>
+              <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
+                {desc}
+              </div>
             </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.01
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Dispatch task to agent
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /intent
-            </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.005
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Goal → commands
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              GET /fleet-status
-            </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.001
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Live agent fleet
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /swarm
-            </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.02
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Multi-agent swarm
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 

@@ -92,6 +92,10 @@ Service health and endpoint summary.
       "POST /intent": "$0.05 — resolve a goal into commands",
       "GET /fleet-status": "$0.01 — live agent fleet status",
       "POST /swarm": "$0.50 — launch multi-agent swarm",
+      "POST /memory-crystal": "$0.05 — summon memory crystal",
+      "POST /neural-swarm": "$0.10 — neural swarm delegation",
+      "POST /fusion-chamber": "$0.15 — fuse memory crystals",
+      "POST /cosmos-explore": "$0.20 — explore Memory Cosmos",
       "POST /voice/transcribe": "$0.05 — speech-to-text (Whisper)",
       "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)"
     },
@@ -170,6 +174,10 @@ curl http://localhost:4021/agent/16905/payment-info
           "intent": "$0.05",
           "fleet-status": "$0.01",
           "swarm": "$0.50",
+          "memory-crystal": "$0.05",
+          "neural-swarm": "$0.10",
+          "fusion-chamber": "$0.15",
+          "cosmos-explore": "$0.20",
           "voice/transcribe": "$0.05",
           "voice/synthesize": "$0.08"
         }
@@ -392,6 +400,129 @@ Text-to-speech via OpenAI TTS HD.
 | `speed` | number | No | `1.0` | Speed multiplier (0.25–4.0) |
 
 **Response** `200`: Audio stream (`audio/mpeg`)
+
+---
+
+### `POST /memory-crystal` — $0.05
+
+Summon a memory crystal from the agent's memory cosmos.
+
+**Body**:
+```json
+{
+  "agentId": "soul",
+  "query": "earliest memory of consciousness",
+  "maxResults": 5
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `agentId` | string | No | `"soul"` | Agent whose memories to query |
+| `query` | string | Yes | — | Semantic search query |
+| `maxResults` | number | No | `5` | Max crystals to return |
+
+**Response** `200`:
+```json
+{
+  "type": "memory-crystal",
+  "crystals": [
+    { "id": "...", "content": "...", "importance": 8, "memory_type": "reflection" }
+  ],
+  "totalFound": 3,
+  "timestamp": "2026-02-15T..."
+}
+```
+
+---
+
+### `POST /neural-swarm` — $0.10
+
+Delegate a complex task across multiple agents in a neural swarm.
+
+**Body**:
+```json
+{
+  "goal": "Audit all smart contract security vulnerabilities",
+  "agents": ["oracle", "alchemist", "web3dev"]
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `goal` | string | Yes | — | The task to distribute |
+| `agents` | string[] | No | `["oracle","alchemist","web3dev"]` | Target agents |
+
+**Response** `200`:
+```json
+{
+  "swarm": { "id": "...", "mode": "collab", "status": "pending" },
+  "agents": ["oracle", "alchemist", "web3dev"],
+  "taskCount": 3,
+  "spawnBilling": { "agentsSpawned": 3, "costPerSpawn": "$0.02", "totalSpawnCost": "$0.06" },
+  "timestamp": "2026-02-15T..."
+}
+```
+
+---
+
+### `POST /fusion-chamber` — $0.15
+
+Fuse memory crystals together in the Materia chamber.
+
+**Body**:
+```json
+{
+  "memoryIds": ["mem-1", "mem-2"],
+  "catalyst": "dream"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `memoryIds` | string[] | Yes | — | At least 2 memory IDs to fuse |
+| `catalyst` | string | No | `"standard"` | Fusion catalyst type |
+
+**Response** `200`:
+```json
+{
+  "type": "fusion-result",
+  "inputMemories": 2,
+  "catalyst": "dream",
+  "association": { "id": "...", "association_type": "dream", "strength": 0.8 },
+  "timestamp": "2026-02-15T..."
+}
+```
+
+---
+
+### `POST /cosmos-explore` — $0.20
+
+Explore the Memory Cosmos world — islands, highways, and crystals.
+
+**Body**:
+```json
+{
+  "mode": "navigate",
+  "target": "consciousness-island"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `mode` | string | No | `"overview"` | `overview`, `navigate`, or `search` |
+| `target` | string | No | — | Target island/region (for navigate mode) |
+| `query` | string | No | — | Semantic search query (for search mode) |
+
+**Response** `200`:
+```json
+{
+  "type": "cosmos-exploration",
+  "mode": "navigate",
+  "cosmos": { "islands": 5, "highways": 8, "crystals": 142 },
+  "timestamp": "2026-02-15T..."
+}
+```
 
 ---
 
