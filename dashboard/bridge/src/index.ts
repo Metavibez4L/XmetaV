@@ -103,13 +103,16 @@ process.on("SIGINT", async () => {
   supabase.removeChannel(swarmChannel);
   supabase.removeChannel(intentChannel);
 
-  // Mark bridge as offline
+  // Mark bridge + all fleet agents as offline
+  const now = new Date().toISOString();
+  const offlineRows = [
+    "bridge", "main", "soul", "oracle", "sentinel", "briefing",
+    "alchemist", "web3dev", "akua", "basedintern", "midas",
+  ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
+
   await supabase
     .from("agent_sessions")
-    .upsert(
-      { agent_id: "bridge", status: "offline", last_heartbeat: new Date().toISOString() },
-      { onConflict: "agent_id" }
-    );
+    .upsert(offlineRows, { onConflict: "agent_id" });
 
   process.exit(0);
 });
@@ -122,11 +125,16 @@ process.on("SIGTERM", async () => {
   supabase.removeChannel(channel);
   supabase.removeChannel(swarmChannel);
   supabase.removeChannel(intentChannel);
+
+  const now = new Date().toISOString();
+  const offlineRows = [
+    "bridge", "main", "soul", "oracle", "sentinel", "briefing",
+    "alchemist", "web3dev", "akua", "basedintern", "midas",
+  ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
+
   await supabase
     .from("agent_sessions")
-    .upsert(
-      { agent_id: "bridge", status: "offline", last_heartbeat: new Date().toISOString() },
-      { onConflict: "agent_id" }
-    );
+    .upsert(offlineRows, { onConflict: "agent_id" });
+
   process.exit(0);
 });
