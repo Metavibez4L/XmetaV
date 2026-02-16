@@ -8,6 +8,7 @@
     "dev": "tsx watch index.ts"
   },
   "dependencies": {
+    "@coinbase/x402": "^2.1.0",
     "@supabase/supabase-js": "^2.49.0",
     "@x402/core": "latest",
     "@x402/evm": "latest",

@@ -4,16 +4,22 @@ This directory contains **agent-by-agent runbooks** for the OpenClaw agents conf
 
 > Note: These docs intentionally avoid including any secrets (gateway tokens, API keys). Use `openclaw config get ...` locally when you need exact values.
 
-## Static Agents
+## Core Fleet (12 agents)
 
 - [`main`](./main.md) — **orchestrator** (agent factory + swarm + command center)
+- [`sentinel`](./sentinel.md) — **fleet ops** (lifecycle manager, spawn coordination, health monitoring)
+- [`soul`](./soul.md) — **memory orchestrator** (context curation, dream consolidation, association building, memory retrieval learning)
 - [`briefing`](./briefing.md) — **context curator** (continuity, health sentinel, memory distillation)
+- [`oracle`](./oracle.md) — **on-chain intel** (gas, prices, chain activity, crypto sentiment)
+- [`alchemist`](./alchemist.md) — **tokenomics** (supply, emissions, staking curves, liquidity)
+- [`midas`](./midas.md) — **revenue & growth** (x402 analytics, pricing, forecasts, growth pipeline)
+- [`web3dev`](./web3dev.md) — **blockchain dev** (compile, test, audit, deploy smart contracts)
 - [`basedintern`](./basedintern.md) — repo agent (coding tools, lean) pinned to `/home/manifest/basedintern`
 - [`basedintern_web`](./basedintern.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
 - [`akua`](./akua.md) — repo agent (coding tools, lean) pinned to `/home/manifest/akua`
 - [`akua_web`](./akua.md) — same repo, full tools (browser/web) — use sparingly to save Kimi quota
 
-All agents use **Kimi K2.5** (256k context) via Ollama.
+All agents use **Kimi K2.5** (256k context) via Ollama. All sub-agents have `IDENTITY.md` + `SOUL.md` files defining their purpose, commands, team awareness, and operating principles.
 
 ## Dynamic Agents
 
@@ -112,7 +118,8 @@ find ~/.openclaw -name "*.lock" -type f -delete
 cd dashboard && npm run dev
 
 # Start the bridge daemon (dashboard <-> OpenClaw)
-cd dashboard/bridge && npm start
+cd dashboard/bridge && npm run dev  # local watch
+# or: npm start  # one-shot
 ```
 
 ## Tooling baseline

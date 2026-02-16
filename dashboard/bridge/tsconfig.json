@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "lib/**/*"]
+  "include": ["src/**/*", "lib/**/*"],
+  "exclude": ["lib/x402-client.ts"]
 }

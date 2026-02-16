@@ -137,8 +137,8 @@ export async function getAgentReputation(
     return { count, summaryValue, summaryValueDecimals, displayScore };
   } catch {
     return {
-      count: 0n,
-      summaryValue: 0n,
+      count: BigInt(0),
+      summaryValue: BigInt(0),
       summaryValueDecimals: 0,
       displayScore: "0",
     };

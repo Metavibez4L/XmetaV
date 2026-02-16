@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { useVoice } from "@/hooks/useVoice";
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { AgentCommand } from "@/lib/types";
 import { cleanAgentOutput } from "@/lib/utils";
+import { createClient } from "@/lib/supabase-browser";
 
 // ────────────────────────────────────────────────────
 // Types
@@ -130,9 +131,10 @@ const MessageBubble = React.memo(function MessageBubble({
 
 // ────────────────────────────────────────────────────
 // Streaming bubble — renders live text without copying messages array
+// Memoized to avoid re-renders when parent state changes
 // ────────────────────────────────────────────────────
 
-function StreamingBubble({
+const StreamingBubble = React.memo(function StreamingBubble({
   agentId: streamAgentId,
   fullText: streamText,
   isComplete: streamDone,
@@ -141,8 +143,30 @@ function StreamingBubble({
   fullText: string;
   isComplete: boolean;
 }) {
+  // Memoize the cleaned output to avoid re-running regex on every render
+  const cleanedText = useMemo(
+    () => cleanAgentOutput(streamText) || "// waiting for bridge...",
+    [streamText]
+  );
+
+  // Auto-scroll: keep the streaming content in view
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = bubbleRef.current;
+    if (!el) return;
+    // Only auto-scroll if user is near the bottom (within 120px)
+    const parent = el.closest("[data-scroll-container]") as HTMLElement | null;
+    if (parent) {
+      const nearBottom =
+        parent.scrollHeight - parent.scrollTop - parent.clientHeight < 120;
+      if (nearBottom) {
+        parent.scrollTop = parent.scrollHeight;
+      }
+    }
+  }, [cleanedText]);
+
   return (
-    <div className="flex justify-start">
+    <div className="flex justify-start" ref={bubbleRef}>
       <div
         className="max-w-[85%] rounded-lg px-4 py-3 relative"
         style={{
@@ -180,7 +204,7 @@ function StreamingBubble({
           className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed"
           style={{ color: "#c8d6e5cc" }}
         >
-          {cleanAgentOutput(streamText) || "// waiting for bridge..."}
+          {cleanedText}
         </pre>
         {!streamDone && (
           <span
@@ -191,7 +215,7 @@ function StreamingBubble({
       </div>
     </div>
   );
-}
+});
 
 // ────────────────────────────────────────────────────
 // Auto-resize textarea hook
@@ -354,20 +378,50 @@ export function AgentChat() {
       // Save final text BEFORE clearing activeCommandId (which resets fullText)
       lastCompletedTextRef.current = finalText;
 
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "agent" && last.commandId === completedId) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: finalText, status: "completed" },
-          ];
-        }
-        return prev;
-      });
-      setLastCompletedCmdId(completedId);
-      setActiveCommandId(null);
-      setSending(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      // Fetch actual command status from DB to correctly mark failed swaps
+      const sb = createClient();
+      Promise.resolve(
+        sb.from("agent_commands")
+          .select("status")
+          .eq("id", completedId)
+          .single()
+      )
+        .then(({ data: cmd }) => {
+          const finalStatus: "completed" | "failed" =
+            cmd?.status === "failed" ? "failed" : "completed";
+
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "agent" && last.commandId === completedId) {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: finalText, status: finalStatus },
+              ];
+            }
+            return prev;
+          });
+          setLastCompletedCmdId(completedId);
+          setActiveCommandId(null);
+          setSending(false);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        })
+        .catch(() => {
+          // Fallback: just mark as completed
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "agent" && last.commandId === completedId) {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: finalText, status: "completed" },
+              ];
+            }
+            return prev;
+          });
+          setLastCompletedCmdId(completedId);
+          setActiveCommandId(null);
+          setSending(false);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        });
     }
   }, [isComplete, activeCommandId, fullText]);
 
@@ -393,6 +447,19 @@ export function AgentChat() {
       scrollToBottom();
 
       try {
+        // Detect meeting commands and broadcast to arena tab via localStorage
+        const lowerMsg = trimmed.toLowerCase();
+        const isMeetingCmd = /meeting/i.test(lowerMsg);
+        if (isMeetingCmd) {
+          const AGENT_IDS = ["main","operator","sentinel","soul","briefing","oracle","alchemist","web3dev","akua","akua_web","basedintern","basedintern_web"];
+          const mentioned = AGENT_IDS.filter((id) => lowerMsg.includes(id.replace(/_/g, " ")) || lowerMsg.includes(id));
+          const meetingSet = new Set([agentId, "main", ...mentioned]);
+          if (mentioned.length === 0) { meetingSet.add("briefing"); meetingSet.add("oracle"); }
+          const payload = JSON.stringify({ type: "call-meeting", agentIds: Array.from(meetingSet), ts: Date.now() });
+          localStorage.setItem("xmetav-arena-meeting", payload);
+          console.log("[chat] Meeting command sent to arena via localStorage:", Array.from(meetingSet));
+        }
+
         const res = await fetch("/api/commands", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -726,6 +793,7 @@ export function AgentChat() {
         className="flex-1 overflow-auto p-4 sm:p-5"
         ref={scrollRef}
         onScroll={checkShouldScroll}
+        data-scroll-container
       >
         <div className="mx-auto max-w-3xl space-y-4">
           {messages.length === 0 && (

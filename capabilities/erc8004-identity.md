@@ -5,6 +5,8 @@ Reference for integrating **ERC-8004** — the on-chain agent identity and reput
 > Source: https://eips.ethereum.org/EIPS/eip-8004
 > Contracts: https://github.com/erc-8004/erc-8004-contracts
 
+**XmetaV Status:** Registered as Agent **#16905** on Base Mainnet (2026-02-12). See [ERC8004-SCAN.md](../docs/ERC8004-SCAN.md) for the full registry scan.
+
 ## What is ERC-8004?
 
 ERC-8004 provides **portable, on-chain identities** for autonomous agents. It defines three registries:
@@ -51,7 +53,7 @@ Same addresses on Base Sepolia (testnet):
 5. Agent is now discoverable on-chain
 ```
 
-### Registration Script
+### Registration Script (one-time — already done)
 
 ```bash
 cd dashboard/erc8004 && npm install && npx tsx register.ts
@@ -62,6 +64,18 @@ This will:
 - Call `register()` on Base mainnet
 - Save the `agentId` to `dashboard/erc8004/agent-config.json`
 - Update `registration.json` with the on-chain reference
+
+### Set / Update Metadata URI
+
+```bash
+cd dashboard/erc8004
+npx tsx update-uri.ts
+# defaults to raw GitHub URL for metadata.json
+# or pass a custom URI:
+# npx tsx update-uri.ts "https://example.com/metadata.json"
+```
+
+This calls `setAgentURI(16905, uri)` on Base Mainnet, making XmetaV discoverable.
 
 ### Agent Registration Metadata
 
@@ -78,10 +92,10 @@ The `agentURI` (tokenURI) points to a JSON file following the ERC-8004 spec:
     { "type": "dashboard", "url": "http://localhost:3000", "description": "Control Plane" }
   ],
   "registrations": [
-    { "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432", "agentId": "0" }
+    { "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432", "agentId": "16905" }
   ],
-  "supportedTrust": ["reputation"],
-  "capabilities": ["agent-orchestration", "swarm-execution", "x402-payments"]
+  "supportedTrust": ["reputation", "x402-payment-history", "on-chain-identity"],
+  "capabilities": ["agent-orchestration", "swarm-execution", "x402-payments", "persistent-agent-memory"]
 }
 ```
 

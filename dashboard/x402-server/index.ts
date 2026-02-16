@@ -3,6 +3,7 @@ import express from "express";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
+import { facilitator as cdpFacilitator } from "@coinbase/x402";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createPublicClient, http } from "viem";
@@ -14,16 +15,11 @@ import { base } from "viem/chains";
 // ============================================================
 
 const evmAddress = process.env.EVM_ADDRESS as `0x${string}`;
-const facilitatorUrl = process.env.FACILITATOR_URL;
 const port = parseInt(process.env.PORT || "4021", 10);
-const network = process.env.NETWORK || "eip155:8453"; // Base Mainnet default
+const network = (process.env.NETWORK || "eip155:8453") as `${string}:${string}`; // Base Mainnet default
 
 if (!evmAddress) {
   console.error("EVM_ADDRESS environment variable is required");
-  process.exit(1);
-}
-if (!facilitatorUrl) {
-  console.error("FACILITATOR_URL environment variable is required");
   process.exit(1);
 }
 
@@ -37,7 +33,11 @@ const supabase =
       })
     : null;
 
-const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
+// Facilitator: use @coinbase/x402 CDP facilitator (mainnet) or custom URL
+const facilitatorUrl = process.env.FACILITATOR_URL;
+const facilitatorClient = facilitatorUrl
+  ? new HTTPFacilitatorClient({ url: facilitatorUrl })
+  : new HTTPFacilitatorClient(cdpFacilitator);
 
 // OpenAI for voice endpoints (optional — voice endpoints disabled if no key)
 const openaiKey = process.env.OPENAI_API_KEY;
@@ -67,11 +67,12 @@ interface TokenTier {
 }
 
 const TIERS: TokenTier[] = [
-  { name: "None",    minBalance: 0,         discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
-  { name: "Bronze",  minBalance: 1_000,     discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
-  { name: "Silver",  minBalance: 10_000,    discount: 0.20, dailyLimit: 100,  color: "#c0c0c0" },
-  { name: "Gold",    minBalance: 100_000,   discount: 0.35, dailyLimit: 500,  color: "#ffd700" },
-  { name: "Diamond", minBalance: 1_000_000, discount: 0.50, dailyLimit: 2000, color: "#b9f2ff" },
+  { name: "None",      minBalance: 0,           discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
+  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
+  { name: "Bronze",    minBalance: 1_000,       discount: 0.15, dailyLimit: 50,   color: "#cd7f32" },
+  { name: "Silver",    minBalance: 10_000,      discount: 0.25, dailyLimit: 200,  color: "#c0c0c0" },
+  { name: "Gold",      minBalance: 100_000,     discount: 0.50, dailyLimit: 1000, color: "#ffd700" },
+  { name: "Diamond",   minBalance: 1_000_000,   discount: 0.75, dailyLimit: 5000, color: "#b9f2ff" },
 ];
 
 function getTier(balance: number): TokenTier {
@@ -82,7 +83,7 @@ function getTier(balance: number): TokenTier {
 }
 
 const viemClient = XMETAV_TOKEN_ADDRESS
-  ? createPublicClient({ chain: base, transport: http("https://mainnet.base.org") })
+  ? createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs") })
   : null;
 
 async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
@@ -104,6 +105,127 @@ async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
 const app = express();
 app.use(express.json());
 
+// ---- Payment logging helper ----
+async function logPayment(endpoint: string, amount: string, req: express.Request) {
+  if (!supabase) return;
+  try {
+    const callerAddress = req.headers["x-caller-address"] as string | undefined;
+    const callerAgent = (req as any).callerAgent as {
+      agentId: string; owner: string; wallet: string; x402Enabled?: boolean;
+    } | undefined;
+    const row: Record<string, unknown> = {
+      endpoint,
+      amount,
+      agent_id: callerAgent?.agentId || "external",
+      payer_address: callerAddress || callerAgent?.wallet || null,
+      payee_address: evmAddress,
+      network,
+      status: "settled",
+    };
+    // metadata column may not exist yet — try with it, fallback without
+    const metaPayload = callerAgent
+      ? { callerAgentId: callerAgent.agentId, callerOwner: callerAgent.owner, x402Enabled: callerAgent.x402Enabled }
+      : null;
+    const { error } = await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
+    if (error?.message?.includes("metadata")) {
+      await supabase.from("x402_payments").insert(row);
+    }
+    // ---- Midas endpoint_analytics tracking ----
+    trackEndpointAnalytics(endpoint, amount, callerAddress);
+
+    // ---- A/B pricing experiment tracking ----
+    const numAmt = parseFloat(amount.replace("$", ""));
+    // Randomly assign variant (50/50 split); "control" uses current price
+    const variant = Math.random() < 0.5 ? "control" : "premium";
+    trackABExperiment(endpoint, variant, true, numAmt);
+  } catch { /* best effort */ }
+}
+
+// ---- Midas per-endpoint revenue tracking ----
+async function trackEndpointAnalytics(endpoint: string, amount: string, _callerAddress?: string) {
+  if (!supabase) return;
+  try {
+    const numericAmount = parseFloat(amount.replace("$", ""));
+    // Upsert: increment total_calls and revenue for this endpoint
+    const { data: existing } = await supabase
+      .from("endpoint_analytics")
+      .select("id, total_calls, paid_calls, avg_payment_usd, revenue_7d, revenue_30d")
+      .eq("endpoint_path", endpoint)
+      .maybeSingle();
+    if (existing) {
+      const newTotal = (existing.total_calls || 0) + 1;
+      const newPaid = (existing.paid_calls || 0) + 1;
+      const newRevenue7d = parseFloat(existing.revenue_7d || "0") + numericAmount;
+      const newRevenue30d = parseFloat(existing.revenue_30d || "0") + numericAmount;
+      await supabase.from("endpoint_analytics").update({
+        total_calls: newTotal,
+        paid_calls: newPaid,
+        avg_payment_usd: newRevenue30d / newPaid,
+        revenue_7d: newRevenue7d,
+        revenue_30d: newRevenue30d,
+        last_called_at: new Date().toISOString(),
+      }).eq("id", existing.id);
+    } else {
+      await supabase.from("endpoint_analytics").insert({
+        endpoint_path: endpoint,
+        total_calls: 1,
+        paid_calls: 1,
+        free_calls: 0,
+        conversion_rate: 100,
+        avg_payment_usd: numericAmount,
+        revenue_7d: numericAmount,
+        revenue_30d: numericAmount,
+        growth_trend: "up",
+        last_called_at: new Date().toISOString(),
+      });
+    }
+  } catch { /* best-effort analytics */ }
+}
+
+// ---- A/B Pricing Experiment Tracking ----
+async function trackABExperiment(endpoint: string, variant: string, converted: boolean, amount: number) {
+  if (!supabase) return;
+  try {
+    const { data: exp } = await supabase
+      .from("pricing_experiments")
+      .select("id, impressions, conversions, revenue_usd")
+      .eq("endpoint_path", endpoint)
+      .eq("variant_name", variant)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (exp) {
+      const newImpressions = (exp.impressions || 0) + 1;
+      const newConversions = (exp.conversions || 0) + (converted ? 1 : 0);
+      const newRevenue = parseFloat(exp.revenue_usd || "0") + (converted ? amount : 0);
+      await supabase.from("pricing_experiments").update({
+        impressions: newImpressions,
+        conversions: newConversions,
+        revenue_usd: newRevenue,
+        conversion_rate: newImpressions > 0 ? (newConversions / newImpressions) * 100 : 0,
+        avg_revenue_per_impression: newImpressions > 0 ? newRevenue / newImpressions : 0,
+      }).eq("id", exp.id);
+    }
+  } catch { /* best-effort */ }
+}
+
+// ---- Swarm Spawn Billing ----
+async function billSwarmSpawns(swarmId: string, agents: string[], payerAddress?: string) {
+  if (!supabase) return;
+  const SPAWN_PRICE = 0.02; // $0.02 per sub-agent spawn
+  try {
+    const rows = agents.map(agent => ({
+      swarm_id: swarmId,
+      agent_id: agent,
+      spawn_price_usd: SPAWN_PRICE,
+      status: "billed",
+      payer_address: payerAddress || null,
+    }));
+    await supabase.from("swarm_spawn_billing").insert(rows);
+    // Track total spawn revenue in endpoint analytics
+    trackEndpointAnalytics("/swarm/spawns", `$${(SPAWN_PRICE * agents.length).toFixed(2)}`);
+  } catch { /* best-effort */ }
+}
+
 // ---- Token tier middleware: adds X-Token-Tier and X-Token-Discount headers ----
 if (XMETAV_TOKEN_ADDRESS) {
   app.use(async (req, res, next) => {
@@ -117,6 +239,69 @@ if (XMETAV_TOKEN_ADDRESS) {
     next();
   });
 }
+
+// ---- ERC-8004 Identity Resolution Middleware ----
+// Resolves calling agent's on-chain identity from X-Agent-Id header
+const ERC8004_REGISTRY = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" as const;
+const ERC8004_ABI = [
+  { name: "ownerOf", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+  { name: "tokenURI", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ name: "", type: "string" }] },
+  { name: "getAgentWallet", type: "function", stateMutability: "view",
+    inputs: [{ name: "agentId", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
+] as const;
+
+const erc8004Client = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL || "https://base-mainnet.g.alchemy.com/v2/bHdHyC4tCZcSjdNYDPRQs"),
+});
+
+// Extend Express Request to carry resolved agent identity
+declare global {
+  namespace Express {
+    interface Request {
+      callerAgent?: {
+        agentId: string;
+        owner: string;
+        wallet: string;
+        tokenURI: string;
+        x402Enabled?: boolean;
+      };
+    }
+  }
+}
+
+app.use(async (req, _res, next) => {
+  const agentIdHeader = req.headers["x-agent-id"] as string | undefined;
+  if (!agentIdHeader) return next();
+  try {
+    const agentId = BigInt(agentIdHeader);
+    const [owner, uri, wallet] = await Promise.all([
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
+    ]);
+    let x402Enabled = false;
+    if (uri) {
+      try {
+        const meta = await fetch(uri).then(r => r.json());
+        x402Enabled = meta?.x402Support?.enabled === true;
+      } catch { /* metadata fetch optional */ }
+    }
+    req.callerAgent = {
+      agentId: agentId.toString(),
+      owner: owner as string,
+      wallet: wallet as string,
+      tokenURI: uri as string,
+      x402Enabled,
+    };
+    console.log(`[ERC-8004] Resolved caller agent #${agentId} — owner: ${owner}, x402: ${x402Enabled}`);
+  } catch {
+    console.log(`[ERC-8004] Agent #${agentIdHeader} not found in registry, proceeding without identity`);
+  }
+  next();
+});
 
 // ---- x402 Payment Middleware ----
 // Gates XmetaV platform endpoints with USDC micro-payments on Base
@@ -173,6 +358,55 @@ app.use(
         description: "Launch a multi-agent swarm orchestration",
         mimeType: "application/json",
       },
+      // ---- Value-Based Premium Endpoints ----
+      "POST /memory-crystal": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.05",  // Unique memory crystal summon
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Summon a memory crystal from the agent's memory cosmos",
+        mimeType: "application/json",
+      },
+      "POST /neural-swarm": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.10",  // Complex multi-agent delegation
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Delegate a task across the neural swarm network",
+        mimeType: "application/json",
+      },
+      "POST /fusion-chamber": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.15",  // Rare memory fusion operation
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Fuse memory crystals in the Materia chamber",
+        mimeType: "application/json",
+      },
+      "POST /cosmos-explore": {
+        accepts: [
+          {
+            scheme: "exact",
+            price: "$0.20",  // Experiential memory cosmos exploration
+            network,
+            payTo: evmAddress,
+          },
+        ],
+        description: "Explore the Memory Cosmos world — islands, highways, crystals",
+        mimeType: "application/json",
+      },
       ...(openai
         ? {
             "POST /voice/transcribe": {
@@ -182,25 +416,6 @@ app.use(
                   price: "$0.05",  // Was $0.005 — 10x (covers Whisper ~$0.006 + margin)
                   network,
                   payTo: evmAddress,
-                },
-              ],
-              description: "Speech-to-text transcription via Whisper",
-              mimeType: "application/json",
-            },
-            "POST /voice/synthesize": {
-              accepts: [
-                {
-                  scheme: "exact",
-                  price: "$0.08",  // Was $0.01 — 8x (covers TTS $0.015 + healthy margin)
-                  network,
-                  payTo: evmAddress,
-                },
-              ],
-              description: "Text-to-speech synthesis via OpenAI TTS",
-              mimeType: "audio/mpeg",
-            },
-          }
-        : {}),
                 },
               ],
               description: "Speech-to-text transcription via Whisper",
@@ -235,6 +450,7 @@ app.use(
  * Body: { agent: "main"|"akua"|"basedintern", message: "..." }
  */
 app.post("/agent-task", async (req, res) => {
+  logPayment("/agent-task", "$0.10", req);
   const { agent, message } = req.body;
 
   if (!agent || !message) {
@@ -242,7 +458,7 @@ app.post("/agent-task", async (req, res) => {
     return;
   }
 
-  const validAgents = ["main", "akua", "akua_web", "basedintern", "basedintern_web"];
+  const validAgents = ["main", "sentinel", "soul", "briefing", "oracle", "alchemist", "midas", "web3dev", "akua", "akua_web", "basedintern", "basedintern_web"];
   if (!validAgents.includes(agent)) {
     res.status(400).json({ error: `Invalid agent. Choose from: ${validAgents.join(", ")}` });
     return;
@@ -287,6 +503,7 @@ app.post("/agent-task", async (req, res) => {
  * Body: { goal: "Deploy an NFT contract on Base" }
  */
 app.post("/intent", async (req, res) => {
+  logPayment("/intent", "$0.05", req);
   const { goal } = req.body;
 
   if (!goal || typeof goal !== "string") {
@@ -336,6 +553,7 @@ app.post("/intent", async (req, res) => {
  * GET /fleet-status — live status of all agents
  */
 app.get("/fleet-status", async (_req, res) => {
+  logPayment("/fleet-status", "$0.01", _req);
   if (supabase) {
     const { data: sessions } = await supabase
       .from("agent_sessions")
@@ -347,6 +565,13 @@ app.get("/fleet-status", async (_req, res) => {
 
     const fleet = [
       { id: "main", name: "Main (Orchestrator)", workspace: "~/.openclaw/workspace" },
+      { id: "sentinel", name: "Sentinel (Fleet Ops)", workspace: "/home/manifest/sentinel" },
+      { id: "soul", name: "Soul (Memory Orchestrator)", workspace: "/home/manifest/soul" },
+      { id: "briefing", name: "Briefing (Context Curator)", workspace: "/home/manifest/briefing" },
+      { id: "oracle", name: "Oracle (On-Chain Intel)", workspace: "/home/manifest/oracle" },
+      { id: "alchemist", name: "Alchemist (Tokenomics)", workspace: "/home/manifest/alchemist" },
+      { id: "midas", name: "Midas (Revenue & Growth)", workspace: "/home/manifest/midas" },
+      { id: "web3dev", name: "Web3Dev (Blockchain Dev)", workspace: "/home/manifest/web3dev" },
       { id: "akua", name: "Akua (Solidity/Base)", workspace: "/home/manifest/akua" },
       { id: "basedintern", name: "BasedIntern (TypeScript)", workspace: "/home/manifest/basedintern" },
     ].map((agent) => {
@@ -370,6 +595,13 @@ app.get("/fleet-status", async (_req, res) => {
     res.json({
       fleet: [
         { id: "main", name: "Main (Orchestrator)", status: "unknown" },
+        { id: "sentinel", name: "Sentinel (Fleet Ops)", status: "unknown" },
+        { id: "soul", name: "Soul (Memory Orchestrator)", status: "unknown" },
+        { id: "briefing", name: "Briefing (Context Curator)", status: "unknown" },
+        { id: "oracle", name: "Oracle (On-Chain Intel)", status: "unknown" },
+        { id: "alchemist", name: "Alchemist (Tokenomics)", status: "unknown" },
+        { id: "midas", name: "Midas (Revenue & Growth)", status: "unknown" },
+        { id: "web3dev", name: "Web3Dev (Blockchain Dev)", status: "unknown" },
         { id: "akua", name: "Akua (Solidity/Base)", status: "unknown" },
         { id: "basedintern", name: "BasedIntern (TypeScript)", status: "unknown" },
       ],
@@ -384,6 +616,7 @@ app.get("/fleet-status", async (_req, res) => {
  * Body: { mode: "parallel"|"pipeline"|"collab", tasks: [{ agent: "...", message: "..." }] }
  */
 app.post("/swarm", async (req, res) => {
+  logPayment("/swarm", "$0.50", req);
   const { mode, tasks } = req.body;
 
   const validModes = ["parallel", "pipeline", "collab"];
@@ -437,9 +670,22 @@ app.post("/swarm", async (req, res) => {
 
     await supabase.from("swarm_tasks").insert(taskRows);
 
+    // Per-spawn billing: charge $0.02 per sub-agent
+    const spawnAgents = tasks.map((t: { agent: string }) => t.agent);
+    const callerAddr = req.headers["x-caller-address"] as string | undefined;
+    billSwarmSpawns(run.id, spawnAgents, callerAddr);
+
+    // A/B tracking
+    trackABExperiment("/swarm", "control", true, 0.50);
+
     res.json({
       swarm: run,
       tasks: taskRows.length,
+      spawnBilling: {
+        agentsSpawned: spawnAgents.length,
+        costPerSpawn: "$0.02",
+        totalSpawnCost: `$${(0.02 * spawnAgents.length).toFixed(2)}`,
+      },
       note: "Swarm queued — the bridge daemon will orchestrate execution.",
       timestamp: new Date().toISOString(),
     });
@@ -451,6 +697,185 @@ app.post("/swarm", async (req, res) => {
       note: "Supabase not connected — swarm logged but not dispatched",
       timestamp: new Date().toISOString(),
     });
+  }
+});
+
+// ---- Value-Based Premium Endpoints ----
+
+/**
+ * POST /memory-crystal — summon a memory crystal from agent memory
+ * Body: { query: "...", agent?: "soul" }
+ */
+app.post("/memory-crystal", async (req, res) => {
+  logPayment("/memory-crystal", "$0.05", req);
+  const { query, agent } = req.body;
+  if (!query) { res.status(400).json({ error: "query is required" }); return; }
+
+  if (supabase) {
+    // Find matching memories and return as crystal
+    const { data: memories } = await supabase
+      .from("agent_memory")
+      .select("id, agent_id, content, memory_type, importance, created_at")
+      .ilike("content", `%${query}%`)
+      .order("importance", { ascending: false })
+      .limit(5);
+
+    const crystal = {
+      type: "memory-crystal",
+      query,
+      fragments: memories || [],
+      crystalClass: (memories?.length || 0) >= 3 ? "rare" : "common",
+      xp: Math.floor(Math.random() * 50) + 10,
+      timestamp: new Date().toISOString(),
+    };
+    res.json(crystal);
+  } else {
+    res.json({ type: "memory-crystal", query, fragments: [], note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /neural-swarm — delegate a complex task across multiple agents
+ * Body: { goal: "...", agents?: ["oracle", "alchemist"] }
+ */
+app.post("/neural-swarm", async (req, res) => {
+  logPayment("/neural-swarm", "$0.10", req);
+  const { goal, agents: requestedAgents } = req.body;
+  if (!goal) { res.status(400).json({ error: "goal is required" }); return; }
+
+  const targetAgents = requestedAgents || ["oracle", "alchemist", "web3dev"];
+  if (supabase) {
+    const manifest = {
+      mode: "collab",
+      source: "x402-neural-swarm",
+      tasks: targetAgents.map((a: string, i: number) => ({
+        taskId: `neural-${i}`,
+        agent: a,
+        message: `[Neural Swarm] ${goal}`,
+      })),
+    };
+    const { data: run, error } = await supabase
+      .from("swarm_runs")
+      .insert({ name: `Neural Swarm: ${goal.slice(0, 50)}`, mode: "collab", status: "pending", manifest })
+      .select("id, mode, status, created_at")
+      .single();
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    const taskRows = targetAgents.map((a: string, i: number) => ({
+      swarm_id: run.id, task_id: `neural-${i}`, agent_id: a, message: `[Neural Swarm] ${goal}`, status: "pending",
+    }));
+    await supabase.from("swarm_tasks").insert(taskRows);
+
+    // Per-spawn billing for neural swarm
+    const callerAddr = req.headers["x-caller-address"] as string | undefined;
+    billSwarmSpawns(run.id, targetAgents, callerAddr);
+
+    res.json({
+      swarm: run,
+      agents: targetAgents,
+      taskCount: taskRows.length,
+      spawnBilling: {
+        agentsSpawned: targetAgents.length,
+        costPerSpawn: "$0.02",
+        totalSpawnCost: `$${(0.02 * targetAgents.length).toFixed(2)}`,
+      },
+      note: "Neural swarm dispatched.",
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ accepted: true, goal, agents: targetAgents, note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /fusion-chamber — fuse memory crystals together
+ * Body: { memoryIds: ["id1", "id2"], catalyst?: "dream" }
+ */
+app.post("/fusion-chamber", async (req, res) => {
+  logPayment("/fusion-chamber", "$0.15", req);
+  const { memoryIds, catalyst } = req.body;
+  if (!Array.isArray(memoryIds) || memoryIds.length < 2) {
+    res.status(400).json({ error: "At least 2 memoryIds required for fusion" }); return;
+  }
+
+  if (supabase) {
+    const { data: memories } = await supabase
+      .from("agent_memory")
+      .select("id, content, memory_type, importance")
+      .in("id", memoryIds);
+
+    if (!memories || memories.length < 2) {
+      res.status(404).json({ error: "Could not find enough memories to fuse" }); return;
+    }
+
+    // Create a fused memory association
+    const fusedContent = memories.map(m => m.content).join(" ⟷ ");
+    const maxImportance = Math.max(...memories.map(m => m.importance || 0));
+    const { data: association } = await supabase
+      .from("memory_associations")
+      .insert({
+        source_memory_id: memories[0].id,
+        target_memory_id: memories[1].id,
+        association_type: catalyst || "fusion",
+        strength: Math.min(1.0, (maxImportance / 10) + 0.3),
+        context: `Fused via x402 chamber: ${fusedContent.slice(0, 200)}`,
+      })
+      .select("id, association_type, strength, created_at")
+      .single();
+
+    res.json({
+      type: "fusion-result",
+      inputMemories: memoryIds.length,
+      catalyst: catalyst || "standard",
+      association,
+      crystalClass: maxImportance >= 8 ? "legendary" : maxImportance >= 5 ? "epic" : "rare",
+      xp: Math.floor(maxImportance * 15) + 25,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ type: "fusion-result", inputMemories: memoryIds.length, note: "Supabase not connected", timestamp: new Date().toISOString() });
+  }
+});
+
+/**
+ * POST /cosmos-explore — explore the Memory Cosmos world
+ * Body: { region?: "city"|"wasteland"|"forest", depth?: number }
+ */
+app.post("/cosmos-explore", async (req, res) => {
+  logPayment("/cosmos-explore", "$0.20", req);
+  const { region, depth } = req.body;
+  const targetRegion = region || "city";
+  const exploreDepth = Math.min(depth || 3, 10);
+
+  if (supabase) {
+    // Pull recent memories, associations, and dream insights
+    const [memRes, assocRes, dreamRes] = await Promise.all([
+      supabase.from("agent_memory").select("id, agent_id, content, memory_type, importance, created_at")
+        .order("created_at", { ascending: false }).limit(exploreDepth * 5),
+      supabase.from("memory_associations").select("id, source_memory_id, target_memory_id, association_type, strength")
+        .order("strength", { ascending: false }).limit(exploreDepth * 3),
+      supabase.from("dream_insights").select("id, category, insight, confidence, created_at")
+        .order("created_at", { ascending: false }).limit(exploreDepth),
+    ]);
+
+    const islands = (memRes.data || []).reduce((acc: Record<string, number>, m) => {
+      acc[m.agent_id] = (acc[m.agent_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      type: "cosmos-exploration",
+      region: targetRegion,
+      depth: exploreDepth,
+      islands: Object.entries(islands).map(([agent, count]) => ({ agent, memoryCount: count, terrain: targetRegion })),
+      highways: (assocRes.data || []).map(a => ({ from: a.source_memory_id, to: a.target_memory_id, type: a.association_type, strength: a.strength })),
+      dreams: dreamRes.data || [],
+      totalMemories: memRes.data?.length || 0,
+      totalConnections: assocRes.data?.length || 0,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ type: "cosmos-exploration", region: targetRegion, note: "Supabase not connected", timestamp: new Date().toISOString() });
   }
 });
 
@@ -470,7 +895,7 @@ if (openai) {
         return;
       }
 
-      const file = new File([audioBuffer], "audio.webm", { type: "audio/webm" });
+      const file = new File([new Uint8Array(audioBuffer)], "audio.webm", { type: "audio/webm" });
 
       const response = await openai.audio.transcriptions.create({
         model: "whisper-1",
@@ -568,23 +993,84 @@ app.get("/health", (_req, res) => {
       : "disabled (no XMETAV_TOKEN_ADDRESS)",
     endpoints: {
       gated: {
-        "POST /agent-task": "$0.01 — dispatch a task to an agent",
-        "POST /intent": "$0.005 — resolve a goal into commands",
-        "GET /fleet-status": "$0.001 — live agent fleet status",
-        "POST /swarm": "$0.02 — launch multi-agent swarm",
+        "POST /agent-task": "$0.10 — dispatch a task to an agent",
+        "POST /intent": "$0.05 — resolve a goal into commands",
+        "GET /fleet-status": "$0.01 — live agent fleet status",
+        "POST /swarm": "$0.50 — launch multi-agent swarm",
+        "POST /memory-crystal": "$0.05 — summon memory crystal",
+        "POST /neural-swarm": "$0.10 — neural swarm delegation",
+        "POST /fusion-chamber": "$0.15 — fuse memory crystals",
+        "POST /cosmos-explore": "$0.20 — explore Memory Cosmos",
         ...(openai
           ? {
-              "POST /voice/transcribe": "$0.005 — speech-to-text (Whisper)",
-              "POST /voice/synthesize": "$0.01 — text-to-speech (TTS HD)",
+              "POST /voice/transcribe": "$0.05 — speech-to-text (Whisper)",
+              "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)",
             }
           : {}),
       },
       free: {
         "GET /health": "this endpoint",
         "GET /token-info": "XMETAV token info and tier table",
+        "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
       },
     },
   });
+});
+
+// ---- ERC-8004 Agent Payment Info (free, public discovery) ----
+// Uses the shared erc8004Client and ERC8004_ABI from identity middleware above
+
+app.get("/agent/:agentId/payment-info", async (req, res) => {
+  const agentId = BigInt(req.params.agentId);
+
+  try {
+    const [owner, tokenURI, agentWallet] = await Promise.all([
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
+    ]);
+
+    // Check if the agent metadata declares x402 support
+    let metadata: Record<string, unknown> | null = null;
+    let x402Enabled = false;
+    if (tokenURI) {
+      try {
+        if ((tokenURI as string).startsWith("data:")) {
+          const json64 = (tokenURI as string).split(",")[1];
+          metadata = JSON.parse(Buffer.from(json64, "base64").toString());
+        } else {
+          const resp = await fetch(tokenURI as string, { signal: AbortSignal.timeout(5000) });
+          if (resp.ok) metadata = await resp.json() as Record<string, unknown>;
+        }
+        if (metadata) {
+          // Check both new x402Support.enabled flag and legacy services array
+          const x402Support = metadata.x402Support as { enabled?: boolean } | undefined;
+          const services = metadata.services as Array<{ type: string }> | undefined;
+          x402Enabled = x402Support?.enabled === true || !!services?.some((s) => s.type === "x402");
+        }
+      } catch { /* metadata fetch failed — ok, just report what we have */ }
+    }
+
+    res.json({
+      agentId: agentId.toString(),
+      owner: owner as string,
+      agentWallet: agentWallet as string,
+      tokenURI: tokenURI as string,
+      x402Enabled,
+      acceptedSchemes: x402Enabled ? ["exact"] : [],
+      network: "eip155:8453",
+      pricing: x402Enabled && metadata
+        ? (metadata as Record<string, unknown>)
+        : null,
+      registry: ERC8004_REGISTRY,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    res.status(404).json({
+      error: `Agent #${agentId} not found in ERC-8004 registry`,
+      registry: ERC8004_REGISTRY,
+    });
+  }
 });
 
 // ---- Start ----
@@ -600,13 +1086,21 @@ app.listen(port, () => {
   console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
   console.log(`  Token:     ${XMETAV_TOKEN_ADDRESS ? XMETAV_TOKEN_ADDRESS : "disabled (no XMETAV_TOKEN_ADDRESS)"}`);
   console.log(`\n  Gated endpoints:`);
-  console.log(`    POST /agent-task       $0.01   Dispatch task to agent`);
-  console.log(`    POST /intent           $0.005  Resolve goal → commands`);
-  console.log(`    GET  /fleet-status     $0.001  Live fleet status`);
-  console.log(`    POST /swarm            $0.02   Multi-agent swarm`);
+  console.log(`    POST /agent-task       $0.10   Dispatch task to agent`);
+  console.log(`    POST /intent           $0.05   Resolve goal → commands`);
+  console.log(`    GET  /fleet-status     $0.01   Live fleet status`);
+  console.log(`    POST /swarm            $0.50   Multi-agent swarm`);
+  console.log(`    POST /memory-crystal   $0.05   Memory crystal summon`);
+  console.log(`    POST /neural-swarm     $0.10   Neural swarm delegation`);
+  console.log(`    POST /fusion-chamber   $0.15   Fuse memory crystals`);
+  console.log(`    POST /cosmos-explore   $0.20   Explore Memory Cosmos`);
   if (openai) {
-    console.log(`    POST /voice/transcribe $0.005  Speech-to-text (Whisper)`);
-    console.log(`    POST /voice/synthesize $0.01   Text-to-speech (TTS HD)`);
+    console.log(`    POST /voice/transcribe $0.05   Speech-to-text (Whisper)`);
+    console.log(`    POST /voice/synthesize $0.08   Text-to-speech (TTS HD)`);
   }
+  console.log(`\n  Free endpoints:`);
+  console.log(`    GET  /health                    Service health`);
+  console.log(`    GET  /token-info                Token tiers & discounts`);
+  console.log(`    GET  /agent/:agentId/payment-info  ERC-8004 agent lookup`);
   console.log();
 });

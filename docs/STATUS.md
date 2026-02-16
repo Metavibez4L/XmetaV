@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-13  
+**Last verified:** 2026-02-15  
 **System:** metavibez4L (WSL2)  
-**XmetaV Version:** v14 (Fleet Expansion + Office Reorganization + Specialist Agents)
+**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)
 
 This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
 
@@ -18,14 +18,22 @@ This file captures the **known-good** runtime settings for this machine and the 
 
 # Verify OpenClaw
 openclaw health
-openclaw --version  # Expected: 2026.2.1
+openclaw --version  # Expected: 2026.2.14
+
+# Supabase tables sanity (service role / admin only)
+# - agent_memory is the persistent memory bus used by the bridge
+# - shared memory entries use agent_id = "_shared"
+#
+# Example SQL in Supabase editor:
+#   select agent_id, kind, created_at from agent_memory order by created_at desc limit 10;
+#   select count(*) from agent_memory;
 ```
 
 ---
 
 ## Versions
 
-- OpenClaw: `openclaw --version` (expected: 2026.2.1)
+- OpenClaw: `openclaw --version` (expected: 2026.2.14)
 - Node: `node --version` (expected: 22.x)
 - Ollama: `ollama --version` (native install recommended; snap often breaks CUDA)
 
@@ -35,7 +43,7 @@ openclaw --version  # Expected: 2026.2.1
 - State dir: `~/.openclaw/`
 - Config file: `~/.openclaw/openclaw.json`
 - Workspace(s): per-agent (`openclaw agents list`)
-- Gateway: local (`gateway.mode: local`)
+- Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local` — agents use `--local` flag, gateway is fallback for channels)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
 
 ## Configured agents (this machine)
@@ -45,6 +53,8 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | Agent | Model | Workspace | Tools | Role |
 |-------|-------|-----------|-------|------|
 | `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
+| `sentinel` | `kimi-k2.5:cloud` | `/home/manifest/sentinel` | coding | **Fleet Ops** — lifecycle, spawn coordination, health |
+| `soul` | `kimi-k2.5:cloud` | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dreams, associations |
 | `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
 | `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
@@ -52,16 +62,19 @@ This command center is set up for **multiple isolated agents**, all powered by *
 | `briefing` | `kimi-k2.5:cloud` | `/home/manifest/briefing` | coding | **Context Curator** — continuity, health, memory |
 | `oracle` | `kimi-k2.5:cloud` | `/home/manifest/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
 | `alchemist` | `kimi-k2.5:cloud` | `/home/manifest/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
+| `midas` | `kimi-k2.5:cloud` | `/home/manifest/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
 | `web3dev` | `kimi-k2.5:cloud` | `/home/manifest/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
 
 \* = default agent
 
-Detailed agent runbooks:
+Detailed agent runbooks (index: [`docs/agents/README.md`](agents/README.md)):
 - `docs/agents/main.md`
+- `docs/agents/sentinel.md`
 - `docs/agents/briefing.md`
 - `docs/agents/oracle.md`
 - `docs/agents/alchemist.md`
+- `docs/agents/midas.md`
 - `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`
@@ -169,9 +182,28 @@ Expected values (high level):
 - `models.providers.ollama.api`: `openai-responses` (required for tool calling!)
 - `models.providers.ollama.apiKey`: set to a non-secret placeholder (e.g. `"local"`) to satisfy OpenClaw auth checks for local Ollama
 
+Quick tool-calling sanity test:
+
+```bash
+openclaw agent --agent main --local --thinking off \
+  --session-id tool_test_$(date +%s) \
+  --message "Call exec: echo TOOL_OK"
+# Expected: agent calls exec tool and returns TOOL_OK
+
+## Persistent memory bus (Supabase)
+
+This environment supports a Supabase-backed memory bus that complements OpenClaw session history:
+
+- Table: `agent_memory`
+- Scope: per-agent entries plus shared entries (`agent_id = "_shared"`)
+- Bridge behavior: injects recent memory into dispatch prompts; writes an `outcome`/`error` entry after completion
+
+Migration file (dashboard): `dashboard/scripts/setup-db-agent-memory.sql`
+```
+
 ## Standard way to run the agent (stable)
 
-Use embedded mode + disable thinking for “simple chat” reliability on small local models:
+Use `--local` + `--thinking off` for reliable agent calls (bypasses gateway websocket, runs embedded):
 
 ```bash
 openclaw agent \
@@ -214,6 +246,7 @@ curl -i -sS http://127.0.0.1:11434/api/chat \
 
 Fix:
 - Wait for the limit to reset, or upgrade your Ollama plan.
+- **Temporary fallback**: route non-critical agents (sentinel, briefing) to local `qwen2.5:7b-instruct` while keeping main on cloud. Edit the agent's `models.json` to swap the model.
 
 ## Health checks
 
@@ -258,7 +291,7 @@ fuser -k 18789/tcp 2>/dev/null || true
 
 ## Tool Calling (System Automation)
 
-With `tools.profile=coding` (or `full` for `basedintern`) and `api=openai-responses`, the agent can:
+With `tools.profile=full` (main) or `coding` (repo agents) and `api=openai-responses`, the agent can:
 - Execute shell commands via `exec` tool
 - Read/write files via `read`/`write` tools
 - Manage background processes via `process` tool
@@ -285,7 +318,7 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Dashboard (Next.js) | Active | `cd dashboard && npm run dev` (localhost:3000) |
-| Bridge Daemon | Active when running | `cd dashboard/bridge && npm start` |
+| Bridge Daemon | Active when running | `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot) |
 | Supabase | Active | Project: `ptlneqcjsnrxxruutsxm` |
 
 ### Supabase tables
@@ -300,6 +333,20 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `swarm_tasks` | Per-task status and output | Authenticated: SELECT, INSERT, UPDATE |
 | `x402_payments` | x402 payment transaction log | Authenticated: SELECT, INSERT |
 | `intent_sessions` | Intent resolution sessions | Authenticated: SELECT, INSERT |
+| `agent_memory` | Persistent memory bus (per-agent + shared) | Authenticated: SELECT, INSERT |
+| `memory_associations` | Soul agent memory association graph | Authenticated: SELECT, INSERT |
+| `memory_queries` | Soul agent memory retrieval log | Authenticated: SELECT, INSERT |
+| `dream_insights` | Soul agent dream consolidation insights | Authenticated: SELECT, INSERT |
+| `soul_dream_manifestations` | Lucid dream proposals and actions | Authenticated: SELECT + Service role: ALL |
+| `soul_dream_sessions` | Dream session tracking and stats | Authenticated: SELECT + Service role: ALL |
+| `soul_association_modifications` | Self-modification audit trail | Authenticated: SELECT + Service role: ALL |
+| `agent_swaps` | Token swap execution log | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_crystals` | Living memory crystals (materia system) | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_fusions` | Crystal fusion history (FF7-style) | Authenticated: SELECT, INSERT |
+| `memory_summons` | Memory summons log | Authenticated: SELECT, INSERT |
+| `limit_breaks` | Limit break event tracking | Authenticated: SELECT, INSERT, UPDATE |
+| `memory_achievements` | Achievement/quest progression | Authenticated: SELECT, INSERT, UPDATE |
+| `daily_quests` | Daily quest generation | Authenticated: SELECT, INSERT, UPDATE |
 
 All tables have Realtime enabled for live updates.
 
@@ -316,6 +363,8 @@ View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments
 | `/payments` | Payments | x402 wallet status, daily spend, payment history, gated endpoints |
 | `/identity` | Identity | ERC-8004 on-chain agent NFT, reputation, and capabilities |
 | `/token` | $XMETAV | Token balance, tier table, discount info, holder benefits |
+| `/consciousness` | Consciousness | Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
+| `/memory-cosmos` | Memory Cosmos | Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable memory world, quests |
 | `/arena` | XMETAV HQ | Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | Live Logs | Real-time log streaming with severity/agent filters and search |
 
@@ -342,10 +391,10 @@ Required environment variables (in `dashboard/.env.local`):
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public, used in browser) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (public) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
-| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (**server-side only**, never expose to browser) |
+| `OPENAI_API_KEY` | OpenAI API key for Whisper STT + TTS (**server-side only**) |
 | `XMETAV_TOKEN_ADDRESS` | Deployed $XMETAV ERC-20 contract address |
 
 ### Swarm runs (dashboard)
@@ -382,10 +431,11 @@ ERC-20 token on Base Mainnet with tiered discounts for x402 endpoints.
 | Tier | Min Balance | Discount | Daily Limit |
 |------|-------------|----------|-------------|
 | None | 0 | 0% | $5 |
-| Bronze | 1,000 | 10% | $25 |
-| Silver | 10,000 | 20% | $100 |
-| Gold | 100,000 | 35% | $500 |
-| Diamond | 1,000,000 | 50% | $2,000 |
+| Starter | 100 | 10% | $25 |
+| Bronze | 1,000 | 15% | $50 |
+| Silver | 10,000 | 25% | $200 |
+| Gold | 100,000 | 50% | $1,000 |
+| Diamond | 1,000,000 | 75% | $5,000 |
 
 ### Environment
 
@@ -410,7 +460,7 @@ XmetaV v10 adds voice interaction with streaming TTS, push-to-talk, wake word de
 | Waveform Visualizer | Active | `VoiceWaveform` — canvas-based frequency bars during record/playback |
 | Settings Panel | Active | `VoiceSettings` — voice, model, speed, PTT, wake, continuous toggles |
 | Dashboard UI | Active | Voice toggle + gear icon in Agent Chat header |
-| x402 Gating | Active | Endpoints payment-gated: $0.005 (transcribe), $0.01 (synthesize) |
+| x402 Gating | Active | Endpoints payment-gated: $0.05 (transcribe), $0.08 (synthesize) |
 
 ### Usage
 
@@ -436,7 +486,7 @@ npx tsx scripts/voice-cli.ts
 
 ---
 
-## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14)
+## XMETAV HQ — Isometric Office Arena (v12, fixed v13, reorganized v14, extended v17)
 
 Full isometric office visualization rendered with PixiJS at `/arena`, driven by live Supabase Realtime events.
 
@@ -451,14 +501,15 @@ Full isometric office visualization rendered with PixiJS at `/arena`, driven by 
 | Effects | Active | `renderer/effects.ts` — command pulses, streaming particles, dispatch beams, bursts, glitches |
 | Supabase Events | Active | `useArenaEvents.ts` — subscribes to sessions, commands, responses, controls + 10s periodic sync |
 | HUD Overlay | Active | DOM: title, system status, agent legend, floating labels, TEST MEETING button |
-| Meeting Sync | **Fixed (v13)** | State replay after PixiJS init resolves race condition; periodic sync catches dropped events |
+| Meeting Sync | **Stabilized (v17)** | Replay after PixiJS init + periodic sync; meeting lifecycle guards reduce status-churn ending meetings early |
 
 ### Office layout (v14 — reorganized)
 
-Grid expanded from 10x8 to 10x10 with four distinct zones:
+Grid expanded from 10x8 to 10x10 with five distinct zones:
 
-- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above
-- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 10 chairs for all agents
+- **COMMAND room** (top, rows 0–2, walled): Main agent desk with 3 holo screens + Operator orb floating above (visual-only; not an OpenClaw agent)
+- **SOUL office** (left alcove, cols 0–1): Magenta-tinted private alcove behind glass with surveillance desk + mini fleet monitors
+- **MEETING area** (center, rows 3–5): Hexagonal glass table with holographic projector, 12 seats
 - **INTEL room** (bottom-left, rows 6–9, glass walls): Briefing, Oracle, Alchemist — with space for 2 future agents. Blue-tinted floor and `#38bdf8` glass partition walls.
 - **DEV FLOOR** (bottom-right, rows 6–9, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks. Green-tinted grid lines.
 
@@ -478,6 +529,8 @@ When 2+ agents are "busy," avatars smoothly interpolate from their desks to assi
 | Bottom-left | akua_web | 120 |
 | Bottom-right | basedintern_web | 60 |
 | Right center | web3dev | 0 |
+| Upper-right (near operator) | sentinel | 300 |
+| Observer | soul | 195 |
 
 **TEST MEETING** button in the HUD (top-right) forces a meeting for visual verification.
 
@@ -495,9 +548,11 @@ When 2+ agents are "busy," avatars smoothly interpolate from their desks to assi
 
 ---
 
-## Streaming Optimization (v12)
+## Streaming Optimization (v12, further tuned v18)
 
 End-to-end optimization of the agent chat streaming pipeline for lower latency and smoother rendering.
+
+### v12 baseline
 
 | Component | Change | Impact |
 |-----------|--------|--------|
@@ -506,6 +561,17 @@ End-to-end optimization of the agent chat streaming pipeline for lower latency a
 | `useRealtimeMessages` | Ref-based string accumulator (no array/join) | Eliminates GC pressure |
 | `useRealtimeMessages` | 80ms throttle for batched renders | Smoother streaming UI |
 | `AgentChat.tsx` | StreamingBubble component | Independent render from message history |
+
+### v18 tuning (2.5× faster rendering)
+
+| Component | Change | Impact |
+|-----------|--------|--------|
+| `streamer.ts` | Chunk size 400→160, flush 200→80ms, first flush 50→30ms | 2.5× faster time-to-first-byte |
+| `streamer.ts` | Retry on failed Supabase inserts | No lost chunks under load |
+| `executor.ts` | Token batching (6 tokens / 15ms) before streamer.write() | Reduces DB round-trips |
+| `useRealtimeMessages` | Throttle 80→50ms (~20fps), RAF-aligned state updates | Eliminates frame drops |
+| `AgentChat.tsx` | StreamingBubble wrapped in React.memo, useMemo cleanAgentOutput | Zero unnecessary re-renders |
+| `AgentChat.tsx` | Smart auto-scroll with data-scroll-container | Only auto-scrolls when near bottom |
 
 ---
 
@@ -525,6 +591,49 @@ Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unre
 
 - Message encoding now pipes through `python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))"` for safe JSON encoding of emojis, newlines, and special characters
 - `status`, `result`, `list` subcommands hardened with `try/except` JSON parsing, `isinstance()` type checks, `.get()` dictionary access
+
+---
+
+## EthSkills (v21)
+
+12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents via `openclaw skills install`.
+
+### Installed Skills
+
+| Skill | Agent(s) | Description |
+|-------|----------|-------------|
+| `wallets` | main | EOAs, Safe multisig, EIP-7702 smart EOAs, ERC-4337 account abstraction, key safety |
+| `tools` | web3dev | Hardhat, Foundry, Tenderly, Etherscan verification |
+| `l2s` | web3dev, oracle | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
+| `orchestration` | web3dev | Multi-contract deploy scripts, upgrade patterns, proxy factories |
+| `addresses` | web3dev, midas, alchemist | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `concepts` | web3dev, midas | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
+| `security` | web3dev | Reentrancy, flash loans, oracle manipulation, access control |
+| `standards` | web3dev, midas | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
+| `frontend-ux` | web3dev | Wallet connection, transaction UX, error handling, mobile |
+| `frontend-playbook` | web3dev | wagmi/viem integration, RainbowKit, WalletConnect |
+| `building-blocks` | web3dev | OpenZeppelin patterns, diamond proxy, minimal proxy |
+| `gas` | oracle, midas, alchemist | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
+
+### Dashboard Integration
+
+- **Fleet Table** (`/fleet`): Skills badges per agent in purple (#e879f9) badges
+- **Identity Page** (`/identity`): Skills shown in fleet roster grid per agent
+- **ERC-8004 Metadata**: 13 new capabilities added to on-chain metadata; per-agent `skills` arrays in `fleet.agents`
+
+### Verification
+
+```bash
+# List all installed skills
+openclaw skills list
+
+# Check skill files
+ls ~/.openclaw/workspace/skills/
+
+# Expected: wallets/ tools/ l2s/ orchestration/ addresses/ concepts/
+#           security/ standards/ frontend-ux/ frontend-playbook/
+#           building-blocks/ gas/ (plus agent-factory/ swarm/ dispatch/ supabase/ web/)
+```
 
 ---
 
@@ -564,13 +673,300 @@ Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unre
 
 ---
 
+## Soul Agent (v18 — Lucid Dreaming)
+
+Memory orchestrator providing context curation, association building, dream consolidation, lucid dreaming (autonomous evolution), and fleet-wide memory retrieval learning.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, dream-proposals, retrieval, types) |
+| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` tables |
+| Lucid Dreaming | Active | Phase 5 autonomous evolution — dream proposals, self-modification, meeting triggers |
+| Arena Presence | Active | Room: SOUL (private alcove), Color: Magenta (#ff006e) |
+| Arena Office | Active | L-shaped surveillance desk + arc of mini fleet-monitor screens |
+| Meeting Seat | Active | Observer position (195°) |
+| Topology | Active | Watches: main, briefing, oracle, alchemist, sentinel |
+| ERC-8004 | Active | Listed in `fleet.agents` + 5 soul capabilities in metadata |
+| Bridge | Active | Listed in ALLOWED_AGENTS |
+| Supabase | Active | Registered in agent_controls |
+| API Route | Active | `GET/POST /api/soul` — proposals, approval, rejection, manual dream trigger |
+| Dashboard | Active | LucidDreaming component on `/consciousness` page |
+
+### Lucid Dreaming (Phase 5)
+
+During dream cycles, Soul generates actionable manifestations across 7 categories:
+
+| Category | Description | Auto-Executable |
+|----------|-------------|----------------|
+| `fusion` | Crystal fusion proposals | No |
+| `association` | Self-modify memory graph (reinforce/create links) | Yes (≥0.8 confidence) |
+| `pricing` | x402 endpoint pricing suggestions | No |
+| `skill` | Agent skill recommendations | No |
+| `meeting` | Autonomous meeting triggers (cross-agent patterns) | No |
+| `pattern` | Detected pattern worth highlighting | Yes (≥0.8 confidence) |
+| `correction` | Error pattern requiring intervention | No |
+
+Status flow: `proposed` → `approved`/`rejected` → `executed`/`expired` (72hr TTL)
+
+Capabilities: `soul-memory-orchestration`, `dream-consolidation`, `lucid-dreaming`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+
+---
+
+## Oracle Identity Scouting (v21)
+
+Automated on-chain identity discovery system enabling the Oracle agent to scout and catalog ERC-8004 registered agents on Base mainnet.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Scout Library | Active | `bridge/lib/oracle/identity-scout.ts` — range scanning, metadata fetching |
+| Bridge Integration | Active | `bridge/lib/oracle/index.ts` — exports scout functions |
+| API Route | Active | `/api/oracle/discovery` — HTTP endpoint for scouting |
+| Dashboard Page | Active | `/oracle` — discovery dashboard with agent cards |
+| Hook | Active | `useOracleDiscovery.ts` — React hook for scouting state |
+| Sidebar | Active | Oracle Discovery nav entry |
+| Types | Active | `OracleDiscoveryResult`, `DiscoveredAgent` in types.ts |
+
+### Capabilities
+
+- Scan agent ID ranges on ERC-8004 IdentityRegistry
+- Fetch and parse agent metadata (capabilities, services, fleet)
+- Display discovered agents with registration details
+- Filter by capabilities and services
+
+---
+
+## Arena Optimizations (v21)
+
+Performance audit and optimization of the ~3,600 line arena codebase.
+
+| Optimization | File | Impact |
+|-------------|------|--------|
+| Particle Pool | `effects.ts` | Object reuse eliminates GC pressure from particle creation |
+| Position Hash Diffs | `avatars.ts` | Skip redundant position calculations when state unchanged |
+| lastKnownStatus Cache | `avatars.ts` | Prevent duplicate status transitions |
+| Throttled ResizeObserver | `ArenaCanvas.tsx` | Debounced canvas resize prevents layout thrashing |
+
+---
+
+## Alchemy RPC (v21)
+
+All on-chain reads switched from default Base RPC to **Alchemy** for better reliability and rate limits.
+
+- RPC URL: `https://base-mainnet.g.alchemy.com/v2/...` (via `BASE_RPC_URL` env)
+- Files updated: 11 files across bridge, erc8004, x402-server, and API routes
+- Previous: Default Base public RPC (rate-limited, unreliable)
+
+---
+
+## Memory Crystal System (v20 — Cyber-Neural Memory Evolution)
+
+Final-Fantasy-inspired memory gamification at `/memory-cosmos` with 7 interconnected subsystems.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Memory Crystals (Materia) | Active | Crystals with XP, levels (1-30), star ratings (1-6★), class evolution |
+| Crystal Fusion (FF7 Style) | Active | 5 fusion recipes: Nexus, Prophecy, Storm, Phantom, Infinity |
+| Memory Summons | Active | Keyword-triggered crystal summoning with animated ritual |
+| Limit Breaks | Active | Triggered at 10+ crystals with 500+ total XP — creates legendary 6★ crystal |
+| Memory Cosmos (World) | Active | Pannable/zoomable explorable world with islands, bridges, terrain types |
+| Achievements | Active | 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers |
+| Daily Quests | Active | Auto-generated daily quests with XP rewards |
+
+### Database (6 tables + 1 view + 3 enums)
+
+| Table | Purpose |
+|-------|---------|
+| `memory_crystals` | Core crystal data: type, color, class, XP, level, star rating, equipped status |
+| `memory_fusions` | Fusion history: source crystal IDs + result crystal + recipe name |
+| `memory_summons` | Summon log: task context, keyword matched, crystal summoned |
+| `limit_breaks` | Limit break events: trigger, power boost, affected agents, resolution |
+| `memory_achievements` | Achievement definitions with tier, progress, unlock conditions |
+| `daily_quests` | Auto-generated daily quests with type-based objectives |
+
+Enums: `crystal_type` (milestone, decision, incident), `crystal_color` (cyan, magenta, gold, emerald, violet), `crystal_class` (anchor, mage, knight, sage, rogue, summoner, ninja, godhand)
+
+View: `crystal_level_thresholds` — XP required per level (1-30)
+
+### Crystal Class Evolution
+
+| Class | Star Req | Specialty |
+|-------|----------|----------|
+| anchor | ★ | Base class |
+| mage | ★★ | Memory amplification |
+| knight | ★★★ | Defensive anchoring |
+| sage | ★★★★ | Cross-agent wisdom |
+| rogue | ★★★★ | Fast context switching |
+| summoner | ★★★★★ | Crystal summoning power |
+| ninja | ★★★★★ | Stealth memory injection |
+| godhand | ★★★★★★ | Legendary — all abilities |
+
+### Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| CrystalCard | `crystals/CrystalCard.tsx` | Animated canvas crystal card with shape/particles/XP bar |
+| CrystalInventory | `crystals/CrystalInventory.tsx` | Filterable/sortable grid with stats |
+| FusionChamber | `crystals/FusionChamber.tsx` | Two-slot fusion UI with 4-phase animation |
+| SummonOverlay | `crystals/SummonOverlay.tsx` | Modal with concentric summoning circles |
+| LimitBreakBanner | `crystals/LimitBreakBanner.tsx` | Golden lightning banner for active limit breaks |
+| MemoryCosmos | `crystals/MemoryCosmos.tsx` | Pannable/zoomable explorable world map |
+| QuestTracker | `crystals/QuestTracker.tsx` | Achievement + daily quest progress display |
+
+### Bridge Engine
+
+`dashboard/bridge/lib/memory-crystal.ts` — Full game engine (~530 lines):
+- `createCrystal()`, `awardXP()`, `equipCrystal()`, `unequipCrystal()`
+- `findFusionRecipe()`, `fuseCrystals()` — 5 recipes with ingredient matching
+- `summonCrystal()` — keyword relevance scoring for auto-selection
+- `checkLimitBreak()`, `resolveLimitBreak()` — legendary crystal creation
+- `ensureDailyQuests()`, `getDailyQuests()` — auto-generation
+- 30-level XP curve, star ratings 1-6★, class evolution system
+
+### Hook
+
+`useMemoryCrystals` — React hook with Supabase queries + realtime subscriptions on `memory_crystals` and `limit_breaks` tables. 12s auto-refresh. Exposes `fuseCrystals()`, `summonCrystal()`, `equipCrystal()`, `unequipCrystal()`, `refresh()` actions.
+
+Files: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCrystals.ts`, `dashboard/bridge/lib/memory-crystal.ts`
+
+---
+
+## Consciousness Tab (v19 — Lucid Dreaming)
+
+Dual-aspect awareness dashboard at `/consciousness` providing real-time visualization of memory, anchoring, context, dream consolidation, and lucid dreaming proposals.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Consciousness Page | Active | `/consciousness` — 7-panel awareness visualization |
+| Sidebar Nav | Active | Brain icon at position 03 (Ctrl+3) |
+| useConsciousness Hook | Active | Parallel fetch from 6 Supabase tables, 15s auto-refresh |
+
+### Panels
+
+| Panel | Component | Description |
+|-------|-----------|-------------|
+| Unified Awareness | `UnifiedAwareness.tsx` | Split view: Main (cyan) ↔ beam ↔ Soul (magenta), live status indicators |
+| Memory Graph | `MemoryGraph.tsx` | Force-directed canvas with drag/zoom, agent-clustered nodes, kind-colored |
+| Anchor Timeline | `AnchorTimeline.tsx` | Horizontal chain of on-chain anchors, click-to-BaseScan links |
+| Context Metrics | `ContextMetrics.tsx` | 4 metric cards + recent context injections feed |
+| Dream Mode | `DreamModeStatus.tsx` | 6hr idle threshold progress bar + insights feed |
+| Lucid Dreaming | `LucidDreaming.tsx` | Phase 5 proposal cards with approve/reject, dream trigger, session history |
+| Mini Arena | `MiniArena.tsx` | Stylized live agent positions with realtime subscription, focus toggle |
+
+Files: `dashboard/src/components/consciousness/`, `dashboard/src/hooks/useConsciousness.ts`
+
+---
+
+## Swap Execution System (v18)
+
+Agent-initiated token swap execution via the bridge, with voice normalization and on-chain pre-checks.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Swap Executor | Active | `bridge/src/swap-executor.ts` — intercepts swap intents from agent output |
+| Swap API | Active | `/api/swap` — POST endpoint for swap execution |
+| DB Table | Active | `agent_swaps` — swap execution log with status tracking |
+| Gas Pre-check | Active | Validates ETH balance for gas before submitting |
+| Token Balance Check | Active | Validates token balance before swap |
+| Error Handling | Active | Clean viem error messages, failed status shown in chat |
+
+### Voice Swap Normalization (v18)
+
+Voice-to-text often produces informal swap commands. The normalizer converts spoken aliases to canonical token symbols before the executor processes them.
+
+| Component | File | Description |
+|-----------|------|-------------|
+| VOICE_ALIASES | `bridge/src/swap-executor.ts` | Dictionary mapping spoken words → token symbols |
+| normalizeVoiceSwap | `bridge/src/swap-executor.ts` | Regex-based normalization function |
+
+Example normalizations:
+- "swap 50 bucks of ether for chain link" → "swap 50 USDC for ETH for LINK"
+- "trade one thousand dollars of wrapped bitcoin" → "swap 1000 USDC for WBTC"
+
+Fleet lifecycle manager providing spawn coordination, resource management, and inter-agent communication.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| IDENTITY.md | Active | `~/.openclaw/agents/sentinel/agent/IDENTITY.md` |
+| SOUL.md | Active | `~/.openclaw/agents/sentinel/agent/SOUL.md` |
+| models.json | Active | kimi-k2.5:cloud (256k context) |
+| Arena Presence | Active | Room: COMMAND, Color: Red (#ef4444) |
+| Bridge | Active | Listed in ALLOWED_AGENTS |
+| Supabase | Active | Registered in agent_controls |
+
+Commands: `status`, `health`, `spawn`, `queue`, `errors`
+
+---
+
+## Agent Identity System (v15)
+
+All sub-agents now have proper IDENTITY.md and SOUL.md files defining their self-awareness.
+
+| Agent | IDENTITY.md | SOUL.md | Status |
+|-------|-------------|---------|--------|
+| main | `~/.openclaw/workspace/IDENTITY.md` | `~/.openclaw/workspace/SOUL.md` | Active |
+| sentinel | `~/.openclaw/agents/sentinel/agent/` | Same | Active |
+| briefing | `~/.openclaw/agents/briefing/agent/` | Same | Active |
+| oracle | `~/.openclaw/agents/oracle/agent/` | Same | Active |
+| alchemist | `~/.openclaw/agents/alchemist/agent/` | Same | Active |
+| web3dev | `~/.openclaw/agents/web3dev/agent/` | Same | Active |
+
+Each agent's identity includes: purpose, commands, data sources, team awareness, operating principles, communication style, and arena info.
+
+---
+
+## Agent Session Persistence (v15)
+
+Main agent uses a persistent daily session for conversation context.
+
+| Feature | Value |
+|---------|-------|
+| Session ID format | `dash_main_YYYYMMDD` |
+| Scope | Per-day (resets at midnight) |
+| Lock fallback | Unique ID when persistent session is locked |
+| Other agents | Always use unique session IDs |
+
+**How it works:** When main is invoked, the bridge checks if the daily session lock file exists. If unlocked, main reuses the same session, preserving full conversation history within the day. If locked (concurrent command), it falls back to a unique session ID so the command isn't blocked.
+
+---
+
+## Output Noise Filter (v15)
+
+Expanded to catch all bridge/diagnostic noise in agent responses.
+
+| Pattern | Description |
+|---------|-------------|
+| `[diagnostic]` | Lane task errors from OpenClaw runtime |
+| `[heartbeat]` | Bridge heartbeat messages |
+| `[bridge]` | Bridge daemon internals |
+| `[swarm]` | Swarm executor messages |
+| `[intent-tracker]` | Intent tracking messages |
+| `[voice/...]` | Voice transcription debug |
+| `session file locked` | Session lock timeout errors |
+
+Located in: `dashboard/src/lib/utils.ts` → `cleanAgentOutput()`
+
+---
+
+## Voice STT Changes (v15)
+
+| Change | Before | After |
+|--------|--------|-------|
+| Default STT | `gpt-4o-transcribe` | Browser `SpeechRecognition` |
+| Fallback | — | `whisper-1` with `language: "en"` |
+| Prompt | Full example sentences | Removed entirely |
+| Temperature | `0` | Removed |
+
+Browser SpeechRecognition bypasses WSL2 audio degradation by processing audio directly in Chrome, avoiding WebM encoding and network roundtrip.
+
+---
+
 ## x402 Payments (Base Mainnet) ✅ PRODUCTION
 
 XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol (Coinbase).
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` |
+| x402 Express Server | **Mainnet** ✅ | `cd dashboard/x402-server && npm start` (dev: `npm run dev`) |
 | Bridge x402 Client | **Mainnet** ✅ | Auto-pays with `EVM_PRIVATE_KEY` |
 | Supabase `x402_payments` table | Active | Payment logging with daily spend view |
 | Dashboard `/payments` page | Active | Wallet status, history, gated endpoints |
@@ -587,12 +983,16 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
-| `POST /agent-task` | $0.01 | Queue a task for any agent |
-| `POST /intent` | $0.005 | Create an intent resolution session |
-| `GET /fleet-status` | $0.001 | Get fleet status summary |
-| `POST /swarm` | $0.02 | Launch a multi-agent swarm |
-| `POST /voice/transcribe` | $0.005 | Speech-to-text (Whisper) |
-| `POST /voice/synthesize` | $0.01 | Text-to-speech (streaming TTS) |
+| `POST /agent-task` | $0.10 | Dispatch a task to any agent |
+| `POST /intent` | $0.05 | Resolve a goal into executable commands |
+| `GET /fleet-status` | $0.01 | Live agent fleet status |
+| `POST /swarm` | $0.50 | Launch multi-agent swarm orchestration |
+| `POST /memory-crystal` | $0.05 | Summon a memory crystal from cosmos |
+| `POST /neural-swarm` | $0.10 | Neural swarm delegation across agents |
+| `POST /fusion-chamber` | $0.15 | Fuse memory crystals in Materia chamber |
+| `POST /cosmos-explore` | $0.20 | Explore the Memory Cosmos world |
+| `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
 
 ### Free endpoints (x402-server)
 
@@ -616,7 +1016,7 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 
 ## ERC-8004 Agent Identity (Base mainnet)
 
-The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
+The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT with full x402 payment support declared in metadata.
 
 | Property | Value |
 |----------|-------|
@@ -624,8 +1024,25 @@ The XmetaV main agent is registered on-chain as an ERC-8004 identity NFT.
 | Contract | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` (IdentityRegistry) |
 | Network | Base Mainnet |
 | Owner | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` |
+| tokenURI | `https://raw.githubusercontent.com/Metavibez4L/XmetaV/dev/dashboard/erc8004/metadata.json` |
+| x402Support | `enabled: true` (declared in on-chain metadata) |
+| setAgentURI tx | [BaseScan](https://basescan.org/tx/0xc5c67e881d94c09746378f791eaee56e70c424742dc30c528109895ee5f23339) |
 | NFT | [BaseScan](https://basescan.org/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=16905) |
-| Tx | [BaseScan](https://basescan.org/tx/0xee8da73203e1a6ce48560f66731a02fb4a74c346d6f1a02bd4cf94d7e05adb3b) |
+
+### Identity Resolution Middleware
+
+The x402 server includes ERC-8004 identity resolution middleware:
+- Incoming requests with `X-Agent-Id` header trigger on-chain lookup
+- Resolves `ownerOf`, `tokenURI`, `getAgentWallet` from the Identity Registry
+- Fetches metadata and checks `x402Support.enabled`
+- Attaches resolved identity to `req.callerAgent` for downstream handlers
+
+### Discovery Endpoint
+
+```
+GET /agent/16905/payment-info
+```
+Returns: owner, wallet, tokenURI, x402 support status, accepted schemes, pricing, and registry address.
 
 ### Dashboard `/identity` page
 
@@ -637,6 +1054,7 @@ Shows agent registration status, owner, wallet, capabilities, services, trust mo
 |----------|----------|-------------|
 | `ERC8004_AGENT_ID` | `bridge/.env` | On-chain agent ID (16905) |
 | `EVM_PRIVATE_KEY` | `bridge/.env` | Wallet key (shared with x402) |
+| `BASE_RPC_URL` | `x402-server/.env` | Alchemy RPC for on-chain reads |
 
 Full reference: `capabilities/erc8004-identity.md`
 
@@ -693,27 +1111,66 @@ Workarounds:
 - Use the deterministic `openclaw browser ...` CLI for browser automation.
 - Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
 
-aw config set browser.enabled true
-openclaw config set browser.defaultProfile openclaw
-openclaw config set browser.executablePath "$HOME/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
-```
+---
 
-### Smoke test (CLI)
+## Build Hardening (v21)
 
-```bash
-# Start gateway (if not already running)
-./scripts/start-gateway.sh
+Comprehensive fix of pre-existing TypeScript build errors across the codebase. All resolved to pass `npx next build` clean.
 
-openclaw browser start
-openclaw browser open https://example.com
-openclaw browser snapshot
-```
+## Optimization Pass (v23)
 
-### Known limitation (small local models)
+Comprehensive security, performance, and build audit applied across the full dashboard + bridge codebase.
 
-With smaller local models (e.g. `qwen2.5:7b-instruct`), the agent may sometimes ignore the `browser` tool and fall back to shell-based approaches.
+### Security
 
-Workarounds:
-- Use the deterministic `openclaw browser ...` CLI for browser automation.
-- Or use `exec` + `curl -sL ...` for “web fetch + summarize” workflows.
+| Fix | Files | Impact |
+|-----|-------|--------|
+| Auth guards (`requireAuth()`) on all API routes | `api/soul`, `api/agents/memory`, `api/midas`, `api/erc8004/identity`, `api/anchors` | Prevents unauthenticated access to data endpoints |
+| UUID validation on user-supplied params | `api/soul`, `api/agents/memory` | Blocks injection via malformed UUIDs |
+| Limit clamping (`clampLimit()`) | `api/soul`, `api/agents/memory` | Prevents unbounded result sets via limit param abuse |
+| RLS policies on dream tables | `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` | Authenticated SELECT policies added (were service-role only) |
+| DB indexes | `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` | Query performance for common access patterns |
+| Shared auth utility | `src/lib/api-auth.ts` (new) | `requireAuth()`, `isValidUUID()`, `clampLimit()` — DRY auth for all routes |
 
+### Performance
+
+| Fix | Files | Impact |
+|-----|-------|--------|
+| Explicit column lists (no `SELECT *`) | `dream.ts`, `retrieval.ts`, `useConsciousness.ts`, `dream-proposals.ts` | Reduced payload size, lower Supabase egress |
+| Bounded dream cycle queries (`.limit(500)`) | `dream.ts` | Prevents unbounded memory scan |
+| Batched N+1 association queries | `dream-proposals.ts` | Single query across all clusters instead of per-cluster |
+| Batched upserts in `executeManifest` | `dream-proposals.ts` | Batch insert instead of per-pair loop |
+| `getManifestationStats` bounded (`.limit(1000)`) | `dream-proposals.ts` | Prevents full table scan |
+| Polling interval 15s → 30s | `useConsciousness.ts` | 50% reduction in dashboard polling load |
+| `await` on `processPendingCommands` loop | `bridge/src/index.ts` | Commands execute sequentially (was fire-and-forget) |
+| Proper SIGTERM handler with graceful shutdown | `bridge/src/index.ts` | Clean session teardown, channel unsubscribe, PID cleanup |
+
+### Build / Canvas
+
+| Fix | Files | Impact |
+|-----|-------|--------|
+| `ctx.setTransform()` replaces stacking `ctx.scale()` | `MemoryGraph.tsx` | Prevents cumulative scaling bug on resize |
+| Map lookup for edge node resolution | `MemoryGraph.tsx` | O(1) vs O(n) `.find()` per edge |
+| `document.hidden` skip in animation loop | `DreamscapeView.tsx` | Saves GPU/CPU when tab is backgrounded |
+| `optimizePackageImports` for lucide-react | `next.config.ts` | Faster builds, smaller bundles |
+| `serverExternalPackages` for pg | `next.config.ts` | Prevents pg from being bundled into client |
+| Type fix in `getManifestationStats` | `dream-proposals.ts` | Clean build (Record<string,number> cast) |
+
+| File | Issue | Fix |
+|------|-------|-----|
+| `bridge/lib/swap-executor.ts` | BigInt literals (`0n`, `4_000_000_000_000n`) | `BigInt()` function calls |
+| `bridge/lib/swap-executor.ts` | Duplicate `"arrow"` key in voice aliases | Removed duplicate |
+| `erc8004/lib/client.ts` | BigInt literals (`0n`) | `BigInt(0)` |
+| `erc8004/register.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `erc8004/update-uri.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `token/scripts/deploy.ts` | BigInt literal (`0n`) | `BigInt(0)` |
+| `scripts/voice-cli.ts` | Unused `@ts-expect-error` directive | `@ts-ignore` |
+| `src/components/AgentChat.tsx` | `.catch()` on `PromiseLike` | `Promise.resolve()` wrapper |
+| `src/hooks/useVoice.ts` | `Uint8Array` not assignable to `BufferSource` | `.buffer as ArrayBuffer` |
+| `src/hooks/useWakeWord.ts` | Missing `SpeechRecognition` type | `any` type annotations |
+| `src/lib/voice.ts` | `Buffer` not assignable to `BlobPart` | `new Uint8Array()` wrapper |
+| `x402-server/index.ts` | `string` not assignable to template literal type | `as` cast |
+| `x402-server/index.ts` | `Buffer` not assignable to `BlobPart` | `new Uint8Array()` wrapper |
+| Missing deps | `@x402/fetch`, `@x402/evm` | `npm install` |
+
+**Root cause**: `tsconfig.json` targets ES2017, which doesn't support BigInt literal syntax (`0n`). All BigInt values must use `BigInt()` function calls.

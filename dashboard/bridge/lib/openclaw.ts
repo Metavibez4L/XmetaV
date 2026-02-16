@@ -1,14 +1,17 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
 import { randomUUID } from "crypto";
+import { existsSync } from "fs";
 
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set([
   "main",
-  "operator",
+  "soul",
+  "sentinel",
   "briefing",
   "oracle",
   "alchemist",
+  "midas",
   "web3dev",
   "akua",
   "akua_web",
@@ -45,8 +48,26 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   const nodePath = process.env.NODE_PATH || "node";
   const timeout = timeoutSeconds ?? DEFAULT_TIMEOUT_S;
 
-  // Use a unique session ID per command to avoid lock contention
-  const sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+  // Session strategy:
+  // - "main" gets a daily persistent session so it retains conversation context
+  //   BUT: falls back to a unique ID if the session lock is held (concurrent commands)
+  // - All other agents get unique session IDs to avoid lock contention
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  let sessionId: string;
+  if (agentId === "main") {
+    const persistentId = `dash_main_${today}`;
+    const homeDir = process.env.HOME || "/home/manifest";
+    const lockPath = resolve(homeDir, `.openclaw/agents/main/sessions/${persistentId}.jsonl.lock`);
+    if (existsSync(lockPath)) {
+      // Persistent session is busy — fall back to unique ID so the command isn't blocked
+      sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+      console.log(`[openclaw] Main session locked, using fallback: ${sessionId}`);
+    } else {
+      sessionId = persistentId;
+    }
+  } else {
+    sessionId = `dash_${randomUUID().slice(0, 8)}_${Date.now()}`;
+  }
 
   const args = [
     "agent",

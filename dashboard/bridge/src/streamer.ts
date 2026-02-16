@@ -1,16 +1,17 @@
 import { supabase } from "../lib/supabase.js";
 
-const CHUNK_SIZE = 400;           // chars per chunk — flush immediately when reached
-const FLUSH_INTERVAL_MS = 200;    // flush every 200ms for snappy streaming
-const FIRST_FLUSH_MS = 50;        // flush the very first chunk fast (50ms)
+const CHUNK_SIZE = 160;           // chars per chunk — flush when reached (was 400)
+const FLUSH_INTERVAL_MS = 80;     // flush every 80ms for smoother streaming (was 200)
+const FIRST_FLUSH_MS = 30;        // first chunk fires fast (was 50)
 
 /**
  * Creates a buffered streamer that writes output chunks to agent_responses.
  * Buffers small writes and flushes periodically to avoid excessive DB writes.
  *
  * Optimizations:
- *  - First chunk flushes in 50ms for fast time-to-first-byte
- *  - Subsequent flushes every 200ms or when buffer hits 400 chars
+ *  - First chunk flushes in 30ms for fast time-to-first-byte
+ *  - Subsequent flushes every 80ms or when buffer hits 160 chars
+ *  - Concurrent-flush guard with retry (no lost chunks)
  *  - Non-blocking flushes (fire-and-forget with error logging)
  */
 export function createStreamer(commandId: string) {
@@ -41,6 +42,8 @@ export function createStreamer(commandId: string) {
 
       if (error) {
         console.error(`[streamer] Failed to write chunk:`, error.message);
+        // Re-queue failed content so it's not lost
+        buffer = content + buffer;
       }
     } finally {
       flushing = false;
@@ -89,6 +92,9 @@ export function createStreamer(commandId: string) {
         .from("agent_responses")
         .insert({ command_id: commandId, content, is_final: false });
     }
+
+    // Small delay to ensure last chunk is received by realtime subscribers
+    await new Promise(r => setTimeout(r, 40));
 
     // Write final marker (content is empty — is_final flag signals completion)
     const { error } = await supabase

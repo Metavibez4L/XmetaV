@@ -35,7 +35,8 @@ const DEFAULT_PHRASES = [
 
 // ── Get SpeechRecognition constructor (vendor-prefixed) ──
 
-function getSpeechRecognition(): (new () => SpeechRecognition) | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSpeechRecognition(): (new () => any) | null {
   if (typeof window === "undefined") return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -53,7 +54,8 @@ export function useWakeWord({
   const [isActive, setIsActive] = useState(false);
   const [lastHeard, setLastHeard] = useState<string | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const onWakeRef = useRef(onWake);
   onWakeRef.current = onWake;
 
@@ -105,13 +107,15 @@ export function useWakeWord({
       }
     };
 
-    recognition.onerror = (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (e: any) => {
       // "no-speech" and "aborted" are normal — just restart
       if (e.error === "no-speech" || e.error === "aborted") return;
       console.warn("[useWakeWord] error:", e.error);
     };
 
-    recognition.onresult = (event) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const text = result[0].transcript;

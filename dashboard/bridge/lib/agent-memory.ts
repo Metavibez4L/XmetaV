@@ -1,0 +1,325 @@
+import { supabase } from "./supabase.js";
+import { anchorMemory, isAnchoringEnabled, MemoryCategory } from "./memory-anchor.js";
+import type { MemoryCategoryType } from "./memory-anchor.js";
+import { processNewMemory } from "./soul/index.js";
+import { createCrystal } from "./memory-crystal.js";
+
+// ============================================================
+// Agent Memory — Persistent context across spawns
+//
+// Each agent gets a rolling memory window. The bridge:
+//  1. Reads recent memories before dispatch → injects as context
+//  2. After completion → writes an outcome summary back
+//
+// Memory kinds:
+//  - observation: something noticed during execution
+//  - outcome: result summary of a completed task
+//  - fact: a persistent fact (e.g., "USDC balance is 0.42")
+//  - error: a failure worth remembering
+//  - goal: an ongoing objective
+//  - note: freeform note from orchestrator
+// ============================================================
+
+export type MemoryKind = "observation" | "outcome" | "fact" | "error" | "goal" | "note";
+
+export interface MemoryEntry {
+  id?: string;
+  agent_id: string;
+  kind: MemoryKind;
+  content: string;
+  source?: string;
+  ttl_hours?: number | null;
+  created_at?: string;
+}
+
+/** Maximum characters of memory context to inject into a dispatch message */
+const MAX_CONTEXT_CHARS = 2000;
+
+/** How many recent entries to fetch per agent */
+const RECENT_LIMIT = 15;
+
+// ---- Read ----
+
+/**
+ * Fetch recent memory entries for an agent (most recent first).
+ * Also includes `_shared` entries visible to all agents.
+ */
+export async function getAgentMemory(
+  agentId: string,
+  limit = RECENT_LIMIT
+): Promise<MemoryEntry[]> {
+  const { data, error } = await supabase
+    .from("agent_memory")
+    .select("*")
+    .in("agent_id", [agentId, "_shared"])
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error(`[memory] Failed to read memory for ${agentId}:`, error.message);
+    return [];
+  }
+
+  return (data ?? []) as MemoryEntry[];
+}
+
+/**
+ * Build a concise memory preamble string to prepend to dispatch messages.
+ * Returns empty string if no memories exist.
+ */
+export async function buildMemoryContext(agentId: string): Promise<string> {
+  const entries = await getAgentMemory(agentId);
+  if (entries.length === 0) return "";
+
+  // Reverse so oldest first (chronological reading order)
+  const chronological = entries.reverse();
+
+  const lines: string[] = [];
+  let chars = 0;
+
+  for (const entry of chronological) {
+    const prefix = entry.agent_id === "_shared" ? "[shared]" : `[${entry.kind}]`;
+    const ts = entry.created_at
+      ? new Date(entry.created_at).toISOString().slice(0, 16).replace("T", " ")
+      : "";
+    const line = `${prefix} ${ts}: ${entry.content}`;
+
+    if (chars + line.length > MAX_CONTEXT_CHARS) break;
+    lines.push(line);
+    chars += line.length + 1;
+  }
+
+  if (lines.length === 0) return "";
+
+  return [
+    "--- MEMORY (from previous sessions) ---",
+    ...lines,
+    "--- END MEMORY ---",
+    "",
+  ].join("\n");
+}
+
+// ---- Write ----
+
+/**
+ * Write a memory entry for an agent.
+ */
+export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
+  const { data, error } = await supabase.from("agent_memory").insert({
+    agent_id: entry.agent_id,
+    kind: entry.kind,
+    content: entry.content,
+    source: entry.source ?? "bridge",
+    ttl_hours: entry.ttl_hours ?? null,
+  }).select("id").single();
+
+  if (error) {
+    console.error(`[memory] Failed to write memory for ${entry.agent_id}:`, error.message);
+    return null;
+  }
+
+  return data?.id ?? null;
+}
+
+/**
+ * Write a shared memory entry visible to all agents.
+ */
+export async function writeSharedMemory(
+  content: string,
+  kind: MemoryKind = "fact",
+  source = "orchestrator"
+): Promise<void> {
+  await writeMemory({
+    agent_id: "_shared",
+    kind,
+    content,
+    source,
+  });
+}
+
+// ---- Capture ----
+
+/**
+ * Extract the last meaningful lines from agent output as an outcome summary.
+ * Strips noise, takes last N non-empty lines.
+ */
+export function extractOutcomeSummary(rawOutput: string, maxLines = 5): string {
+  if (!rawOutput) return "";
+
+  const NOISE = [
+    /^\[agent\//,
+    /^\[tools\]/,
+    /^\[mcp\]/,
+    /^\[skill\]/,
+    /^\[exit code/,
+    /^\[context\]/,
+    /^\[memory\]/,
+    /^\[dispatch\]/,
+    /^\[Bridge\]/,
+    /^\[openclaw\]/,
+    /^\[session\]/,
+    /^\[model\]/,
+    /^\[runtime\]/,
+    /^\[thinking\]/,
+    /^\[streaming\]/,
+    /^\[diagnostic\]/,
+    /^\[heartbeat\]/,
+    /^\[bridge\]/,
+    /^\[swarm\]/,
+    /^\[intent-tracker\]/,
+    /^\[voice\//,
+    /^Command exited with code/,
+    /^command@/,
+    /^ENTER send/,
+    /^\s*at\s+\S/,
+    /^Error:\s/,
+    /^node:\S/,
+    /^.*session file locked/,
+  ];
+
+  // Strip ANSI
+  const clean = rawOutput.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+
+  const lines = clean
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .filter((l) => !NOISE.some((pat) => pat.test(l)));
+
+  // Take last N lines as the outcome
+  const summary = lines.slice(-maxLines).join("\n");
+
+  // Cap at ~500 chars
+  return summary.length > 500 ? summary.slice(-500) : summary;
+}
+
+/**
+ * After a command completes, capture a summary into agent memory.
+ * If the outcome is significant (milestone/decision/incident), also anchor on-chain.
+ */
+export async function captureCommandOutcome(
+  agentId: string,
+  message: string,
+  rawOutput: string,
+  exitCode: number | null
+): Promise<void> {
+  const summary = extractOutcomeSummary(rawOutput);
+  if (!summary) return;
+
+  const kind: MemoryKind = exitCode === 0 ? "outcome" : "error";
+  const taskSnippet = message.length > 80 ? message.slice(0, 80) + "..." : message;
+
+  const memContent = `Task: "${taskSnippet}" → ${kind === "outcome" ? "completed" : "failed (exit " + exitCode + ")"}. Output: ${summary}`;
+
+  const memoryId = await writeMemory({
+    agent_id: agentId,
+    kind,
+    content: memContent,
+    source: "bridge",
+    ttl_hours: 72, // Auto-expire after 3 days
+  });
+
+  // Soul: build associations from the new memory (non-blocking)
+  if (memoryId) {
+    processNewMemory(memoryId, agentId, memContent).catch(() => {});
+  }
+
+  // Anchor significant memories on-chain (IPFS + Base)
+  await anchorIfSignificant(agentId, kind, taskSnippet, summary);
+}
+
+// ---- On-Chain Anchoring ----
+
+/** Keywords that indicate a milestone worth anchoring */
+const MILESTONE_KEYWORDS = [
+  "deploy", "deployed", "launch", "launched", "release", "shipped",
+  "contract", "token", "created", "initialized", "migration",
+  "first", "production", "mainnet", "live",
+];
+
+/** Keywords that indicate an important decision */
+const DECISION_KEYWORDS = [
+  "chose", "decided", "switched", "migrated", "upgraded",
+  "replaced", "configured", "enabled", "disabled",
+];
+
+/** Keywords that indicate an incident */
+const INCIDENT_KEYWORDS = [
+  "crash", "down", "outage", "failed", "timeout", "panic",
+  "critical", "emergency", "rollback", "revert",
+];
+
+/**
+ * Determine if a memory outcome is significant enough to anchor on-chain.
+ * If so, pin to IPFS and write the hash to the AgentMemoryAnchor contract.
+ */
+async function anchorIfSignificant(
+  agentId: string,
+  kind: MemoryKind,
+  task: string,
+  summary: string
+): Promise<void> {
+  if (!isAnchoringEnabled()) return;
+
+  const text = `${task} ${summary}`.toLowerCase();
+  let category: MemoryCategoryType | null = null;
+
+  // Incidents take priority (errors + incident keywords)
+  if (kind === "error" && INCIDENT_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.INCIDENT;
+  }
+  // Milestones
+  else if (MILESTONE_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.MILESTONE;
+  }
+  // Decisions
+  else if (DECISION_KEYWORDS.some((kw) => text.includes(kw))) {
+    category = MemoryCategory.DECISION;
+  }
+
+  if (category === null) return;
+
+  const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
+
+  const categoryNames = ["milestone", "decision", "incident"];
+  console.log(`[anchor] Detected ${categoryNames[category]}: "${task.slice(0, 60)}..." — anchoring on-chain`);
+
+  const result = await anchorMemory(agentTokenId, category, {
+    content: summary,
+    kind,
+    source: agentId,
+    task,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (result) {
+    console.log(`[anchor] ✓ IPFS: ${result.ipfsCid} | TX: ${result.txHash}`);
+    // Write a memory noting the anchor
+    const anchorMemoryResult = await writeMemory({
+      agent_id: agentId,
+      kind: "fact",
+      content: `Memory anchored on-chain: ipfs://${result.ipfsCid} (tx: ${result.txHash})`,
+      source: "anchor",
+      ttl_hours: null, // permanent
+    });
+
+    // Auto-create a memory crystal from the anchor
+    const crystalName = `${categoryNames[category!]} — ${task.slice(0, 40)}`;
+    try {
+      await createCrystal({
+        memoryId: anchorMemoryResult || undefined,
+        anchorTxHash: result.txHash,
+        ipfsCid: result.ipfsCid,
+        agentId,
+        name: crystalName,
+        description: summary.slice(0, 200),
+        category: category!,
+      });
+    } catch (crystalErr) {
+      console.warn(
+        `[anchor] Crystal creation failed (non-fatal):`,
+        (crystalErr as Error).message
+      );
+    }
+  }
+}

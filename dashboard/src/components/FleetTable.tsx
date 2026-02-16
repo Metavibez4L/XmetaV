@@ -126,6 +126,18 @@ export const FleetTable = React.memo(function FleetTable() {
                     </div>
                   </div>
 
+                  {agent.skills && agent.skills.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] font-mono" style={{ color: '#4a6a8a' }}>SKILLS:</span>
+                      {agent.skills.map((skill) => (
+                        <span key={skill} className="text-[8px] font-mono px-1.5 py-0.5 rounded"
+                          style={{ color: '#e879f9', background: '#e879f908', border: '1px solid #e879f915' }}>
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-1.5">
                     <span className="text-[9px] font-mono" style={{ color: '#4a6a8a' }}>WORKSPACE:</span>
                     <code className="text-[10px] font-mono truncate max-w-[240px]" style={{ color: '#4a6a8a' }}>

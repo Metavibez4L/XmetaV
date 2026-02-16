@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, BlurFilter } from "pixi.js";
+import { Application, Container, Graphics, BlurFilter, ColorMatrixFilter } from "pixi.js";
 import {
   ARENA_AGENTS,
   MEETING_TABLE_TILE,
@@ -26,6 +26,11 @@ interface AvatarEntry {
   core: Graphics;
   silhouette: Graphics;
   ring: Graphics;
+  /** Chromatic aberration layers (red-shifted + blue-shifted copies) */
+  chromaR: Graphics;
+  chromaB: Graphics;
+  /** Outer neon pulse ring */
+  neonAura: Graphics;
   state: NodeState;
   /** Home (desk) position in iso-space */
   homeX: number;
@@ -84,6 +89,32 @@ export function initAvatars(
     glow.filters = [new BlurFilter({ strength: 14, quality: 3 })];
     container.addChild(glow);
 
+    // ── Cyberpunk: Neon aura ring (pulsing outer ring) ──
+    const neonAura = new Graphics();
+    neonAura.circle(0, 0, cfg.size * 1.3).stroke({
+      color: cfg.color,
+      width: 2,
+      alpha: 0.3,
+    });
+    neonAura.circle(0, 0, cfg.size * 1.5).stroke({
+      color: cfg.color,
+      width: 0.8,
+      alpha: 0.15,
+    });
+    neonAura.filters = [new BlurFilter({ strength: 6, quality: 2 })];
+    container.addChild(neonAura);
+
+    // ── Cyberpunk: Chromatic aberration layers ──
+    const chromaR = new Graphics();
+    chromaR.circle(0, 0, cfg.size * 0.6).fill({ color: 0xff0040, alpha: 0.06 });
+    chromaR.position.set(1.5, 0);
+    container.addChild(chromaR);
+
+    const chromaB = new Graphics();
+    chromaB.circle(0, 0, cfg.size * 0.6).fill({ color: 0x0040ff, alpha: 0.06 });
+    chromaB.position.set(-1.5, 0);
+    container.addChild(chromaB);
+
     // Core orb
     const core = new Graphics();
     core.circle(0, 0, cfg.size * 0.6).fill({
@@ -120,6 +151,9 @@ export function initAvatars(
       core,
       silhouette,
       ring,
+      chromaR,
+      chromaB,
+      neonAura,
       state: "idle",
       homeX: sx,
       homeY: sy,
@@ -167,6 +201,16 @@ export function initAvatars(
           entry.silhouette.alpha = entry.inMeeting ? 0.5 : 0.35;
           entry.ring.visible = false;
 
+          // ── Cyberpunk: gentle neon pulse ──
+          entry.neonAura.alpha = 0.15 + Math.sin(time * 0.8 + phase) * 0.08;
+          entry.neonAura.scale.set(1 + Math.sin(time * 1.0 + phase) * 0.05);
+          // Chromatic aberration — subtle drift
+          const cDrift = Math.sin(time * 0.6 + phase) * 1.2;
+          entry.chromaR.position.set(1 + cDrift, 0);
+          entry.chromaB.position.set(-1 - cDrift, 0);
+          entry.chromaR.alpha = 0.04;
+          entry.chromaB.alpha = 0.04;
+
           if (entry.config.floating) {
             bobY = Math.sin(time * 0.8 + phase) * 4;
           }
@@ -182,6 +226,16 @@ export function initAvatars(
           entry.ring.visible = true;
           entry.ring.rotation = time * 2.5;
 
+          // ── Cyberpunk: intense neon pulse ──
+          entry.neonAura.alpha = 0.35 + Math.sin(time * 3 + phase) * 0.2;
+          entry.neonAura.scale.set(1 + Math.sin(time * 2.5 + phase) * 0.1);
+          // Chromatic aberration — intense split
+          const cSplit = Math.sin(time * 4 + phase) * 2.5;
+          entry.chromaR.position.set(2 + cSplit, Math.sin(time * 3) * 0.8);
+          entry.chromaB.position.set(-2 - cSplit, -Math.sin(time * 3) * 0.8);
+          entry.chromaR.alpha = 0.1;
+          entry.chromaB.alpha = 0.1;
+
           if (entry.config.floating) {
             bobY = Math.sin(time * 1.5 + phase) * 3;
           }
@@ -193,6 +247,12 @@ export function initAvatars(
           entry.core.alpha = 0.2 + (Math.random() > 0.96 ? 0.25 : 0);
           entry.silhouette.alpha = 0.04;
           entry.ring.visible = false;
+
+          // ── Cyberpunk: static flicker ──
+          entry.neonAura.alpha = Math.random() > 0.95 ? 0.12 : 0.02;
+          entry.neonAura.scale.set(1);
+          entry.chromaR.alpha = 0;
+          entry.chromaB.alpha = 0;
           break;
         }
       }
@@ -232,9 +292,10 @@ export function initAvatars(
           console.log("[arena]   - skipping", id, ": not found");
           continue;
         }
+
+        // Wake offline agents — the caller already decided who joins
         if (entry.state === "offline") {
-          console.log("[arena]   - skipping", id, ": offline");
-          continue;
+          entry.state = "idle";
         }
 
         const seat = MEETING_SEATS.find((s) => s.agentId === id);

@@ -50,6 +50,7 @@ export interface AgentInfo {
   tools: string;
   model: string;
   status: AgentStatus;
+  skills?: string[];
 }
 
 // ============================================================
@@ -222,6 +223,111 @@ export interface X402WalletInfo {
 }
 
 // ============================================================
+// Memory Crystal (Materia) types
+// ============================================================
+
+export type CrystalType = "milestone" | "decision" | "incident";
+export type CrystalColor = "cyan" | "magenta" | "gold" | "red" | "green" | "purple" | "amber";
+export type CrystalClass =
+  | "anchor" | "knight" | "paladin" | "mage" | "sage"
+  | "rogue" | "ninja" | "summoner" | "godhand";
+
+/** Row in the memory_crystals table */
+export interface MemoryCrystal {
+  id: string;
+  memory_id: string | null;
+  anchor_tx_hash: string | null;
+  ipfs_cid: string | null;
+  agent_id: string;
+  name: string;
+  description: string | null;
+  crystal_type: CrystalType;
+  crystal_color: CrystalColor;
+  star_rating: number;
+  xp: number;
+  level: number;
+  class: CrystalClass;
+  effects: Record<string, number>;
+  equipped_by: string | null;
+  is_fused: boolean;
+  is_legendary: boolean;
+  created_at: string;
+  evolved_at: string | null;
+  last_used_at: string | null;
+}
+
+/** Row in the memory_fusions table */
+export interface MemoryFusion {
+  id: string;
+  crystal_a_id: string;
+  crystal_b_id: string;
+  result_crystal_id: string | null;
+  recipe_name: string;
+  recipe_key: string;
+  result_effects: Record<string, number>;
+  result_star: number;
+  fused_by: string;
+  fused_at: string;
+}
+
+/** Row in the memory_summons table */
+export interface MemorySummon {
+  id: string;
+  crystal_id: string;
+  summoned_by: string;
+  task_context: string | null;
+  context_boost: number;
+  xp_gained: number;
+  arena_effect: string;
+  summoned_at: string;
+}
+
+/** Row in the limit_breaks table */
+export interface LimitBreak {
+  id: string;
+  trigger_event: string;
+  trigger_agent: string;
+  legendary_crystal_id: string | null;
+  power_boost: number;
+  agents_affected: string[];
+  anchor_count_at_trigger: number;
+  active: boolean;
+  activated_at: string;
+  resolved_at: string | null;
+}
+
+/** Row in the memory_achievements table */
+export interface MemoryAchievement {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  tier: "bronze" | "silver" | "gold" | "legendary";
+  requirement: Record<string, number>;
+  unlocked: boolean;
+  progress: number;
+  target: number;
+  unlocked_at: string | null;
+  created_at: string;
+}
+
+/** Row in the daily_quests table */
+export interface DailyQuest {
+  id: string;
+  quest_date: string;
+  title: string;
+  description: string | null;
+  quest_type: string;
+  target: number;
+  progress: number;
+  completed: boolean;
+  xp_reward: number;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// ============================================================
 // Agent fleet
 // ============================================================
 
@@ -233,6 +339,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "~/.openclaw/workspace",
     tools: "full",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["wallets"],
   },
   {
     id: "akua",
@@ -261,6 +368,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/oracle",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["gas", "l2s"],
   },
   {
     id: "alchemist",
@@ -268,6 +376,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/alchemist",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["gas", "addresses"],
   },
   {
     id: "web3dev",
@@ -275,5 +384,22 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "/home/manifest/web3dev",
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
+    skills: ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"],
+  },
+  {
+    id: "soul",
+    name: "Soul (Memory Orchestrator)",
+    workspace: "/home/manifest/soul",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["recall", "dream", "inject"],
+  },
+  {
+    id: "midas",
+    name: "Midas (Revenue & Growth)",
+    workspace: "/home/manifest/midas",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"],
   },
 ];

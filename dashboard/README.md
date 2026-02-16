@@ -27,6 +27,10 @@ https://supabase.com/dashboard/project/ptlneqcjsnrxxruutsxm/sql/new
 1. `scripts/setup-db.sql` — creates `agent_commands`, `agent_responses`, `agent_sessions` tables with RLS + Realtime
 2. `scripts/setup-db-agent-controls.sql` — creates `agent_controls` table for enable/disable toggles
 3. `scripts/setup-db-swarms.sql` — creates `swarm_runs` + `swarm_tasks` tables with RLS + Realtime
+4. `scripts/setup-db-agent-memory.sql` — creates `agent_memory` table for persistent memory (`_shared` + per-agent) with RLS + Realtime
+5. `scripts/setup-db-x402.sql` — creates `x402_payments` table with payment logging, daily spend view, indexes
+6. `scripts/setup-db-intent.sql` — creates `intent_sessions` table for intent resolution tracking
+7. `supabase/migrations/005_x402_metadata_column.sql` — adds `metadata` jsonb column to `x402_payments`, fixes network default to mainnet
 
 ### 2. Create Admin User
 
@@ -72,6 +76,8 @@ The bridge daemon will:
 - Orchestrate swarm tasks (parallel, pipeline, collaborative)
 - Stream output back to the dashboard in real-time
 - Enforce agent enable/disable controls
+- Use persistent daily sessions for main agent (with lock-contention fallback)
+- Inject recent Supabase-backed memory entries into dispatch prompts and capture outcomes back into memory
 - Send periodic heartbeats
 
 ### 6. Deploy to Vercel
@@ -115,10 +121,11 @@ Set the three environment variables in Vercel project settings.
 | `agent_commands` | Command bus (dashboard -> bridge) | `id`, `agent_id`, `message`, `session_id`, `status` |
 | `agent_responses` | Response bus (bridge -> dashboard) | `id`, `command_id`, `content`, `is_complete` |
 | `agent_sessions` | Session tracking | `id`, `agent_id`, `session_id` |
+| `agent_memory` | Persistent memory bus (shared + per-agent) | `id`, `agent_id`, `kind`, `content`, `created_at` |
 | `agent_controls` | Agent enable/disable state | `id`, `agent_id`, `enabled` |
 | `swarm_runs` | Swarm run metadata | `id`, `name`, `mode`, `status`, `manifest`, `synthesis` |
 | `swarm_tasks` | Per-task status and output | `id`, `swarm_id`, `agent_id`, `message`, `status`, `output` |
-| `x402_payments` | x402 payment transaction log | `id`, `endpoint`, `amount`, `tx_hash`, `payer_address`, `status` |
+| `x402_payments` | x402 payment transaction log | `id`, `endpoint`, `amount`, `agent_id`, `payer_address`, `payee_address`, `network`, `status`, `metadata` |
 | `intent_sessions` | Intent resolution sessions | `id`, `query`, `cursor_agent_id`, `status` |
 
 All tables have:
@@ -131,6 +138,7 @@ All tables have:
 | Route | Method | Description |
 |-------|--------|-------------|
 | `/api/commands` | POST | Send a command to an agent |
+| `/api/agents/memory` | GET, POST, DELETE | List/write/delete persistent agent memory entries |
 | `/api/agents/controls` | GET, POST | Get/set agent enable/disable state |
 | `/api/bridge/status` | GET | Check bridge daemon status |
 | `/api/bridge/start` | POST | Start bridge daemon |
@@ -253,7 +261,7 @@ dashboard/
       heartbeat.ts              # Periodic bridge heartbeat
     lib/
       supabase.ts               # Supabase client for bridge
-      openclaw.ts               # OpenClaw CLI wrapper (spawn child processes)
+      openclaw.ts               # OpenClaw CLI wrapper (spawn, persistent sessions, lock fallback)
       x402-client.ts            # x402 fetch wrapper (auto-pays 402 responses)
     .gitignore                  # Ignores bridge PID file
   scripts/
@@ -297,6 +305,7 @@ cd dashboard/x402-server
 cp .env.example .env  # fill in EVM_ADDRESS, FACILITATOR_URL
 npm install
 npm start             # starts on port 4021
+# dev: npm run dev     # watch mode
 ```
 
 Gated endpoints: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02). Free endpoint: `/health`.
@@ -320,8 +329,8 @@ npx tsx register.ts   # register or re-register the agent
 The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (v8.16.0, WebGL). It visualizes all 10+ agents in real-time across a 10x10 isometric grid.
 
 **Office Layout (v14 — reorganized):**
-- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above
-- **MEETING area** (center): Hexagonal glass table with holographic projector and 10 chairs
+- **COMMAND room** (top, walled): Main agent at large desk with 3 holo screens, Operator orb floating above (visual-only; not an OpenClaw agent)
+- **MEETING area** (center): Hexagonal glass table with holographic projector and 12 seats
 - **INTEL room** (bottom-left, glass walls): Briefing, Oracle, Alchemist workstations — blue-tinted floor, room for 2 more agents
 - **DEV FLOOR** (bottom-right, open, no walls): Web3Dev, Akua, Akua_web, Basedintern, Basedintern_web at open desks — green-tinted grid lines
 
@@ -334,7 +343,7 @@ The `/arena` page renders a fullscreen isometric cyberpunk office using PixiJS (
 - Completion bursts and failure glitch effects per-agent
 - Desk screens animate: scrolling code (busy), red flicker (fail), dim (offline)
 
-**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (10 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
+**Meeting Visualization:** When 2+ agents are "busy," avatars smoothly interpolate from their desks to assigned seats around the hexagonal table (12 seats). The holographic projector activates with connection lines, floating discs, and a "MEETING IN SESSION" HUD indicator.
 
 **Architecture:** `Supabase Realtime + 10s periodic sync -> useArenaEvents hook -> PixiJS imperative API (refs)`
 
@@ -345,7 +354,9 @@ No React re-renders for animations -- the hook calls PixiJS methods directly via
 | Agent | Color | Room |
 |-------|-------|------|
 | Main | Cyan `#00f0ff` | COMMAND |
-| Operator | Amber `#f59e0b` | COMMAND |
+| Operator (visual) | Amber `#f59e0b` | COMMAND |
+| Sentinel | Red `#ef4444` | COMMAND |
+| Soul | Magenta `#ff006e` | SOUL |
 | Briefing | Sky `#38bdf8` | INTEL |
 | Oracle | Gold `#fbbf24` | INTEL |
 | Alchemist | Fuchsia `#e879f9` | INTEL |
@@ -386,7 +397,7 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 |-------|----------|
 | Dashboard won't start | Check `.env.local` has all 3 Supabase keys; run `npm install` |
 | Bridge not connecting | Verify Supabase URL/keys match in both `dashboard/.env.local` and `bridge/.env` |
-| Commands not executing | Ensure bridge daemon is running (`npm start` in `bridge/`); check bridge heartbeat on Command Center |
+| Commands not executing | Ensure bridge daemon is running (`npm run dev` in `bridge/` for local watch); check bridge heartbeat on Command Center |
 | Swarm stuck in pending | Bridge daemon must be running; check that swarm_runs Realtime is enabled in Supabase |
 | Agent disabled warning | Check Fleet page; toggle the agent back to enabled |
 | Cancel not working | Verify RLS UPDATE policies exist on `swarm_runs` and `swarm_tasks` (run `setup-db-swarms.sql`) |
@@ -402,3 +413,6 @@ The dashboard uses a **cyberpunk hacker** aesthetic:
 | MetaMask error on Payments/Identity | Safe to ignore -- app uses server-side wallets; error handling shows retry UI |
 | New agent not in arena | Add to `agents.ts` (ARENA_AGENTS, MEETING_SEATS, ARENA_CONNECTIONS), `office.ts` (workstationAgents), `types.ts` (KNOWN_AGENTS), and Supabase `agent_controls` |
 | Intel room agents overlapping | Check tile positions in `agents.ts` — INTEL room uses cols 0–4, rows 6–9 |
+| Verbose debug text in responses | Check `cleanAgentOutput()` in `src/lib/utils.ts` covers the pattern; add new regex to NOISE_PATTERNS |
+| Main agent has no memory | Verify bridge uses persistent session (`dash_main_YYYYMMDD`); check `bridge/lib/openclaw.ts` |
+| Session lock errors | Stale lock files: `find ~/.openclaw -name "*.lock" -delete`; bridge auto-falls back to unique session |

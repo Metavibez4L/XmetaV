@@ -1,6 +1,11 @@
 import { supabase } from "../lib/supabase.js";
 import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
+import { captureCommandOutcome } from "../lib/agent-memory.js";
+import { buildSoulContext } from "../lib/soul/index.js";
+import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
+import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
+import { refreshSitrep } from "./heartbeat.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -61,6 +66,166 @@ export async function executeCommand(command: {
 
   console.log(`[executor] Executing command ${id} on agent "${agent_id}"`);
 
+  // ── Swap command interception ──────────────────────────────────
+  // If the message is a swap command (e.g. "swap 5 USDC to ETH"),
+  // execute it directly instead of spawning an agent.
+  const swapParams = parseSwapCommand(message);
+  if (swapParams && isSwapEnabled()) {
+    console.log(`[executor] Swap command detected: ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    streamer.write(`\n🔄 **Executing swap:** ${swapParams.amount} ${swapParams.fromToken} → ${swapParams.toToken}\n\n`);
+    streamer.write(`⏳ Checking balances & getting quote from Aerodrome...\n\n`);
+
+    try {
+      const result = await executeSwap({
+        ...swapParams,
+        agentId: agent_id,
+        commandId: id,
+      });
+
+      if (result.success) {
+        streamer.write(`✅ **Swap executed successfully!**\n\n`);
+        streamer.write(`📊 **${result.amountIn} → ${result.amountOut}**\n\n`);
+        streamer.write(`🔗 [View on BaseScan](${result.explorerUrl})\n\n`);
+        if (result.approveTxHash) {
+          streamer.write(`🔐 Approval: [${result.approveTxHash.slice(0, 10)}...](https://basescan.org/tx/${result.approveTxHash})\n\n`);
+        }
+        streamer.write(`Transaction: \`${result.txHash}\`\n`);
+      } else {
+        streamer.write(`\n❌ **Swap failed**\n\n`);
+        streamer.write(`${result.error}\n`);
+      }
+
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Clean error for display
+      const cleanMsg = msg.length > 300 ? msg.slice(0, 300) + "..." : msg;
+      streamer.write(`\n❌ **Swap error**\n\n${cleanMsg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
+    // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
+
+  // ── Oracle memory-scan interception ────────────────────────────
+  // If oracle (or main delegating to oracle) sends a memory-scan
+  // command, execute it directly via the dashboard API.
+  if (
+    (agent_id === "oracle" || agent_id === "main") &&
+    isMemoryScanCommand(message)
+  ) {
+    console.log(`[executor] Memory-scan command detected for "${agent_id}"`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    streamer.write(`\n🔍 **Oracle ERC-8004 Memory-Similarity Scan starting...**\n\n`);
+    streamer.write(`⏳ Scanning Base Mainnet for agents with memory/consciousness metadata...\n\n`);
+
+    try {
+      const result = await executeMemoryScan(message);
+
+      streamer.write(result.markdown);
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+
+      // Capture to memory
+      captureCommandOutcome(
+        agent_id,
+        message,
+        result.markdown,
+        result.success ? 0 : 1
+      ).catch((err) =>
+        console.error(`[executor] Memory capture failed (non-fatal):`, err)
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      streamer.write(`\n❌ **Memory scan error**\n\n${msg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
+    // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
+
+  // Inject Soul-curated context into the dispatch message
+  let enrichedMessage = message;
+  try {
+    const soulCtx = await buildSoulContext(agent_id, message);
+    if (soulCtx) {
+      enrichedMessage = soulCtx + message;
+      console.log(`[executor] Soul injected context for "${agent_id}" (${soulCtx.length} chars)`);
+    }
+  } catch (err) {
+    console.error(`[executor] Soul context failed (non-fatal):`, err);
+  }
+
   // Mark as running
   await supabase
     .from("agent_commands")
@@ -78,13 +243,45 @@ export async function executeCommand(command: {
   const streamer = createStreamer(id);
   streamer.start();
 
+  // Accumulate raw output for memory capture
+  let rawOutput = "";
+
+  // Token batching: collect small rapid-fire tokens before flushing to reduce
+  // DB write pressure. Flushes after 6 tokens or 15ms — whichever comes first.
+  let tokenBatch = "";
+  let tokenCount = 0;
+  let batchTimer: ReturnType<typeof setTimeout> | null = null;
+  const BATCH_TOKENS = 6;
+  const BATCH_MS = 15;
+
+  function flushTokenBatch() {
+    if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }
+    if (tokenBatch.length > 0) {
+      streamer.write(tokenBatch);
+      tokenBatch = "";
+      tokenCount = 0;
+    }
+  }
+
   try {
     const child = runAgentWithFallback({
       agentId: agent_id,
-      message,
-      onChunk: (text) => streamer.write(text),
+      message: enrichedMessage,
+      onChunk: (text) => {
+        rawOutput += text;
+        tokenBatch += text;
+        tokenCount++;
+        if (tokenCount >= BATCH_TOKENS) {
+          flushTokenBatch();
+        } else if (!batchTimer) {
+          batchTimer = setTimeout(flushTokenBatch, BATCH_MS);
+        }
+      },
       onExit: async (code) => {
         running.delete(agent_id);
+
+        // Flush any remaining batched tokens before ending the stream
+        flushTokenBatch();
 
         await streamer.end(code);
 
@@ -93,6 +290,11 @@ export async function executeCommand(command: {
           .from("agent_commands")
           .update({ status })
           .eq("id", id);
+
+        // Capture outcome to agent memory (non-blocking)
+        captureCommandOutcome(agent_id, message, rawOutput, code).catch((err) =>
+          console.error(`[executor] Memory capture failed (non-fatal):`, err)
+        );
 
         // Reset agent session to idle
         await supabase
@@ -103,6 +305,9 @@ export async function executeCommand(command: {
           );
 
         console.log(`[executor] Command ${id} finished: ${status}`);
+
+        // Refresh SITREP so main always has latest context
+        refreshSitrep("post-command");
 
         // Check for queued commands for this agent
         pickNextCommand(agent_id);

@@ -203,7 +203,7 @@ export function initOffice(
 
   // ── WORKSTATION DESKS — Intel + Dev Floor agents ───────────────
   const workstationAgents = [
-    "briefing", "oracle", "alchemist",                                  // Intel room
+    "briefing", "oracle", "alchemist", "midas",                         // Intel room
     "web3dev", "akua", "akua_web", "basedintern", "basedintern_web",  // Dev floor
   ];
   for (const agentId of workstationAgents) {
@@ -249,6 +249,72 @@ export function initOffice(
     const screen = createScreen(dPos.x, dPos.y - 22, 22, 16, cfg.color);
     layer.addChild(screen.container);
     screens.set(agentId, screen);
+  }
+
+  // ── SOUL OFFICE — Multi-monitor surveillance desk ─────────────
+  // Soul's desk is wider, positioned in the soul room alcove
+  const soulCfg = ARENA_AGENTS.find((a) => a.id === "soul");
+  if (soulCfg) {
+    const sPos = toScreen(soulCfg.tile.col, soulCfg.tile.row);
+
+    // Wide L-shaped desk
+    const soulDesk = new Graphics();
+    drawBox(
+      soulDesk,
+      sPos.x, sPos.y,
+      TILE_W * 0.45, TILE_H * 0.35, 8,
+      0x1a1528, 0x14102e, 0x100c28, 0.9,
+    );
+    const sdHw = TILE_W * 0.45;
+    const sdHh = TILE_H * 0.35;
+    soulDesk
+      .poly(
+        [
+          sPos.x, sPos.y - sdHh - 8,
+          sPos.x + sdHw, sPos.y - 8,
+          sPos.x, sPos.y + sdHh - 8,
+          sPos.x - sdHw, sPos.y - 8,
+        ],
+        true,
+      )
+      .stroke({ color: 0xff006e, width: 1, alpha: 0.25 });
+    layer.addChild(soulDesk);
+
+    // Chair
+    const soulChair = new Graphics();
+    drawBox(
+      soulChair,
+      sPos.x, sPos.y + 14,
+      6, 4, 6,
+      0x1a1028, 0x140c24, 0x100820, 0.7,
+    );
+    layer.addChild(soulChair);
+
+    // Soul's own screen (central, larger)
+    const soulScreen = createScreen(sPos.x, sPos.y - 28, 20, 16, 0xff006e);
+    layer.addChild(soulScreen.container);
+    screens.set("soul", soulScreen);
+
+    // Fleet monitor screens — one mini screen per watched agent
+    // Arranged in an arc above Soul's desk
+    const watchedAgents = ARENA_AGENTS.filter(
+      (a) => a.id !== "soul" && a.id !== "operator"
+    );
+    const monitorCount = watchedAgents.length;
+    const arcSpread = 52; // total width of the arc in pixels
+    const arcHeight = 14; // vertical stagger
+
+    for (let i = 0; i < monitorCount; i++) {
+      const agent = watchedAgents[i];
+      // Position in an arc above the desk
+      const t = monitorCount > 1 ? i / (monitorCount - 1) : 0.5;
+      const mx = sPos.x - arcSpread / 2 + t * arcSpread;
+      const my = sPos.y - 46 - Math.sin(t * Math.PI) * arcHeight;
+      const miniScreen = createScreen(mx, my, 10, 8, agent.color);
+      layer.addChild(miniScreen.container);
+      // Store with prefixed key so Soul can track each agent's state
+      screens.set("soul_mon_" + agent.id, miniScreen);
+    }
   }
 
   // ── Animation ticker ──────────────────────────────────────────
@@ -300,6 +366,9 @@ export function initOffice(
     setScreenState(agentId, state) {
       const s = screens.get(agentId);
       if (s) s.state = state;
+      // Mirror state to Soul's monitor for this agent
+      const mon = screens.get("soul_mon_" + agentId);
+      if (mon) mon.state = state;
     },
     setMeetingMode(active) {
       meetingMode = active;

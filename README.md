@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
 
-Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
+Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,8 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  11 (main + fleet + intel + dev)    |
+ |   agents:  12 (+ dynamic)                     |
+ |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
  |   identity: ERC-8004 NFT #16905 (Base)        |
@@ -32,16 +33,28 @@ Last updated: **2026-02-13** | OpenClaw 2026.2.1 | XmetaV Command Center v14
 
 - **Control Plane Dashboard** — Cyberpunk-themed Next.js web UI for agent chat, fleet management, swarm orchestration, and bridge control (Vercel-deployable)
 - **XMETAV HQ (Arena)** — Isometric office visualization with PixiJS: boss office, meeting table with seat-based agent meetings, workstations, glowing orb avatars, real-time command pulses, dispatch beams, and reactive holo screens -- all driven by live Supabase events with periodic sync
+- **Cyberpunk Arena Evolution** — Neon aura rings with chromatic aberration on avatars, hex rain data torrents for streaming, RGB-split failure glitches, holographic meeting ring with scanlines, distant city skyline parallax, and perspective neon grid floor
+- **Neural Swarm Links** — Real-time neural data links between agents during swarm runs: pipeline chains, hub-and-spoke topology, per-agent status rings, flowing data particles, chromatic ghost lines — all driven by Supabase Realtime on swarm_runs/swarm_tasks
 - **Live Log Streaming** — Real-time log viewer with severity filters, agent filters, search, and auto-scroll
 - **Swarm Dashboard** — Create, monitor, and review multi-agent swarm runs from the browser with live streaming output
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
-- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + `@x402/fetch` (pay-per-use API gating for agent services)
-- **ERC-8004 Identity** — On-chain agent identity (NFT) and reputation on Base mainnet (Agent #16905)
-- **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.005-$0.01 per request)
+- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + CDP facilitator with JWT auth (pay-per-use API gating: $0.01-$0.50 per endpoint)
+- **ERC-8004 Identity** — On-chain agent identity (NFT #16905) with `x402Support` metadata, identity resolution middleware, and `/agent/:id/payment-info` discovery endpoint
+- **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.05-$0.08 per request)
+- **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)
+- **Soul Agent (Memory Orchestrator)** — Dedicated memory orchestration agent with dream consolidation, association building, context packet curation, fleet-wide memory retrieval learning, and surveillance desk with mini fleet monitors in the Arena
+- **Consciousness Tab** — Dual-aspect awareness dashboard: unified Main↔Soul split view, force-directed memory graph, on-chain anchor timeline, context metrics, dream mode status, and mini arena — all with 30s auto-refresh from Supabase
+- **Dreamscape Visualization** — Canvas-based dream session renderer: hexagonal memory shards with glow, diamond insight crystals by category, curved synaptic bridges with flowing data particles, mouse-interactive repulsion, ambient data motes, and insight ticker strip
+- **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification: living crystals with XP/levels/star ratings (1-6★), class evolution (anchor→godhand), fusion recipes (FF7-style), memory summons with animated rituals, limit breaks spawning legendary 6★ crystals, explorable Memory Cosmos world map, achievements, and daily quests
+- **Memory Cosmos World** — Pannable/zoomable explorable memory landscape at `/memory-cosmos`: golden-spiral island layout with terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, star parallax background, hover info panels
+- **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
+- **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
+- **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
-- Multi-agent management (11 agents: main, operator, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web, + dynamic)
+- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle), gas/standards/addresses/concepts (midas). Skills displayed as badges in Fleet table and Identity page
+- Multi-agent management (12 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -83,9 +96,9 @@ XmetaV/
 |   |   |   |-- arena/        # XMETAV HQ isometric office visualization (standalone)
 |   |   |   |-- auth/         # Login page
 |   |   |   +-- api/          # API routes (commands, swarms, agents, bridge)
-|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, etc.
+|   |   |-- components/       # UI: Sidebar, AgentChat, FleetTable, SwarmCreate, Consciousness, Crystals, etc.
 |   |   |   +-- arena/        # PixiJS renderers (iso, background, office, avatars, effects)
-|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms)
+|   |   |-- hooks/            # Realtime hooks (messages, bridge, sessions, swarms, consciousness, crystals)
 |   |   +-- lib/              # Supabase clients, types
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
@@ -151,7 +164,9 @@ XmetaV/
         |-- briefing.md       # briefing (context curator) runbook
         |-- oracle.md         # oracle (on-chain intel) runbook
         |-- alchemist.md      # alchemist (tokenomics) runbook
-        +-- web3dev.md        # web3dev (blockchain dev) runbook
+        |-- midas.md          # midas (revenue & growth) runbook
+        |-- web3dev.md        # web3dev (blockchain dev) runbook
+        |-- sentinel.md      # sentinel (fleet ops) runbook
 ```
 
 ---
@@ -162,7 +177,7 @@ XmetaV/
 
 | Requirement | Version | Check Command |
 |-------------|---------|---------------|
-| OpenClaw CLI | 2026.2.1+ | `openclaw --version` |
+| OpenClaw CLI | 2026.2.14+ | `openclaw --version` |
 | Node.js | 22.x | `node --version` |
 | Ollama | Latest (native install) | `ollama --version` |
 | NVIDIA GPU | CUDA support | `nvidia-smi` |
@@ -223,6 +238,7 @@ openclaw agent --agent main --local --thinking off \
 | **`distill.sh`** | **Memory Distill** -- consolidate activity into MEMORY.md + refresh SITREP | `./scripts/distill.sh` |
 | **`oracle-agent.sh`** | **Oracle Agent** -- on-chain intel, gas, prices, sentiment, alerts | `./scripts/oracle-agent.sh` |
 | **`alchemist-agent.sh`** | **Alchemist Agent** -- $XMETAV tokenomics, emissions, staking curves | `./scripts/alchemist-agent.sh` |
+| **`midas-agent.sh`** | **Midas Agent** -- x402 revenue analytics, pricing, growth pipeline | `./scripts/midas-agent.sh` |
 | **`web3dev-agent.sh`** | **Web3Dev Agent** -- compile, test, audit, deploy smart contracts | `./scripts/web3dev-agent.sh` |
 
 ---
@@ -301,6 +317,7 @@ Cloud models (like `kimi-k2.5:cloud`) are subject to plan/session usage limits. 
 | Model | `ollama/kimi-k2.5:cloud` (256k context) |
 | Workspace | `~/.openclaw/workspace` |
 | Tools | `full` (fs, runtime, web, browser, sessions, automation) |
+| Skills | `wallets` (EOAs, Safe multisig, EIP-7702, ERC-4337) |
 | Role | **Orchestrator** — agent factory + swarm + command center |
 
 ```bash
@@ -337,6 +354,7 @@ See [docs/agents/briefing.md](docs/agents/briefing.md) for full documentation.
 | **Workspace** | `/home/manifest/oracle` |
 | **Tools** | `coding` (exec, read, write) |
 | **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `gas` (tx costs, L1 vs L2), `l2s` (Arbitrum, Optimism, Base, zkSync) |
 | **Role** | Monitor gas, prices, chain activity, protocol intel, crypto sentiment |
 
 Provides real-time market intelligence via public APIs (CoinGecko, Etherscan, DeFiLlama, CryptoCompare). Writes `ORACLE.md` reports and surfaces alerts before anyone has to ask.
@@ -375,6 +393,31 @@ Reads directly from the $XMETAV contract on Base Mainnet. Models emission schedu
 
 See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
 
+### Agent: `midas` (revenue & growth)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Revenue intelligence & growth strategy |
+| **Workspace** | `/home/manifest/midas` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `revenue`, `pricing`, `growth`, `forecast` |
+| **Role** | x402 analytics, endpoint pricing, revenue forecasts, growth pipeline, R&D prioritisation |
+
+Sits between Oracle and Alchemist (arena seat 165°). Synthesizes market intel + tokenomics into revenue strategy. Tracks all x402 payment flows, analyzes endpoint performance, recommends pricing adjustments, and maintains a ROI-ranked growth opportunity pipeline.
+
+```bash
+# Run manually
+./scripts/midas-agent.sh
+
+# Revenue snapshot daily at 6 AM, endpoints every 12h, growth scan Monday 8 AM:
+# 0 6 * * *    /home/manifest/XmetaV/scripts/midas-agent.sh --report    >> /tmp/midas.log 2>&1
+# 0 */12 * * * /home/manifest/XmetaV/scripts/midas-agent.sh --endpoints >> /tmp/midas.log 2>&1
+# 0 8 * * 1   /home/manifest/XmetaV/scripts/midas-agent.sh --growth    >> /tmp/midas.log 2>&1
+```
+
+See [docs/agents/midas.md](docs/agents/midas.md) for full documentation.
+
 ### Agent: `web3dev` (blockchain developer)
 
 | Property | Value |
@@ -383,6 +426,7 @@ See [docs/agents/alchemist.md](docs/agents/alchemist.md) for full documentation.
 | **Workspace** | `/home/manifest/web3dev` |
 | **Tools** | `coding` (exec, process, read, write) |
 | **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `tools`, `l2s`, `orchestration`, `addresses`, `concepts`, `security`, `standards`, `frontend-ux`, `frontend-playbook`, `building-blocks` (10 ethskills) |
 | **Role** | Smart contract dev, security auditor, deployment engineer, x402 maintainer |
 
 Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Static security audits, gas/size analysis, and production-ready contract scaffolding (ERC-20, staking, vesting, escrow).
@@ -397,6 +441,20 @@ Owns all Hardhat projects (Akua 18 contracts, $XMETAV token, BasedIntern). Stati
 ```
 
 See [docs/agents/web3dev.md](docs/agents/web3dev.md) for full documentation.
+
+### Agent: `sentinel` (fleet lifecycle)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Agent lifecycle manager — spawn coordination, fleet health |
+| **Workspace** | `/home/manifest/sentinel` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Role** | Spawn coordinators, resource managers, inter-agent communication, fleet health monitoring |
+
+Manages agent lifecycles and fleet health. Coordinates agent spawning, monitors resource usage, handles inter-agent communication routing, and maintains fleet health dashboards. Commands: `status`, `health`, `spawn`, `queue`, `errors`.
+
+See [docs/agents/sentinel.md](docs/agents/sentinel.md) for full documentation.
 
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
@@ -505,6 +563,8 @@ cd dashboard/bridge && npm install && npm start
 | `/payments` | **Payments** -- x402 wallet status, spend tracking, payment history, gated endpoints |
 | `/identity` | **Identity** -- ERC-8004 on-chain agent identity, reputation, and NFT details |
 | `/token` | **$XMETAV** -- ERC-20 token balance, tier status, discount table, holder benefits |
+| `/consciousness` | **Consciousness** -- Dual-aspect awareness: memory graph, anchor timeline, context metrics, dream mode, mini arena |
+| `/memory-cosmos` | **Memory Cosmos** -- Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable world, achievements, quests |
 | `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
 
@@ -514,6 +574,7 @@ cd dashboard/bridge && npm install && npm start
 - **Bridge Controls** -- Start/stop the local bridge daemon from the dashboard
 - **Real-time** -- All data updates live via Supabase Realtime (no polling)
 - **Cyberpunk UI** -- Neon blue/dark hacker aesthetic with glitch effects, scanlines, and animated elements
+- **Memory Crystal System** -- FF-style crystal materia with XP, fusion, summons, limit breaks, and an explorable Memory Cosmos world
 
 **Architecture:** `Browser (Vercel) <-> Supabase (command bus) <-> Bridge Daemon (WSL) <-> OpenClaw CLI <-> Agents`
 
@@ -592,10 +653,10 @@ flowchart TB
             end
         end
 
-        subgraph FLEET["Agent Fleet (11)"]
+        subgraph FLEET["Agent Fleet (10+)"]
             direction LR
             F_MAIN["main\n(orch.)"]
-            F_INTEL["briefing\noracle\nalchemist"]
+            F_INTEL["sentinel\nbriefing\noracle\nalchemist"]
             F_DEV["web3dev\nakua (+web)\nbasedintern (+web)"]
             F_DYN["dynamic\nagents"]
         end
@@ -725,6 +786,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
 | [capabilities/x402-payments.md](capabilities/x402-payments.md) | x402 autonomous payment protocol reference |
 | [capabilities/erc8004-identity.md](capabilities/erc8004-identity.md) | ERC-8004 on-chain agent identity reference |
 | [capabilities/voice-commands.md](capabilities/voice-commands.md) | Voice command & response system reference |
+| [docs/memory/](docs/memory/) | Memory system architecture — anchoring, Soul orchestration |
 | [capabilities/quick-commands.md](capabilities/quick-commands.md) | Essential daily-use commands |
 
 ---
@@ -773,6 +835,94 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-02-15 (v23) — Optimization Pass (Security + Performance + Build)
+- **API Security Hardening** — Auth guards (`requireAuth()`) on all 5 data API routes (`/api/soul`, `/api/agents/memory`, `/api/midas`, `/api/erc8004/identity`, `/api/anchors`). UUID validation and limit clamping on user-supplied params. New shared utility `src/lib/api-auth.ts` with `requireAuth()`, `isValidUUID()`, `clampLimit()`
+- **RLS Policies on Dream Tables** — Added authenticated SELECT policies to `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` (were service-role only). Added DB indexes on `agent_memory(source)` and `memory_associations(memory_id, related_memory_id)`
+- **Query Performance** — Replaced all `SELECT *` with explicit column lists across dream.ts, retrieval.ts, useConsciousness.ts, dream-proposals.ts. Bounded dream cycle queries (`.limit(500)`). Batched N+1 association queries in dream-proposals (single query across all clusters). Batched upserts in `executeManifest`. `getManifestationStats` bounded with `.limit(1000)`
+- **Polling Reduction** — `useConsciousness` polling interval 15s → 30s (50% reduction in dashboard Supabase load)
+- **Bridge Hardening** — `await` on `processPendingCommands` loop (was fire-and-forget). Proper SIGTERM handler with graceful shutdown (channel unsubscribe, session teardown, PID cleanup)
+- **Canvas Optimizations** — MemoryGraph: `ctx.setTransform()` replaces stacking `ctx.scale()` (prevents cumulative scaling bug), Map lookup for O(1) edge node resolution. DreamscapeView: `document.hidden` check skips rendering when tab is backgrounded
+- **Build Config** — `optimizePackageImports` for lucide-react, `serverExternalPackages` for pg in next.config.ts. Type fix in `getManifestationStats`
+
+### 2026-02-15 (v22) — Midas Revenue Agent + Anchor Sync + DB Consolidation
+- **Midas Revenue Agent** — New revenue & growth intelligence agent (`midas`). Arena seat 165° (between Oracle 150° and Alchemist 180°). Color: Gold (`#f59e0b`). Skills: `revenue`, `pricing`, `growth`, `forecast`
+  - **Revenue Dashboard** — Aggregates x402 payments into daily snapshots with 7d/30d/90d forecasts, growth rates, and top-endpoint ranking
+  - **Endpoint Analytics** — Per-endpoint usage tracking: call counts, conversion rates, revenue trends (up/stable/down)
+  - **Pricing Intelligence** — Automated x402 tier analysis with confidence-scored pricing recommendations
+  - **Growth Pipeline** — ROI-ranked opportunity pipeline with category tags (endpoint/token/partnership/vertical/optimization) and status tracking
+  - **4 New Supabase Tables** — `revenue_metrics`, `endpoint_analytics`, `growth_opportunities`, `pricing_recommendations` with RLS, indexes, triggers, Realtime
+  - **Bridge Skill** — `bridge/lib/midas-revenue.ts` (~330 lines): report generation, endpoint analytics, pricing analysis, growth opportunity management
+  - **API Route** — `/api/midas?action=dashboard|report|endpoints|opportunities|pricing`
+  - **Agent Script** — `scripts/midas-agent.sh` (cron-compatible: `--report`, `--endpoints`, `--pricing`, `--growth`)
+  - **Arena Integration** — Intel room tile (col 3, row 9), meeting seat, connections to oracle/alchemist/main/soul, MiniArena dot
+- **Anchor Sync Fix** — Dashboard now keeps on-chain anchor count synced:
+  - AgentIdentity auto-refreshes every 30s (was mount-only)
+  - AnchorTimeline periodic 30s sync status refresh + re-fetches on anchor count change
+  - useConsciousness Supabase Realtime subscription on `agent_memory` INSERT where `source=anchor` for instant pickup
+  - Fixed `ANCHOR_CONTRACT_ADDRESS` missing from `.env.local` (was causing "Contract not configured")
+  - Switched anchors + identity API routes from cookie-based server client to admin client (service role) to bypass RLS
+- **DB Consolidation Migration** — Formalized 5 tables + 1 view that only existed as manual setup scripts into the migration chain (`agent_controls`, `intent_sessions`, `x402_payments`, `x402_daily_spend` view, `swarm_runs`, `swarm_tasks`). All `IF NOT EXISTS` guarded
+- **Fleet Count** — 12 autonomous agents + dynamic
+
+### 2026-02-15 (v21) — EthSkills + Dashboard Skills UI + Build Hardening
+- **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents via `openclaw skills install`:
+  - **main**: `wallets` (EOAs, Safe multisig, EIP-7702, ERC-4337, key safety)
+  - **web3dev**: `tools`, `l2s`, `orchestration`, `addresses`, `concepts`, `security`, `standards`, `frontend-ux`, `frontend-playbook`, `building-blocks` (10 skills)
+  - **oracle**: `gas` (L1 vs L2 tx costs), `l2s` (Arbitrum, Optimism, Base, zkSync, Scroll, Linea)
+  - **midas**: `gas`, `standards`, `addresses`, `concepts` (4 EthSkills for revenue context)
+- **Agent Identity Updates** — Updated IDENTITY.md files for main (created from scratch + SOUL.md), web3dev, and oracle to include Skills sections
+- **ERC-8004 Metadata Update** — 13 new capabilities added to on-chain metadata (ethereum-wallet-management, eip-7702-smart-eoas, safe-multisig, erc-4337-account-abstraction, l2-deployment, cross-chain-bridging, gas-economics, defi-composability, solidity-security-patterns, ethereum-standards, dapp-orchestration, frontend-ux, verified-contract-addresses, dev-tooling). Per-agent `skills` arrays added to `fleet.agents`. AgentMemoryAnchor contract added
+- **Dashboard Skills UI** — Skills badges displayed per agent in Fleet table (purple #e879f9 badges) and Identity page fleet roster grid. New `isSkill` color category for skill-related capabilities
+- **Oracle Identity Scouting** — Automated on-chain identity discovery: `bridge/lib/oracle/identity-scout.ts`, `/api/oracle/discovery` endpoint, `/oracle` dashboard page, `useOracleDiscovery` hook (10 new files)
+- **Arena Optimizations** — Performance audit of ~3,600 line arena codebase: particle pool (object reuse), position hash diffs (skip redundant calculations), lastKnownStatus cache (prevent duplicate transitions), throttled ResizeObserver (prevent layout thrashing)
+- **Alchemy RPC** — Switched all 11 files from default Base RPC to Alchemy (`BASE_RPC_URL`) for reliability
+- **Build Hardening** — Fixed 14 pre-existing TypeScript build errors: BigInt literals (`0n` → `BigInt(0)` for ES2017 target), PromiseLike `.catch()`, SpeechRecognition types, Buffer/Uint8Array conversions, template literal types, duplicate object keys, unused directives. Installed missing `@x402/fetch` and `@x402/evm` dependencies. Clean `npx next build` passing
+- **OpenClaw Updated** — 2026.2.12 → 2026.2.14
+
+### 2026-02-14 (v20) — Cyber-Neural Memory Evolution (Crystal Materia System)
+- **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification with 7 interconnected subsystems:
+  - **Living Memory Crystals** — Crystals with XP, 30 levels, star ratings (1-6★), and class evolution (anchor → mage → knight → sage → rogue → summoner → ninja → godhand)
+  - **Crystal Fusion (FF7 Style)** — 5 fusion recipes (Nexus, Prophecy, Storm, Phantom, Infinity) with animated 4-phase fusion chamber (idle → orbit → collide → birth)
+  - **Memory Summons** — Keyword-triggered crystal summoning with triple concentric summoning circle animation, converging particles, and crystal materialization
+  - **Limit Breaks** — Triggered at 10+ crystals with 500+ total XP; creates legendary 6★ godhand crystal with golden lightning banner
+  - **Memory Cosmos World** — Pannable/zoomable explorable memory landscape: golden-spiral island layout, 3 terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, parallax stars
+  - **Achievements** — 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers and progress tracking
+  - **Daily Quests** — Auto-generated daily quests with type-based objectives and XP rewards
+- **6 New Supabase Tables** — `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests` with 3 custom enums, RLS policies, Realtime, and `crystal_level_thresholds` view
+- **Bridge Crystal Engine** — `bridge/lib/memory-crystal.ts` (~530 lines): full game logic for XP curves, class evolution, fusion recipes, summon scoring, limit break detection, quest generation
+- **7 Dashboard Components** — CrystalCard (canvas-animated), CrystalInventory (filterable grid), FusionChamber (4-phase animation), SummonOverlay (summoning circle modal), LimitBreakBanner (golden lightning), MemoryCosmos (world explorer), QuestTracker (achievements + quests)
+- **`/memory-cosmos` Page** — Full page assembling all crystal components with stats row, world explorer, inventory, fusion chamber, and quest tracker
+- **`useMemoryCrystals` Hook** — Supabase queries + realtime subscriptions on `memory_crystals` and `limit_breaks`, 12s auto-refresh, crystal action methods
+- **Sidebar** — Added Gem icon with Memory Cosmos nav entry
+
+### 2026-02-15 (v18) — Consciousness Tab + Swap Execution + Streaming v2
+- **Consciousness Tab** — New `/consciousness` route with 6-panel awareness dashboard: Unified Awareness (Main↔Soul split view), Memory Graph (force-directed canvas with drag/zoom), Anchor Timeline (on-chain anchors with BaseScan links), Context Metrics (4 metric cards + injections feed), Dream Mode Status (6hr idle threshold + insights), Mini Arena (stylized agent positions with realtime subscription). Brain icon in sidebar at position 03 (Ctrl+3). `useConsciousness` hook fetches from 6 Supabase tables with 15s auto-refresh
+- **Swap Execution System** — Agent-initiated token swaps via `bridge/src/swap-executor.ts`. `/api/swap` POST endpoint. `agent_swaps` Supabase table for swap history. Gas balance and token balance pre-checks before submission. Clean viem error messages with failed status in chat
+- **Voice Swap Normalization** — `VOICE_ALIASES` dictionary and `normalizeVoiceSwap()` function convert spoken swap commands ("fifty bucks of ether") to canonical form ("50 USDC for ETH")
+- **Streaming Pipeline v2** — 2.5× faster rendering: streamer chunk 400→160 / flush 200→80ms / first 50→30ms, executor token batching (6 tokens/15ms), `useRealtimeMessages` throttle 80→50ms with RAF alignment, `StreamingBubble` wrapped in `React.memo` with `useMemo` cleanAgentOutput, smart auto-scroll
+- **Identity & Schema Sync** — Updated `registration.json` and `metadata.json` with swap capabilities. Supabase migrations for `agent_memory` and soul tables
+- **Memory Docs** — Mermaid flowcharts in `docs/memory/` (README.md, SOUL.md, ANCHORING.md)
+
+### 2026-02-14 (v17) — Soul Agent + ERC-8004 Metadata Update + Arena Soul Office
+- **Soul Agent** — New memory orchestrator agent (`soul`): context curation, memory association building, dream consolidation during fleet idle, and memory retrieval learning. Room: SOUL (private magenta alcove). Color: Magenta (`#ff006e`)
+- **Soul Office in Arena** — Dedicated isometric alcove (cols 0–1, rows 2–5) with magenta floor tiles, glass partition walls, "SOUL" room label, L-shaped surveillance desk, and an arc of mini fleet-monitor screens that mirror every agent's state in real-time
+- **Soul Arena Integration** — Soul agent node, meeting seat (observer position at 195°), and topology connections to main, briefing, oracle, alchemist, sentinel (watches everyone)
+- **ERC-8004 Metadata Update** — Added Soul to `fleet.agents` and `fleet.rooms` in on-chain metadata. Added 5 soul-specific capabilities: `soul-memory-orchestration`, `dream-consolidation`, `memory-association-building`, `context-packet-curation`, `memory-retrieval-learning`
+- **Soul DB Schema** — Three Supabase tables (`memory_associations`, `memory_queries`, `dream_insights`) with RLS policies for Soul's memory orchestration layer
+- **Soul Bridge Library** — Full `bridge/lib/soul/` module: context building, memory retrieval, association building, dream mode (idle consolidation), and type definitions
+- **Sidebar Cleanup** — Removed Soul tab from sidebar navigation (no `/soul` page yet; Soul is an arena-only agent)
+- **Fleet Count** — 11 autonomous agents (main, sentinel, soul, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web) + dynamic
+
+### 2026-02-13 (v15) — Sentinel Agent + Agent Memory + Identity System + Noise Filter
+- **Sentinel Agent** — New fleet lifecycle manager (`sentinel`): spawn coordination, resource management, inter-agent communication, fleet health monitoring. Room: COMMAND. Color: Red (`#ef4444`). Commands: `status`, `health`, `spawn`, `queue`, `errors`
+- **Agent Identity System** — Created `IDENTITY.md` + `SOUL.md` for all sub-agents (web3dev, oracle, briefing, alchemist, sentinel). Agents now have full self-awareness: who they are, what commands they have, their team, operating principles, and communication style
+- **Main Agent Memory** — Persistent daily session (`dash_main_YYYYMMDD`) gives main conversation context across commands within a day. Falls back to unique session ID when lock is held (concurrent commands don't deadlock)
+- **Noise Filter v3** — Added `[diagnostic]`, `[heartbeat]`, `[bridge]`, `[swarm]`, `[intent-tracker]`, `[voice/...]`, and session-lock errors to output filter. Agent responses now show only actual content
+- **Voice STT Overhaul** — Chrome's built-in Web Speech API (`SpeechRecognition`) as default STT, bypassing WSL2 audio degradation. Whisper-1 fallback with `language: "en"`. Removed prompt/temperature that caused hallucination loops
+- **Operator Cleanup** — Removed `operator` from agent tables, spawn list, and ERC-8004 registration (operator is the human user, not an agent)
+- **Web3 Lab** — Dedicated cubicle for web3dev with orange floor tint and glass partitions (cols 7-9, rows 2-5)
+- **Fleet Count** — 10 autonomous agents (main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web) + dynamic
 
 ### 2026-02-13 (v14) — Fleet Expansion + Office Reorganization + Specialist Agents
 - **4 New Specialist Agents** — `oracle` (on-chain intel), `alchemist` (tokenomics), `web3dev` (blockchain dev), `briefing` (context curator) — each with dedicated skills, cron runners, identities, and arena presence
@@ -959,5 +1109,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity</sub>
+  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
 </p>

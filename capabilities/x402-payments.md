@@ -4,6 +4,65 @@ Reference for integrating **x402** — Coinbase's open payment protocol — with
 
 > Source: https://github.com/coinbase/x402
 
+## Current Status (February 2026)
+
+| Component | Status |
+|-----------|--------|
+| x402 Server | **Live** on port 4021 (Base Mainnet, USDC, CDP JWT auth) |
+| Payment middleware | 6 gated endpoints |
+| ERC-8004 identity middleware | **Active** — resolves caller agent via `X-Agent-Id` header |
+| On-chain metadata | Agent #16905, `x402Support.enabled: true` in tokenURI |
+| Payment logging | Writes to `x402_payments` Supabase table (with caller identity) |
+| $XMETAV token discounts | **Active** — 5-tier system (None → Diamond, 0-50% off) |
+| API Reference | [`docs/API.md`](../docs/API.md) — full endpoint documentation |
+| Agent-to-agent payments | Phase 2 (planned) |
+
+## Live Pricing
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /agent-task` | $0.10 | Dispatch task to an agent |
+| `POST /intent` | $0.05 | Resolve goal → agent commands |
+| `GET /fleet-status` | $0.01 | Live fleet status (8 agents) |
+| `POST /swarm` | $0.50 | Multi-agent swarm dispatch |
+| `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
+
+### Free Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Service health + pricing summary |
+| `GET /token-info` | Token tier info & discounts |
+| `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
+
+## ERC-8004 Identity Resolution
+
+The x402 server includes middleware that resolves calling agents on-chain:
+
+```
+Request with X-Agent-Id: 16905
+         │
+    ┌────▼────┐
+    │ ERC-8004│  Reads ownerOf, tokenURI, getAgentWallet
+    │ Registry│  from 0x8004...432 on Base Mainnet
+    └────┬────┘
+         │
+    req.callerAgent = {
+      agentId, owner, wallet,
+      tokenURI, x402Enabled
+    }
+```
+
+Other agents can discover XmetaV's payment capabilities by querying:
+```
+GET /agent/16905/payment-info
+```
+
+Returns: owner, wallet, tokenURI, x402 support status, accepted schemes, and pricing.
+
+> **Full API Reference**: See [`docs/API.md`](../docs/API.md) for complete endpoint documentation with request/response schemas, authentication details, and agent-to-agent discovery flow.
+
 ## What is x402?
 
 x402 enables instant, automatic **stablecoin payments over HTTP**. Instead of API keys or subscriptions, agents pay for exactly what they use via on-chain USDC settlement on Base.
@@ -200,10 +259,13 @@ await agent.start();
 | Agent | Role | x402 Use Case |
 |-------|------|---------------|
 | `main` | Orchestrator | Delegates x402 tasks, manages payment budgets |
-| `akua` | Solidity/Base agent | Implements x402 server-side (payment gating), deploys contracts |
-| `akua_web` | Full-tools variant | Interacts with x402-gated APIs via browser/web |
+| `akua` | Solidity/Base agent | Implements x402 server-side (payment gating) |
+| `oracle` | Research/analysis | Consumes x402-gated data feeds |
+| `alchemist` | Smart contract dev | Deploys x402-enabled contracts |
+| `sentinel` | Monitoring/health | Validates x402 server uptime |
 | `basedintern` | TypeScript agent | Builds x402 client integrations, XMTP agents |
-| `basedintern_web` | Full-tools variant | Tests x402 flows in browser |
+| `web3dev` | Web3 tooling | Token/ERC-8004 integration |
+| `dynamic` | Adaptive specialist | Runtime x402 task execution |
 
 ### Swarm pattern: x402 service deployment
 

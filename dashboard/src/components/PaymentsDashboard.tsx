@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import type { X402Payment } from "@/lib/types";
+import Link from "next/link";
 import {
   DollarSign,
   Activity,
@@ -13,6 +14,8 @@ import {
   ExternalLink,
   Server,
   Loader2,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react";
 
 interface WalletResponse {
@@ -56,9 +59,20 @@ const networkLabels: Record<string, string> = {
   "eip155:8453": "Base Mainnet",
 };
 
+interface EndpointAnalytics {
+  endpoint_path: string;
+  total_calls: number;
+  paid_calls: number;
+  avg_payment_usd: number;
+  revenue_7d: number;
+  revenue_30d: number;
+  growth_trend: string;
+}
+
 export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
   const [payments, setPayments] = useState<PaymentsResponse | null>(null);
+  const [endpointAnalytics, setEndpointAnalytics] = useState<EndpointAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,13 +81,18 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
     if (showRefresh) setRefreshing(true);
     setError(null);
     try {
-      const [walletRes, paymentsRes] = await Promise.all([
+      const [walletRes, paymentsRes, midasRes] = await Promise.all([
         fetch("/api/x402/wallet").catch(() => null),
         fetch("/api/x402/payments").catch(() => null),
+        fetch("/api/midas?action=endpoints").catch(() => null),
       ]);
       if (walletRes?.ok) setWallet(await walletRes.json());
       else if (walletRes) setError(`Wallet API returned ${walletRes.status}`);
       if (paymentsRes?.ok) setPayments(await paymentsRes.json());
+      if (midasRes?.ok) {
+        const md = await midasRes.json();
+        setEndpointAnalytics(md.endpoints || []);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       setError(`Failed to load wallet data: ${msg}`);
@@ -217,7 +236,7 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
       {/* Token Discount Tier */}
       <TokenTierCard wallet={walletInfo?.address} />
 
-      {/* x402 Server Status */}
+      {/* x402 Server Status — Gated Endpoints */}
       <div
         className="rounded-lg border p-4"
         style={{ background: "#0a1020", borderColor: "#00f0ff15" }}
@@ -226,69 +245,153 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4" style={{ color: "#00f0ff66" }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
-              x402 Service Status
+              x402 Gated Endpoints · 10 endpoints
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-2 w-2 rounded-full"
-              style={{
-                background: wallet?.bridge.online ? "#39ff14" : "#ff2d5e",
-                boxShadow: wallet?.bridge.online
-                  ? "0 0 6px #39ff14"
-                  : "0 0 6px #ff2d5e",
-              }}
-            />
-            <span className="text-[9px] font-mono" style={{ color: "#4a6a8a" }}>
-              Bridge {wallet?.bridge.online ? "Online" : "Offline"}
-            </span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/midas"
+              className="flex items-center gap-1 text-[9px] font-mono px-2 py-1 rounded transition-colors hover:opacity-80"
+              style={{ color: "#f59e0b", border: "1px solid #f59e0b30", background: "#f59e0b08" }}
+            >
+              <TrendingUp className="h-3 w-3" />
+              Midas Revenue
+            </Link>
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{
+                  background: wallet?.bridge.online ? "#39ff14" : "#ff2d5e",
+                  boxShadow: wallet?.bridge.online
+                    ? "0 0 6px #39ff14"
+                    : "0 0 6px #ff2d5e",
+                }}
+              />
+              <span className="text-[9px] font-mono" style={{ color: "#4a6a8a" }}>
+                Bridge {wallet?.bridge.online ? "Online" : "Offline"}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /agent-task
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
+          {[
+            { ep: "POST /agent-task", price: "$0.10", desc: "Dispatch task to agent" },
+            { ep: "POST /intent", price: "$0.05", desc: "Goal → commands" },
+            { ep: "GET /fleet-status", price: "$0.01", desc: "Live agent fleet" },
+            { ep: "POST /swarm", price: "$0.50", desc: "Multi-agent swarm" },
+            { ep: "POST /memory-crystal", price: "$0.05", desc: "Memory crystal summon" },
+            { ep: "POST /neural-swarm", price: "$0.10", desc: "Neural swarm delegation" },
+            { ep: "POST /fusion-chamber", price: "$0.15", desc: "Fuse memory crystals" },
+            { ep: "POST /cosmos-explore", price: "$0.20", desc: "Explore Memory Cosmos" },
+            { ep: "POST /voice/transcribe", price: "$0.05", desc: "Speech-to-text" },
+            { ep: "POST /voice/synthesize", price: "$0.08", desc: "Text-to-speech" },
+          ].map(({ ep, price, desc }) => (
+            <div key={ep} className="p-2 rounded" style={{ background: "#060c18" }}>
+              <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+                {ep}
+              </div>
+              <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
+                {price}
+              </div>
+              <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
+                {desc}
+              </div>
             </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.01
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Dispatch task to agent
-            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Staking Tiers + Endpoint Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Staking Discount Tiers */}
+        <div
+          className="rounded-lg border p-4"
+          style={{ background: "#0a1020", borderColor: "#ffd70015" }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="h-4 w-4" style={{ color: "#ffd70066" }} />
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#ffd70066" }}>
+              $XMETAV Staking Discounts
+            </span>
           </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /intent
-            </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.005
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Goal → commands
-            </div>
+          <div className="space-y-1.5">
+            {[
+              { name: "None",    min: "0",     disc: "0%",  limit: "$5",    color: "#4a6a8a" },
+              { name: "Starter", min: "100",   disc: "10%", limit: "$25",   color: "#a3e635" },
+              { name: "Bronze",  min: "1K",    disc: "15%", limit: "$50",   color: "#cd7f32" },
+              { name: "Silver",  min: "10K",   disc: "25%", limit: "$200",  color: "#c0c0c0" },
+              { name: "Gold",    min: "100K",  disc: "50%", limit: "$1K",   color: "#ffd700" },
+              { name: "Diamond", min: "1M",    disc: "75%", limit: "$5K",   color: "#b9f2ff" },
+            ].map((t) => (
+              <div
+                key={t.name}
+                className="flex items-center justify-between px-3 py-1.5 rounded"
+                style={{ background: "#060c18" }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: t.color }} />
+                  <span className="text-[10px] font-mono font-bold" style={{ color: t.color }}>
+                    {t.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[9px] font-mono" style={{ color: "#4a6a8a" }}>
+                    ≥{t.min}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold" style={{ color: t.name === "None" ? "#4a6a8a" : "#39ff14" }}>
+                    {t.disc}
+                  </span>
+                  <span className="text-[9px] font-mono" style={{ color: "#4a6a8a66" }}>
+                    {t.limit}/day
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              GET /fleet-status
-            </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.001
-            </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Live agent fleet
-            </div>
+        </div>
+
+        {/* Endpoint Analytics */}
+        <div
+          className="rounded-lg border p-4"
+          style={{ background: "#0a1020", borderColor: "#00f0ff15" }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className="h-4 w-4" style={{ color: "#00f0ff66" }} />
+            <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
+              Endpoint Revenue Analytics
+            </span>
           </div>
-          <div>
-            <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
-              POST /swarm
+          {endpointAnalytics.length === 0 ? (
+            <div className="text-center py-6">
+              <BarChart3 className="h-6 w-6 mx-auto mb-2" style={{ color: "#00f0ff15" }} />
+              <p className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
+                Analytics populate as x402 payments are processed
+              </p>
             </div>
-            <div className="text-xs font-mono font-bold" style={{ color: "#e0e8f0" }}>
-              $0.02
+          ) : (
+            <div className="space-y-1.5">
+              {endpointAnalytics.slice(0, 8).map((ep) => (
+                <div
+                  key={ep.endpoint_path}
+                  className="flex items-center justify-between px-3 py-1.5 rounded"
+                  style={{ background: "#060c18" }}
+                >
+                  <span className="text-[10px] font-mono" style={{ color: "#00f0ff88" }}>
+                    {ep.endpoint_path}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-mono" style={{ color: "#4a6a8a" }}>
+                      {ep.total_calls} calls
+                    </span>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: "#39ff14" }}>
+                      ${(ep.revenue_30d || 0).toFixed(4)}
+                    </span>
+                    <TrendBadge trend={ep.growth_trend} />
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a66" }}>
-              Multi-agent swarm
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -453,9 +556,23 @@ function formatTime(iso: string): string {
   }
 }
 
+// ── Trend Badge ──
+
+function TrendBadge({ trend }: { trend: string }) {
+  const isUp = trend === "growing" || trend === "up";
+  const isDown = trend === "declining" || trend === "down";
+  const color = isUp ? "#39ff14" : isDown ? "#ff2d5e" : "#4a6a8a";
+  const arrow = isUp ? "▲" : isDown ? "▼" : "—";
+  return (
+    <span className="text-[9px] font-mono" style={{ color }}>
+      {arrow}
+    </span>
+  );
+}
+
 // ── Token Tier Card ──
 
-function TokenTierCard({ wallet }: { wallet?: string | null }) {
+function TokenTierCard({ wallet: walletAddr }: { wallet?: string | null }) {
   const [tier, setTier] = useState<{
     name: string;
     discount: string;
@@ -465,9 +582,9 @@ function TokenTierCard({ wallet }: { wallet?: string | null }) {
   const [tierError, setTierError] = useState(false);
 
   useEffect(() => {
-    if (!wallet) return;
+    if (!walletAddr) return;
     setTierError(false);
-    fetch(`/api/token?wallet=${wallet}`)
+    fetch(`/api/token?wallet=${walletAddr}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -483,7 +600,7 @@ function TokenTierCard({ wallet }: { wallet?: string | null }) {
         }
       })
       .catch(() => setTierError(true));
-  }, [wallet]);
+  }, [walletAddr]);
 
   return (
     <div

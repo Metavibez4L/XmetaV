@@ -25,6 +25,7 @@ export default function ArenaCanvas() {
   const nodeStatesRef = useRef(new Map<string, string>());
   const busyAgentsRef = useRef(new Set<string>());
   const meetingActiveRef = useRef(false);
+  const meetingAgentsRef = useRef(new Set<string>());
 
   const [hudStats, setHudStats] = useState<HudStats>({
     online: 0,
@@ -44,6 +45,14 @@ export default function ArenaCanvas() {
 
   // -- Meeting detection (stable callback via refs) ---------------------
   const checkMeetingRef = useRef<() => void>(() => {});
+  const meetingEndCooldownRef = useRef(0);
+
+  // Soul always joins meetings as the observer/memory orchestrator
+  const withSoul = (ids: string[]) => {
+    if (!ids.includes("soul")) return [...ids, "soul"];
+    return ids;
+  };
+
   const checkMeeting = useCallback(() => {
     // Don't auto-manage meetings while a manual meeting is active
     if (manualMeetingRef.current) return;
@@ -54,28 +63,40 @@ export default function ArenaCanvas() {
     console.log("[arena] checkMeeting:", busyCount, "busy →", busyIds, "meetingActive:", meetingActiveRef.current);
 
     if (busyCount >= 2 && !meetingActiveRef.current) {
-      console.log("[arena] >>> STARTING AUTO MEETING", busyIds);
+      const meetingIds = withSoul(busyIds);
+      console.log("[arena] >>> STARTING AUTO MEETING", meetingIds);
       meetingActiveRef.current = true;
-      nodesApiRef.current?.startMeeting(busyIds);
-      effectsApiRef.current?.meetingStart(busyIds);
+      meetingAgentsRef.current = new Set(meetingIds);
+      meetingEndCooldownRef.current = Date.now();
+      nodesApiRef.current?.startMeeting(meetingIds);
+      effectsApiRef.current?.meetingStart(meetingIds);
       officeApiRef.current?.setMeetingMode(true);
       setHudStats((s) => ({
         ...s,
         meetingActive: true,
-        meetingAgents: busyIds,
+        meetingAgents: meetingIds,
         meetingType: "auto",
-        lastEvent: `MEETING: ${busyIds.length} agents at table`,
+        lastEvent: `MEETING: ${meetingIds.length} agents at table`,
       }));
     } else if (busyCount >= 2 && meetingActiveRef.current) {
-      nodesApiRef.current?.startMeeting(busyIds);
-      effectsApiRef.current?.meetingStart(busyIds);
+      const meetingIds = withSoul(busyIds);
+      meetingAgentsRef.current = new Set(meetingIds);
+      nodesApiRef.current?.startMeeting(meetingIds);
+      effectsApiRef.current?.meetingStart(meetingIds);
       setHudStats((s) => ({
         ...s,
-        meetingAgents: busyIds,
+        meetingAgents: meetingIds,
       }));
     } else if (busyCount < 2 && meetingActiveRef.current) {
+      // Prevent the periodic sync from ending a meeting too quickly
+      // — agents need at least 5s to animate to seats and be visible
+      if (Date.now() - meetingEndCooldownRef.current < 5000) {
+        console.log("[arena] checkMeeting: skipping end (cooldown)");
+        return;
+      }
       console.log("[arena] >>> ENDING AUTO MEETING");
       meetingActiveRef.current = false;
+      meetingAgentsRef.current.clear();
       nodesApiRef.current?.endMeeting();
       effectsApiRef.current?.meetingEnd();
       officeApiRef.current?.setMeetingMode(false);
@@ -92,25 +113,27 @@ export default function ArenaCanvas() {
   // -- Call a specific meeting with chosen agents ----------------------
   const callMeeting = useCallback((agentIds: string[]) => {
     if (agentIds.length < 2) return;
-    console.log("[arena] >>> CALLING MANUAL MEETING:", agentIds);
+    const meetingIds = withSoul(agentIds);
+    console.log("[arena] >>> CALLING MANUAL MEETING:", meetingIds, "nodesApi:", !!nodesApiRef.current);
     manualMeetingRef.current = true;
     meetingActiveRef.current = true;
+    meetingAgentsRef.current = new Set(meetingIds);
 
     // Visually set called agents to "busy" for the meeting
-    for (const id of agentIds) {
+    for (const id of meetingIds) {
       nodesApiRef.current?.setState(id, "busy");
       officeApiRef.current?.setScreenState(id, "busy");
     }
 
-    nodesApiRef.current?.startMeeting(agentIds);
-    effectsApiRef.current?.meetingStart(agentIds);
+    nodesApiRef.current?.startMeeting(meetingIds);
+    effectsApiRef.current?.meetingStart(meetingIds);
     officeApiRef.current?.setMeetingMode(true);
     setHudStats((s) => ({
       ...s,
       meetingActive: true,
-      meetingAgents: agentIds,
+      meetingAgents: meetingIds,
       meetingType: "manual",
-      lastEvent: `MEETING CALLED: ${agentIds.join(", ")}`,
+      lastEvent: `MEETING CALLED: ${meetingIds.join(", ")}`,
     }));
     setMeetingPanelOpen(false);
   }, []);
@@ -120,6 +143,7 @@ export default function ArenaCanvas() {
     console.log("[arena] >>> DISMISSING MEETING");
     manualMeetingRef.current = false;
     meetingActiveRef.current = false;
+    meetingAgentsRef.current.clear();
     nodesApiRef.current?.endMeeting();
     effectsApiRef.current?.meetingEnd();
     officeApiRef.current?.setMeetingMode(false);
@@ -132,15 +156,64 @@ export default function ArenaCanvas() {
     }));
   }, []);
 
-  // Keep checkMeeting ref current for use in the async PixiJS init
+  // Keep refs current for use in async callbacks & cross-tab listeners
   checkMeetingRef.current = checkMeeting;
+  const callMeetingRef = useRef(callMeeting);
+  callMeetingRef.current = callMeeting;
+
+  // -- Cross-tab meeting listener (localStorage "storage" event) ------
+  // When AgentChat (on /agent tab) detects a meeting command, it writes
+  // to localStorage. The "storage" event fires only in OTHER tabs.
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key !== "xmetav-arena-meeting" || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        if (data?.type === "call-meeting" && Array.isArray(data.agentIds)) {
+          console.log("[arena] Cross-tab meeting received:", data.agentIds);
+          if (!meetingActiveRef.current) {
+            callMeetingRef.current(data.agentIds);
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // -- Arena event handlers (updated every render via ref assignment) --
   const handlersRef = useRef<ArenaHandlers | null>(null);
+  /** Tracks the last hudStats.online count to skip identical setHudStats calls */
+  const lastOnlineRef = useRef(-1);
 
   // Assign fresh handlers on every render so closures stay current
   handlersRef.current = {
     onStatus(agentId, status) {
+      // Quick bail: if the state hasn’t changed, skip all downstream work.
+      // This eliminates the bulk of unnecessary React re-renders from the
+      // 10s periodic sync and duplicate realtime events.
+      if (nodeStatesRef.current.get(agentId) === status) return;
+
+      // If this agent has an active command, don't let session sync
+      // override its busy state — the command is the source of truth
+      const hasActiveCommand = Array.from(activeCommandsRef.current).length > 0 &&
+        busyAgentsRef.current.has(agentId);
+      if (hasActiveCommand && status !== "busy") {
+        nodeStatesRef.current.set(agentId, "busy");
+        return;
+      }
+
+      // During an active meeting, don't let periodic sync disrupt
+      // meeting participants — they must stay "busy" at the table
+      if (meetingActiveRef.current && meetingAgentsRef.current.has(agentId) && status !== "busy") {
+        // Keep meeting participant at the table; only update online count
+        const online = Array.from(nodeStatesRef.current.values()).filter(
+          (s) => s !== "offline",
+        ).length;
+        setHudStats((s) => ({ ...s, online }));
+        return;
+      }
+
       nodesApiRef.current?.setState(agentId, status);
       const screenState =
         status === "busy" ? "busy" : status === "offline" ? "off" : "idle";
@@ -148,7 +221,7 @@ export default function ArenaCanvas() {
 
       nodeStatesRef.current.set(agentId, status);
 
-      // Also track busy from status events
+      // Track busy from status events
       if (status === "busy") {
         busyAgentsRef.current.add(agentId);
       } else {
@@ -158,12 +231,21 @@ export default function ArenaCanvas() {
       const online = Array.from(nodeStatesRef.current.values()).filter(
         (s) => s !== "offline",
       ).length;
-      setHudStats((s) => ({
-        ...s,
-        online,
-        lastEvent: `${agentId} ${status}`,
-      }));
-      checkMeeting();
+
+      // Only update React state if online count or event text changed
+      if (online !== lastOnlineRef.current) {
+        lastOnlineRef.current = online;
+        setHudStats((s) => ({
+          ...s,
+          online,
+          lastEvent: `${agentId} ${status}`,
+        }));
+      }
+
+      // Don't let session sync noise end meetings prematurely
+      if (!meetingActiveRef.current || status === "busy") {
+        checkMeeting();
+      }
     },
     onCommand(commandId, agentId, message) {
       console.log("[arena] onCommand:", agentId, commandId);
@@ -178,7 +260,28 @@ export default function ArenaCanvas() {
         activeCommands: activeCommandsRef.current.size,
         lastEvent: `CMD > ${agentId}: ${message.slice(0, 40)}`,
       }));
-      checkMeeting();
+
+      // Detect meeting commands from voice/chat and trigger arena meeting
+      const lower = message.toLowerCase();
+      const isMeetingCmd = /\b(call|start|begin|schedule|hold|run)\b.*\bmeeting\b|\bmeeting\b.*\b(call|start|begin|with)\b/i.test(lower);
+      if (isMeetingCmd && !meetingActiveRef.current) {
+        // Extract mentioned agent names from the message
+        const allIds = ARENA_AGENTS.map((a) => a.id);
+        const mentioned = allIds.filter((id) => lower.includes(id.replace(/_/g, " ")) || lower.includes(id));
+        // Always include the agent receiving the command + main
+        const meetingSet = new Set([agentId, "main", ...mentioned]);
+        // If no specific agents mentioned, add default intel squad
+        if (mentioned.length === 0) {
+          meetingSet.add("briefing");
+          meetingSet.add("oracle");
+        }
+        const meetingIds = Array.from(meetingSet);
+        console.log("[arena] Voice/chat meeting command detected:", message.slice(0, 60), "→", meetingIds);
+        // Small delay to let the command visuals settle first
+        setTimeout(() => callMeeting(meetingIds), 300);
+      } else {
+        checkMeeting();
+      }
     },
     onChunk(_commandId, agentId) {
       effectsApiRef.current?.streamStart(agentId);
@@ -215,6 +318,25 @@ export default function ArenaCanvas() {
       setHudStats((s) => ({
         ...s,
         lastEvent: `${agentId} ${enabled ? "enabled" : "disabled"}`,
+      }));
+    },
+    onSwarmStart(runId, agentIds, mode) {
+      console.log("[arena] swarmStart:", runId.slice(0, 8), agentIds, mode);
+      effectsApiRef.current?.swarmStart(runId, agentIds, mode);
+      setHudStats((s) => ({
+        ...s,
+        lastEvent: `SWARM ${mode.toUpperCase()}: ${agentIds.length} agents`,
+      }));
+    },
+    onSwarmTaskUpdate(runId, agentId, status) {
+      effectsApiRef.current?.swarmTaskUpdate(runId, agentId, status);
+    },
+    onSwarmEnd(runId) {
+      console.log("[arena] swarmEnd:", runId.slice(0, 8));
+      effectsApiRef.current?.swarmEnd(runId);
+      setHudStats((s) => ({
+        ...s,
+        lastEvent: "Swarm completed",
       }));
     },
   };
@@ -310,15 +432,19 @@ export default function ArenaCanvas() {
       }
       updateLabels();
 
-      // Resize handler
+      // Resize handler (throttled to avoid excessive re-renders)
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
       const ro = new ResizeObserver(() => {
         if (destroyed) return;
-        const newOff = getSceneOffset(
-          app.screen.width,
-          app.screen.height,
-        );
-        scene.position.set(newOff.x, newOff.y);
-        updateLabels();
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const newOff = getSceneOffset(
+            app.screen.width,
+            app.screen.height,
+          );
+          scene.position.set(newOff.x, newOff.y);
+          updateLabels();
+        }, 100);
       });
       ro.observe(el);
 

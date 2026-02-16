@@ -28,23 +28,12 @@ export const VALID_VOICES: VoiceName[] = [
 export type TTSModel = "tts-1" | "tts-1-hd";
 
 export const DEFAULT_VOICE: VoiceName = "nova";
-export const DEFAULT_STT_MODEL = "gpt-4o-transcribe";
+export const DEFAULT_STT_MODEL = "whisper-1";
 export const DEFAULT_TTS_MODEL: TTSModel = "tts-1"; // fast by default; "tts-1-hd" for quality
 
-// Domain-specific prompt to improve transcription accuracy for XmetaV terminology
-const STT_PROMPT = [
-  "XmetaV, XMETAV, $XMETAV, command center, HQ, arena,",
-  "operator, main, briefing, oracle, alchemist, web3dev,",
-  "akua, basedintern, BasedIntern, Akua,",
-  "dispatch, fleet, swarm, bridge, meeting, intel room, dev floor,",
-  "Solidity, Hardhat, Base chain, Base Mainnet, ERC-20, ERC-721, ERC-8004,",
-  "tokenomics, staking, vesting, liquidity, emissions,",
-  "Supabase, OpenClaw, x402, DeFi, DEX, AMM, TVL,",
-  "CoinGecko, Etherscan, BaseScan, DeFiLlama,",
-  "gas, gwei, wei, ETH, USDC, cbETH,",
-  "commit, push, deploy, compile, audit, scaffold,",
-  "SITREP, runbook, cron, daemon, heartbeat,",
-].join(" ");
+// NOTE: STT prompt removed — it causes hallucination loops on noisy audio.
+// Whisper repeats the prompt vocabulary endlessly when it can't hear clearly.
+// gpt-4o-transcribe misdetects language entirely on WSL2 audio quality.
 
 // ── Speech-to-Text (Whisper) ──
 
@@ -58,7 +47,7 @@ export async function transcribeAudio(
   filename = "audio.webm",
   model: string = DEFAULT_STT_MODEL
 ): Promise<string> {
-  const file = new File([audioBuffer], filename, {
+  const file = new File([new Uint8Array(audioBuffer)], filename, {
     type: getMimeType(filename),
   });
 
@@ -67,9 +56,6 @@ export async function transcribeAudio(
   const response = await openai.audio.transcriptions.create({
     model,
     file,
-    prompt: STT_PROMPT,
-    temperature: 0,
-    // language param only supported on whisper models
     ...(isWhisper ? { language: "en" } : {}),
   });
 

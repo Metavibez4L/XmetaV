@@ -26,7 +26,7 @@ For per-agent runbooks, see `docs/agents/`:
 - **Swarm collab**: `./scripts/swarm.sh --collab "review task" basedintern akua`
 - **Swarm status**: `./scripts/swarm.sh --status`
 - **Dashboard**: `cd dashboard && npm run dev` → http://localhost:3000
-- **Bridge daemon**: `cd dashboard/bridge && npm start`
+- **Bridge daemon**: `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot)
 - **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
 - **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
 - **x402 payments**: See `capabilities/x402-payments.md`
@@ -34,6 +34,28 @@ For per-agent runbooks, see `docs/agents/`:
 - **ERC-8004 identity**: See `capabilities/erc8004-identity.md`
 - **$XMETAV token**: See `capabilities/xmetav-token.md`
 - **Dashboard token page**: http://localhost:3000/token (balance, tiers, discounts)
+- **EthSkills**: `openclaw skills list` (12 blockchain/Ethereum skills installed)
+
+## EthSkills (installed)
+
+12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) are installed across fleet agents:
+
+| Skill | Agent(s) | Description |
+|-------|----------|-------------|
+| `wallets` | main | EOAs, Safe multisig, EIP-7702, ERC-4337, key safety |
+| `tools` | web3dev | Hardhat, Foundry, Tenderly, Etherscan verification |
+| `l2s` | web3dev, oracle | L2 ecosystem: Arbitrum, Optimism, Base, zkSync, Scroll, Linea |
+| `orchestration` | web3dev | Multi-contract deploy scripts, upgrade patterns, proxy factories |
+| `addresses` | web3dev, midas, alchemist | Checksum, CREATE2 vanity, EIP-3770 chain-prefixed addresses |
+| `concepts` | web3dev, midas | Core EVM concepts: gas, nonce, logs, storage, ABI encoding |
+| `security` | web3dev | Reentrancy, flash loans, oracle manipulation, access control |
+| `standards` | web3dev, midas | ERC-20, ERC-721, ERC-1155, ERC-2612, ERC-4626, EIP-712 |
+| `frontend-ux` | web3dev | Wallet connection, transaction UX, error handling, mobile |
+| `frontend-playbook` | web3dev | wagmi/viem integration, RainbowKit, WalletConnect |
+| `building-blocks` | web3dev | OpenZeppelin patterns, diamond proxy, minimal proxy |
+| `gas` | oracle, midas, alchemist | Gas economics: L1 vs L2, blob gas, priority fees, estimation |
+
+Skills are stored at `~/.openclaw/workspace/skills/` and verified with `openclaw skills list`.
 
 ## How agent routing works
 
@@ -65,6 +87,22 @@ Manual cleanup:
 ```bash
 find ~/.openclaw -name "*.lock" -type f -delete
 ```
+
+## Persistent memory (dashboard + bridge)
+
+In addition to OpenClaw session history, XmetaV supports a Supabase-backed **persistent memory bus** used by the dashboard + bridge:
+
+- Table: `agent_memory`
+- Shared memory: entries with `agent_id = "_shared"`
+- Bridge behavior: prepends recent memory entries to the dispatched message; writes an `outcome`/`error` memory entry after completion
+
+Setup:
+- Run `dashboard/scripts/setup-db-agent-memory.sql` in the Supabase SQL editor
+
+API (dashboard, service-role on server side):
+- `GET /api/agents/memory?agent_id=<id>&limit=<n>`
+- `POST /api/agents/memory` (insert `{ agent_id, kind, content, source?, ttl_hours? }`)
+- `DELETE /api/agents/memory?id=<uuid>`
 
 ## Deterministic smoke tests
 

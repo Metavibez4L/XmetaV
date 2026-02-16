@@ -1,0 +1,168 @@
+{
+  "type": "erc8004:agent-registration:1.0",
+  "name": "XmetaV",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, and ERC-8004 identity on Base Mainnet.",
+  "image": "",
+  "external_url": "https://github.com/Metavibez4L/XmetaV",
+  "services": [
+    {
+      "type": "x402",
+      "url": "http://localhost:4021",
+      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints (USDC on Base)"
+    },
+    {
+      "type": "dashboard",
+      "url": "http://localhost:3000",
+      "description": "XmetaV Command Center — fleet control, arena visualization, agent chat, voice interface"
+    },
+    {
+      "type": "bridge",
+      "url": "http://localhost:18789",
+      "description": "Agent execution bridge — dispatches commands to OpenClaw agents via Supabase"
+    },
+    {
+      "type": "github",
+      "url": "https://github.com/Metavibez4L/XmetaV",
+      "description": "Source repository — scripts, dashboard, bridge, docs, and agent templates"
+    },
+    {
+      "type": "swap",
+      "url": "http://localhost:3001",
+      "description": "Token swap execution via Aerodrome Router V2 on Base — voice and text commands"
+    }
+  ],
+  "registrations": [
+    {
+      "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+      "agentId": "16905"
+    }
+  ],
+  "supportedTrust": [
+    "reputation",
+    "x402-payment-history",
+    "on-chain-identity"
+  ],
+  "capabilities": [
+    "agent-orchestration",
+    "fleet-management",
+    "swarm-execution",
+    "intent-resolution",
+    "x402-payments",
+    "persistent-agent-memory",
+    "smart-contract-deployment",
+    "solidity-development",
+    "security-auditing",
+    "gas-optimization",
+    "on-chain-intelligence",
+    "market-monitoring",
+    "tokenomics-analysis",
+    "emission-modeling",
+    "session-briefing",
+    "memory-consolidation",
+    "voice-interface",
+    "arena-visualization",
+    "selective-meetings",
+    "agent-lifecycle-management",
+    "fleet-health-monitoring",
+    "spawn-coordination",
+    "soul-memory-orchestration",
+    "dream-consolidation",
+    "memory-association-building",
+    "context-packet-curation",
+    "memory-retrieval-learning",
+    "token-swap-execution",
+    "voice-swap-commands",
+    "dex-trading",
+    "ethereum-wallet-management",
+    "eip-7702-smart-eoas",
+    "safe-multisig",
+    "erc-4337-account-abstraction",
+    "l2-deployment",
+    "cross-chain-bridging",
+    "gas-economics",
+    "defi-composability",
+    "solidity-security-patterns",
+    "ethereum-standards",
+    "dapp-orchestration",
+    "frontend-ux",
+    "verified-contract-addresses",
+    "dev-tooling",
+    "revenue-analytics",
+    "endpoint-pricing",
+    "growth-optimization",
+    "revenue-forecasting"
+  ],
+  "fleet": {
+    "agents": [
+      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command", "skills": ["wallets"] },
+      { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
+      { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
+      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
+      { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel", "skills": ["gas", "addresses"] },
+      { "id": "midas", "role": "Revenue & growth optimizer — pricing, forecasts, endpoint analytics", "room": "intel", "skills": ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"] },
+      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
+      { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
+      { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
+      { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
+    ],
+    "model": "ollama/kimi-k2.5:cloud",
+    "meetingCapacity": 8,
+    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul"]
+  },
+  "contracts": {
+    "token": {
+      "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
+      "symbol": "$XMETAV",
+      "network": "eip155:8453",
+      "standard": "ERC-20"
+    },
+    "identity": {
+      "address": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+      "standard": "ERC-8004",
+      "network": "eip155:8453"
+    },
+    "reputation": {
+      "address": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+      "standard": "ERC-8004",
+      "network": "eip155:8453"
+    },
+    "memoryAnchor": {
+      "address": "0x0D1F695ea1ca6b5Ba22E3bAf6190d8553D9c4D98",
+      "standard": "custom",
+      "network": "eip155:8453"
+    }
+  },
+  "wallet": {
+    "address": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "network": "eip155:8453",
+    "supports": ["USDC", "ETH", "WETH", "USDT", "DAI", "cbETH", "AERO", "$XMETAV"]
+  },
+  "x402Support": {
+    "enabled": true,
+    "network": "eip155:8453",
+    "payTo": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "acceptedSchemes": ["exact"],
+    "denomination": "USDC",
+    "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402",
+    "pricing": {
+      "POST /agent-task": "$0.10",
+      "POST /intent": "$0.05",
+      "GET /fleet-status": "$0.01",
+      "POST /swarm": "$0.50",
+      "POST /voice/transcribe": "$0.05",
+      "POST /voice/synthesize": "$0.08",
+      "GET /midas/dashboard": "$0.02",
+      "GET /midas/report": "$0.05"
+    },
+    "tokenDiscounts": {
+      "token": "$XMETAV",
+      "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
+      "tiers": {
+        "Bronze": { "minBalance": 1000, "discount": "10%" },
+        "Silver": { "minBalance": 10000, "discount": "20%" },
+        "Gold": { "minBalance": 100000, "discount": "35%" },
+        "Diamond": { "minBalance": 1000000, "discount": "50%" }
+      }
+    }
+  }
+}
