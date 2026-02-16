@@ -10,9 +10,11 @@
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
     "@supabase/supabase-js": "^2.49.0",
+    "@types/compression": "^1.8.1",
     "@x402/core": "latest",
     "@x402/evm": "latest",
     "@x402/express": "latest",
+    "compression": "^1.8.1",
     "dotenv": "^17.2.4",
     "express": "^5.1.0",
     "openai": "^6.21.0",

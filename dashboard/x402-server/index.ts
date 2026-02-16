@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
@@ -8,6 +9,29 @@ import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
+
+// ── TTL Cache for expensive lookups ──────────────────────────
+interface CacheEntry<T> { value: T; expiresAt: number; }
+class SimpleCache<T> {
+  private store = new Map<string, CacheEntry<T>>();
+  constructor(private ttlMs: number) {}
+  async getOrFetch(key: string, fn: () => Promise<T>, ttl?: number): Promise<T> {
+    const e = this.store.get(key);
+    if (e && Date.now() < e.expiresAt) return e.value;
+    const v = await fn();
+    this.store.set(key, { value: v, expiresAt: Date.now() + (ttl ?? this.ttlMs) });
+    return v;
+  }
+  invalidate(key: string) { this.store.delete(key); }
+  clear() { this.store.clear(); }
+}
+
+// Cache: token tier lookups (60s TTL — balance rarely changes)
+const tierCache = new SimpleCache<{ name: string; minBalance: number; discount: number; dailyLimit: number; color: string }>(60_000);
+// Cache: ERC-8004 identity resolution (5min TTL — on-chain identity is stable)
+const identityCache = new SimpleCache<{ agentId: string; owner: string; wallet: string; tokenURI: string; x402Enabled?: boolean } | null>(300_000);
+// Cache: fleet-status (30s TTL — acceptable staleness)
+const fleetCache = new SimpleCache<unknown>(30_000);
 
 // ============================================================
 // XmetaV x402 Payment-Gated API
@@ -88,21 +112,24 @@ const viemClient = XMETAV_TOKEN_ADDRESS
 
 async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
   if (!viemClient || !XMETAV_TOKEN_ADDRESS || !callerAddress) return TIERS[0];
-  try {
-    const raw = await viemClient.readContract({
-      address: XMETAV_TOKEN_ADDRESS,
-      abi: ERC20_BALANCE_ABI,
-      functionName: "balanceOf",
-      args: [callerAddress as `0x${string}`],
-    });
-    const balance = Number(raw / BigInt(10 ** 18));
-    return getTier(balance);
-  } catch {
-    return TIERS[0];
-  }
+  return tierCache.getOrFetch(`tier:${callerAddress}`, async () => {
+    try {
+      const raw = await viemClient.readContract({
+        address: XMETAV_TOKEN_ADDRESS,
+        abi: ERC20_BALANCE_ABI,
+        functionName: "balanceOf",
+        args: [callerAddress as `0x${string}`],
+      });
+      const balance = Number(raw / BigInt(10 ** 18));
+      return getTier(balance);
+    } catch {
+      return TIERS[0];
+    }
+  });
 }
 
 const app = express();
+app.use(compression());  // gzip — ~60% bandwidth reduction
 app.use(express.json());
 
 // ---- Payment logging helper ----
@@ -275,29 +302,39 @@ declare global {
 app.use(async (req, _res, next) => {
   const agentIdHeader = req.headers["x-agent-id"] as string | undefined;
   if (!agentIdHeader) return next();
-  try {
-    const agentId = BigInt(agentIdHeader);
-    const [owner, uri, wallet] = await Promise.all([
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
-    ]);
-    let x402Enabled = false;
-    if (uri) {
-      try {
-        const meta = await fetch(uri).then(r => r.json());
-        x402Enabled = meta?.x402Support?.enabled === true;
-      } catch { /* metadata fetch optional */ }
+
+  // Cached ERC-8004 resolution — avoids 3 RPC calls per request
+  const resolved = await identityCache.getOrFetch(`agent:${agentIdHeader}`, async () => {
+    try {
+      const agentId = BigInt(agentIdHeader);
+      const [owner, uri, wallet] = await Promise.all([
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
+      ]);
+      let x402Enabled = false;
+      if (uri) {
+        try {
+          const meta = await fetch(uri).then(r => r.json());
+          x402Enabled = meta?.x402Support?.enabled === true;
+        } catch { /* metadata fetch optional */ }
+      }
+      return {
+        agentId: agentId.toString(),
+        owner: owner as string,
+        wallet: wallet as string,
+        tokenURI: uri as string,
+        x402Enabled,
+      };
+    } catch {
+      return null;
     }
-    req.callerAgent = {
-      agentId: agentId.toString(),
-      owner: owner as string,
-      wallet: wallet as string,
-      tokenURI: uri as string,
-      x402Enabled,
-    };
-    console.log(`[ERC-8004] Resolved caller agent #${agentId} — owner: ${owner}, x402: ${x402Enabled}`);
-  } catch {
+  });
+
+  if (resolved) {
+    req.callerAgent = resolved;
+    console.log(`[ERC-8004] Resolved caller agent #${agentIdHeader} — owner: ${resolved.owner}, x402: ${resolved.x402Enabled}`);
+  } else {
     console.log(`[ERC-8004] Agent #${agentIdHeader} not found in registry, proceeding without identity`);
   }
   next();

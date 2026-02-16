@@ -6,27 +6,30 @@ import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
 import { refreshSitrep } from "./heartbeat.js";
+import { TTLCache } from "../lib/ttl-cache.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
 export const running = new Map<string, ChildProcess>();
 
-async function isAgentEnabled(agentId: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from("agent_controls")
-      .select("enabled")
-      .eq("agent_id", agentId)
-      .single();
+/** Cache agent enabled status for 30s — avoids DB query on every command */
+const agentEnabledCache = new TTLCache<boolean>(30_000);
 
-    // If table doesn't exist or row doesn't exist, default to enabled.
-    if (error) {
+async function isAgentEnabled(agentId: string): Promise<boolean> {
+  return agentEnabledCache.getOrFetch(`enabled:${agentId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from("agent_controls")
+        .select("enabled")
+        .eq("agent_id", agentId)
+        .single();
+
+      if (error) return true;
+      return data?.enabled !== false;
+    } catch {
       return true;
     }
-    return data?.enabled !== false;
-  } catch {
-    return true;
-  }
+  });
 }
 
 export async function executeCommand(command: {
