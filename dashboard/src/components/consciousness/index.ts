@@ -7,3 +7,6 @@ export { DreamscapeView } from "./DreamscapeView";
 export { LucidDreaming } from "./LucidDreaming";
 export { SwarmNetwork } from "./SwarmNetwork";
 export { MiniArena } from "./MiniArena";
+export { DreamSynthesis } from "./DreamSynthesis";
+export { PredictiveContext } from "./PredictiveContext";
+export { MemoryReforge } from "./MemoryReforge";

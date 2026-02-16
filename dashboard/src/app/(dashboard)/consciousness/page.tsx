@@ -11,6 +11,9 @@ import {
   LucidDreaming,
   SwarmNetwork,
   MiniArena,
+  DreamSynthesis,
+  PredictiveContext,
+  MemoryReforge,
 } from "@/components/consciousness";
 import { Brain, RefreshCw, Loader2 } from "lucide-react";
 
@@ -126,7 +129,16 @@ export default function ConsciousnessPage() {
       {/* 6: Lucid Dreaming — Phase 5 autonomous proposals */}
       <LucidDreaming />
 
-      {/* 7: Dreamscape visualization (full width) */}
+      {/* 7: Dream Synthesis + Predictive Loading side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <DreamSynthesis />
+        <PredictiveContext />
+      </div>
+
+      {/* 8: Memory Reforge (full width) */}
+      <MemoryReforge />
+
+      {/* 9: Dreamscape visualization (full width) */}
       <DreamscapeView
         dreamInsights={dreamInsights}
         memories={memories}

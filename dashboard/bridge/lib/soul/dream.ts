@@ -19,6 +19,9 @@ import {
   generateProposals,
   expireOldProposals,
 } from "./dream-proposals.js";
+import { runDreamSynthesis } from "./synthesis.js";
+import { runPredictiveAnalysis } from "./predictive.js";
+import { runDecayPass, autoReforge } from "./reforge.js";
 
 let lastDreamTime = 0;
 let isDreaming = false;
@@ -196,6 +199,41 @@ async function runDreamCycle(sessionId: string): Promise<{
 
   // 6. Prune weak associations
   await pruneWeakAssociations();
+
+  // 7. Dream Synthesis — fuse related anchors into insight shards
+  let synthesisCount = 0;
+  try {
+    const synthesis = await runDreamSynthesis(sessionId);
+    synthesisCount = synthesis.count;
+    if (synthesisCount > 0) {
+      console.log(`[soul] Dream synthesis produced ${synthesisCount} insight shard(s).`);
+    }
+  } catch (err) {
+    console.error("[soul:synthesis] Dream synthesis failed:", (err as Error).message);
+  }
+
+  // 8. Predictive Context Loading — anticipate next session
+  try {
+    const predictions = await runPredictiveAnalysis(sessionId);
+    if (predictions.count > 0) {
+      console.log(`[soul] Generated ${predictions.count} predictive context(s).`);
+    }
+  } catch (err) {
+    console.error("[soul:predictive] Prediction analysis failed:", (err as Error).message);
+  }
+
+  // 9. Memory Decay + Auto-Reforge
+  try {
+    const decay = await runDecayPass();
+    console.log(`[soul] Decay pass: ${decay.scored} scored, ${decay.archived} archived.`);
+
+    const reforge = await autoReforge();
+    if (reforge.reforgedCount > 0) {
+      console.log(`[soul] Auto-reforged ${reforge.reforgedCount} memory group(s) into legendary crystals.`);
+    }
+  } catch (err) {
+    console.error("[soul:reforge] Decay/reforge failed:", (err as Error).message);
+  }
 
   return { insights: insights.length, proposals: proposalCount };
 }
