@@ -1,35 +1,55 @@
 Copyright © 2026 AkuaLabs LLC. All rights reserved.
 
-PROPRIETARY SOFTWARE LICENSE
+PROPRIETARY SOFTWARE LICENSE AGREEMENT
 
-This software and associated documentation files (the "Software") are the
+This software and all associated source code, object code, documentation, 
+designs, architecture, and related materials (the "Software") are the 
 exclusive property of AkuaLabs LLC ("Company").
 
-1. NO PERMISSION IS GRANTED to use, copy, modify, merge, publish, distribute,
-   sublicense, and/or sell copies of the Software without prior written
-   permission from the Company.
+1. OWNERSHIP
+The Software is proprietary and confidential. All rights, title, and 
+interest in and to the Software, including all intellectual property rights, 
+are and shall remain exclusively with the Company.
 
-2. NO COMMERCIAL USE of the Software, in whole or in part, is permitted
-   without a separate commercial license agreement with the Company.
+2. NO LICENSE GRANTED
+No license, express or implied, is granted to any person or entity to use, 
+copy, modify, distribute, sublicense, create derivative works from, 
+commercialize, or otherwise exploit the Software without prior written 
+authorization from the Company.
 
-3. NO DERIVATIVE WORKS may be created from the Software without prior
-   written permission from the Company.
+3. RESTRICTIONS
+Without limiting the foregoing, you may not:
 
-4. VIEWING of this repository, if public, does not constitute a license
-   to use, copy, or distribute the Software in any form.
+   (a) Use the Software for any commercial purpose;
+   (b) Copy or reproduce the Software in whole or in part;
+   (c) Modify, adapt, translate, or create derivative works;
+   (d) Distribute or publish the Software;
+   (e) Reverse engineer, decompile, or attempt to derive source code from
+       any compiled or obfuscated portions of the Software, except as
+       expressly permitted by applicable law.
 
-5. CONTRIBUTIONS: Any contributions submitted to this repository are
-   assigned to AkuaLabs LLC under the terms of the Contributor License
-   Agreement (CLA). By submitting code, you agree to transfer all
-   intellectual property rights to the Company.
+4. PUBLIC REPOSITORY DISCLAIMER
+If this repository is publicly accessible, such access does not grant any
+license or right to use or exploit the Software. Viewing the code does not
+constitute permission for use.
 
-6. REVERSE ENGINEERING of any compiled, minified, or obfuscated portions
-   of the Software is strictly prohibited.
+5. CONTRIBUTIONS
+Any contributions submitted to the Company, including via pull requests,
+issues, or other communication channels, shall be governed by a separate
+Contributor License Agreement (CLA). No contribution shall be accepted
+without express agreement to assign intellectual property rights to the Company.
 
-7. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-   OR IMPLIED. IN NO EVENT SHALL THE COMPANY BE LIABLE FOR ANY CLAIM,
-   DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+6. NO WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS 
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+7. LIMITATION OF LIABILITY
+IN NO EVENT SHALL THE COMPANY BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR RELATED TO THE SOFTWARE.
+
+8. TRADEMARK
+"XmetaV" and associated marks are trademarks of AkuaLabs LLC. No right or 
+license to use any trademark is granted without prior written permission.
 
 For licensing inquiries: legal@akualabs.com
-
-XmetaV™ is a trademark of AkuaLabs LLC.
