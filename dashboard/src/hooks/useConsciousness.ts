@@ -111,6 +111,8 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
 
   const fetchAll = useCallback(async () => {
     try {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
       const [
         sessionsRes,
         memoriesRes,
@@ -118,10 +120,11 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
         anchorsRes,
         queriesRes,
         dreamsRes,
+        recentCmdsRes,
       ] = await Promise.all([
         supabase
           .from("agent_sessions")
-          .select("id, agent_id, status, started_at, last_active, last_heartbeat, tasks_completed, errors")
+          .select("agent_id, status, last_heartbeat")
           .in("agent_id", ["main", "soul"]),
         supabase
           .from("agent_memory")
@@ -149,6 +152,12 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
           .select("id, insight, source_memories, category, confidence, generated_at")
           .order("generated_at", { ascending: false })
           .limit(30),
+        // Check for recent fleet commands — used for dreamReady calculation
+        supabase
+          .from("agent_commands")
+          .select("id")
+          .gte("created_at", sixHoursAgo)
+          .limit(1),
       ]);
 
       if (!mountedRef.current) return;
@@ -187,13 +196,10 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
       // Estimate query time from timestamps (sequential diff)
       const avgQueryTime = 0.3; // placeholder — real latency needs server-side timing
 
-      // Dream readiness: check if soul has been idle > 6 hours
+      // Dream readiness: fleet is idle (no commands in last 6 hours) and has memories to consolidate
       const lastDreamAt = dreamInsights.length > 0 ? dreamInsights[0].generated_at : null;
-      const soulLastActive = soulSession?.last_heartbeat
-        ? new Date(soulSession.last_heartbeat).getTime()
-        : 0;
-      const sixHoursMs = 6 * 60 * 60 * 1000;
-      const dreamReady = Date.now() - soulLastActive > sixHoursMs && memories.length > 5;
+      const hasRecentCommands = (recentCmdsRes.data ?? []).length > 0;
+      const dreamReady = !hasRecentCommands && memories.length > 5;
 
       setData({
         mainSession,
@@ -227,9 +233,39 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
     fetchAll();
     const iv = setInterval(fetchAll, REFRESH_INTERVAL);
 
-    // Realtime subscription — instantly picks up new anchors
-    const channel = supabase
-      .channel("anchor-sync")
+    // Realtime: agent_sessions — instant status updates for main + soul
+    const sessionChannel = supabase
+      .channel("consciousness-sessions")
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "agent_sessions",
+        },
+        (payload: { new: { agent_id?: string; status?: string; last_heartbeat?: string } }) => {
+          if (!mountedRef.current) return;
+          const row = payload.new;
+          if (row.agent_id === "main" || row.agent_id === "soul") {
+            // Inline update without full refetch — keeps UI snappy
+            setData((prev) => {
+              const session: AgentSession = {
+                agent_id: row.agent_id!,
+                status: row.status ?? "idle",
+                last_heartbeat: row.last_heartbeat ?? new Date().toISOString(),
+              };
+              return row.agent_id === "main"
+                ? { ...prev, mainSession: session }
+                : { ...prev, soulSession: session };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Realtime: new anchors — refresh memory data on anchor insert
+    const anchorChannel = supabase
+      .channel("consciousness-anchors")
       .on(
         "postgres_changes" as never,
         {
@@ -239,7 +275,22 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
           filter: "source=eq.anchor",
         },
         () => {
-          // New anchor landed — refresh immediately
+          if (mountedRef.current) fetchAll();
+        }
+      )
+      .subscribe();
+
+    // Realtime: agent commands — refresh on new command (status change)
+    const cmdChannel = supabase
+      .channel("consciousness-commands")
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agent_commands",
+        },
+        () => {
           if (mountedRef.current) fetchAll();
         }
       )
@@ -248,7 +299,9 @@ export function useConsciousness(): ConsciousnessData & { refresh: () => void } 
     return () => {
       mountedRef.current = false;
       clearInterval(iv);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(sessionChannel);
+      supabase.removeChannel(anchorChannel);
+      supabase.removeChannel(cmdChannel);
     };
   }, [fetchAll, supabase]);
 
