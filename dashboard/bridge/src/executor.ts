@@ -5,6 +5,7 @@ import { captureCommandOutcome } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
+import { refreshSitrep } from "./heartbeat.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
@@ -304,6 +305,9 @@ export async function executeCommand(command: {
           );
 
         console.log(`[executor] Command ${id} finished: ${status}`);
+
+        // Refresh SITREP so main always has latest context
+        refreshSitrep("post-command");
 
         // Check for queued commands for this agent
         pickNextCommand(agent_id);
