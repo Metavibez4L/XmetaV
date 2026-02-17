@@ -1160,17 +1160,28 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
       } catch { /* metadata fetch failed — ok, just report what we have */ }
     }
 
+    // Extract x402Support details from metadata for structured response
+    const x402Support = metadata?.x402Support as Record<string, unknown> | undefined;
+
     res.json({
       agentId: agentId.toString(),
       owner: owner as string,
-      agentWallet: agentWallet as string,
+      wallet: agentWallet as string,
       tokenURI: tokenURI as string,
       x402Enabled,
-      acceptedSchemes: x402Enabled ? ["exact"] : [],
-      network: "eip155:8453",
-      pricing: x402Enabled && metadata
-        ? (metadata as Record<string, unknown>)
-        : null,
+      x402Support: x402Enabled && x402Support ? {
+        enabled: true,
+        network: x402Support.network || "eip155:8453",
+        payTo: x402Support.payTo,
+        acceptedSchemes: x402Support.acceptedSchemes || ["exact"],
+        denomination: x402Support.denomination || "USDC",
+        facilitator: x402Support.facilitator,
+        pricing: x402Support.pricing || {},
+        tokenDiscounts: x402Support.tokenDiscounts || null,
+      } : null,
+      capabilities: metadata?.capabilities || [],
+      services: metadata?.services || [],
+      contracts: metadata?.contracts || {},
       registry: ERC8004_REGISTRY,
       timestamp: new Date().toISOString(),
     });
