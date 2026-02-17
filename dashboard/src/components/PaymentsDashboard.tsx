@@ -245,7 +245,7 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4" style={{ color: "#00f0ff66" }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
-              x402 Gated Endpoints · 10 endpoints
+              x402 Gated Endpoints · 16 endpoints
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -273,7 +273,7 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
           {[
             { ep: "POST /agent-task", price: "$0.10", desc: "Dispatch task to agent" },
             { ep: "POST /intent", price: "$0.05", desc: "Goal → commands" },
@@ -285,6 +285,12 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             { ep: "POST /cosmos-explore", price: "$0.20", desc: "Explore Memory Cosmos" },
             { ep: "POST /voice/transcribe", price: "$0.05", desc: "Speech-to-text" },
             { ep: "POST /voice/synthesize", price: "$0.08", desc: "Text-to-speech" },
+            { ep: "POST /execute-trade", price: "$0.50+", desc: "Swap tx bundle (0.5%)" },
+            { ep: "POST /rebalance", price: "$2.00+", desc: "Portfolio rebalance (0.3%)" },
+            { ep: "GET /arb-opportunity", price: "$0.25", desc: "Arb scan" },
+            { ep: "POST /execute-arb", price: "$0.10+", desc: "Execute arb (1% profit)" },
+            { ep: "GET /yield-optimize", price: "$0.50", desc: "Yield farming scan" },
+            { ep: "POST /deploy-yield", price: "$3.00+", desc: "Deploy capital (0.5%)" },
           ].map(({ ep, price, desc }) => (
             <div key={ep} className="p-2 rounded" style={{ background: "#060c18" }}>
               <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>

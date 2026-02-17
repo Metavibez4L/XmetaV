@@ -15,7 +15,7 @@ export default function PaymentsPage() {
               className="text-[7px] font-mono tracking-widest px-2 py-0.5 rounded"
               style={{ background: '#00f0ff10', color: '#00f0ff', border: '1px solid #00f0ff25' }}
             >
-              10 ENDPOINTS
+              16 ENDPOINTS
             </span>
           </div>
           <p className="text-[11px] font-mono mt-1" style={{ color: '#4a6a8a' }}>

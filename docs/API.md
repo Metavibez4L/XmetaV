@@ -98,12 +98,20 @@ Service health and endpoint summary.
       "POST /fusion-chamber": "$0.15 — fuse memory crystals",
       "POST /cosmos-explore": "$0.20 — explore Memory Cosmos",
       "POST /voice/transcribe": "$0.05 — speech-to-text (Whisper)",
-      "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)"
+      "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)",
+      "POST /execute-trade": "$0.50+ — swap tx bundle (0.5% of trade)",
+      "POST /rebalance-portfolio": "$2.00+ — portfolio rebalance (0.3%)",
+      "GET /arb-opportunity": "$0.25 — arbitrage scan",
+      "POST /execute-arb": "$0.10+ — execute arb (1% of profit)",
+      "GET /yield-optimize": "$0.50 — yield farming scan",
+      "POST /deploy-yield-strategy": "$3.00+ — deploy yield capital (0.5%)"
     },
     "free": {
       "GET /health": "this endpoint",
       "GET /token-info": "XMETAV token info and tier table",
-      "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities"
+      "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
+      "GET /digest": "trigger payment digest & memory write",
+      "GET /trade-fees": "trade fee schedule & revenue projections"
     }
   }
 }
@@ -523,6 +531,110 @@ Explore the Memory Cosmos world — islands, highways, and crystals.
   "mode": "navigate",
   "cosmos": { "islands": 5, "highways": 8, "crystals": 142 },
   "timestamp": "2026-02-15T..."
+}
+```
+
+---
+
+## Trade Execution Endpoints
+
+All trade endpoints generate **unsigned transaction bundles** — the caller signs and broadcasts. Pricing is %-of-capital with minimum floors.
+
+### `POST /execute-trade` — $0.50+ (0.5% of trade)
+
+Generate a swap transaction bundle for any Base token pair.
+
+**Body**:
+```json
+{
+  "tokenIn": "USDC",
+  "tokenOut": "WETH",
+  "amountIn": "100",
+  "slippageBps": 50,
+  "walletAddress": "0x..."
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `tokenIn` | string | Yes | — | Input token symbol |
+| `tokenOut` | string | Yes | — | Output token symbol |
+| `amountIn` | string | Yes | — | Amount in human-readable units |
+| `slippageBps` | number | No | `50` | Slippage tolerance in basis points |
+| `walletAddress` | string | Yes | — | Wallet to sign & broadcast from |
+
+---
+
+### `POST /rebalance-portfolio` — $2.00+ (0.3% of capital)
+
+Generate a multi-swap rebalance plan for a target allocation.
+
+**Body**:
+```json
+{
+  "walletAddress": "0x...",
+  "targetAllocation": { "WETH": 50, "USDC": 30, "cbETH": 20 },
+  "totalCapitalUsd": 10000
+}
+```
+
+---
+
+### `GET /arb-opportunity` — $0.25
+
+Scan for arbitrage opportunities across Base DEXes.
+
+**Query**: `?tokens=WETH,USDC,cbETH&minProfitBps=30`
+
+---
+
+### `POST /execute-arb` — $0.10+ (1% of estimated profit)
+
+Execute an arbitrage opportunity by ID.
+
+**Body**:
+```json
+{
+  "opportunityId": "arb-...",
+  "walletAddress": "0x..."
+}
+```
+
+---
+
+### `GET /yield-optimize` — $0.50
+
+Scan yield farming opportunities on Base (Aave, Aerodrome, Moonwell).
+
+**Query**: `?tokens=USDC,WETH&minApy=5`
+
+---
+
+### `POST /deploy-yield-strategy` — $3.00+ (0.5% of capital)
+
+Generate transactions to deploy capital into a yield strategy.
+
+**Body**:
+```json
+{
+  "strategyId": "yield-...",
+  "capitalUsd": 5000,
+  "walletAddress": "0x..."
+}
+```
+
+---
+
+### `GET /trade-fees` (Free)
+
+View the trade fee schedule, whale tiers, and projected monthly revenue.
+
+**Response** `200`:
+```json
+{
+  "endpoints": { ... },
+  "projectedMonthlyRevenue": "$36,950.00",
+  "xmetavDiscountTiers": { ... }
 }
 ```
 

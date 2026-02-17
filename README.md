@@ -40,7 +40,7 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
 - **Agent Factory** — main agent can create new agents, scaffold apps, create GitHub repos, and manage the fleet
 - **Swarm Orchestration** — parallel, pipeline, and collaborative multi-agent task execution (CLI + dashboard)
 - **Fleet Controls** — Enable/disable agents from the dashboard with bridge-side enforcement
-- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + CDP facilitator with JWT auth (pay-per-use API gating: $0.01-$0.50 per endpoint)
+- **x402 Payments** — Autonomous USDC micro-payments on Base via `@x402/express` + CDP facilitator with JWT auth (pay-per-use API gating: $0.01-$3.00 per endpoint, includes trade execution with %-of-capital pricing)
 - **ERC-8004 Identity** — On-chain agent identity (NFT #16905) with `x402Support` metadata, identity resolution middleware, and `/agent/:id/payment-info` discovery endpoint
 - **Voice Commands** — Speak to agents via Whisper STT + TTS with x402 payment gating ($0.05-$0.08 per request)
 - **Persistent Agent Memory Bus** — Supabase-backed memory entries (`_shared` + per-agent) injected by the bridge at dispatch time, with outcome capture after completion (complements OpenClaw session history)

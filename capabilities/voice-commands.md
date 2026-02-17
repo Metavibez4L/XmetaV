@@ -114,8 +114,8 @@ Available on the x402 server (port 4021) when `OPENAI_API_KEY` is configured.
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
-| `POST /voice/transcribe` | $0.005 | Speech-to-text (Whisper) |
-| `POST /voice/synthesize` | $0.01 | Text-to-speech (TTS) |
+| `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
+| `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
 
 ## Models & Pricing
 

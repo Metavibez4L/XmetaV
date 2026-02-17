@@ -8,7 +8,7 @@
     {
       "type": "x402",
       "url": "http://localhost:4021",
-      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints (USDC on Base)"
+      "description": "x402 payment-gated API — agent orchestration, trade execution, yield optimization, arbitrage, swarm, voice, memory endpoints (USDC on Base)"
     },
     {
       "type": "dashboard",
@@ -130,10 +130,18 @@
       "POST /intent": "$0.05",
       "GET /fleet-status": "$0.01",
       "POST /swarm": "$0.50",
+      "POST /memory-crystal": "$0.05",
+      "POST /neural-swarm": "$0.10",
+      "POST /fusion-chamber": "$0.15",
+      "POST /cosmos-explore": "$0.20",
       "POST /voice/transcribe": "$0.05",
       "POST /voice/synthesize": "$0.08",
-      "GET /midas/dashboard": "$0.02",
-      "GET /midas/report": "$0.05"
+      "POST /execute-trade": "$0.50 min (0.5% of trade)",
+      "POST /rebalance-portfolio": "$2.00 + 0.3% of portfolio",
+      "GET /arb-opportunity": "$0.25",
+      "POST /execute-arb": "$0.10 min (1% of profit)",
+      "GET /yield-optimize": "$0.50",
+      "POST /deploy-yield-strategy": "$3.00 + 0.5% of capital"
     },
     "tokenDiscounts": {
       "token": "$XMETAV",

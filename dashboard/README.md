@@ -308,7 +308,7 @@ npm start             # starts on port 4021
 # dev: npm run dev     # watch mode
 ```
 
-Gated endpoints: `/agent-task` ($0.01), `/intent` ($0.005), `/fleet-status` ($0.001), `/swarm` ($0.02). Free endpoint: `/health`.
+Gated endpoints: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+). Free endpoints: `/health`, `/token-info`, `/agent/:id/payment-info`, `/digest`, `/trade-fees`.
 
 ## ERC-8004 Agent Identity
 

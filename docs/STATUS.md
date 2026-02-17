@@ -993,6 +993,12 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `POST /cosmos-explore` | $0.20 | Explore the Memory Cosmos world |
 | `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
 | `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
+| `POST /execute-trade` | $0.50+ | Swap tx bundle (0.5% of trade) |
+| `POST /rebalance-portfolio` | $2.00+ | Portfolio rebalance (0.3% of capital) |
+| `GET /arb-opportunity` | $0.25 | Arbitrage opportunity scan |
+| `POST /execute-arb` | $0.10+ | Execute arbitrage (1% of profit) |
+| `GET /yield-optimize` | $0.50 | Yield farming optimization scan |
+| `POST /deploy-yield-strategy` | $3.00+ | Deploy yield capital (0.5% of capital) |
 
 ### Free endpoints (x402-server)
 
@@ -1000,6 +1006,9 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 |----------|-------------|
 | `GET /health` | Server status and endpoint listing |
 | `GET /token-info` | $XMETAV token contract address and tier table |
+| `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
+| `GET /digest` | Trigger payment digest & memory write |
+| `GET /trade-fees` | Trade fee schedule & revenue projections |
 
 ### Environment variables
 
