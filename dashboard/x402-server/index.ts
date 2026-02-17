@@ -17,6 +17,7 @@ import {
   stopDigestScheduler,
 } from "./payment-memory.js";
 import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
+import { createAlphaFeedsRouter, ALPHA_FEE_SCHEDULES } from "./alpha-feeds.js";
 
 // ── TTL Cache for expensive lookups ──────────────────────────
 interface CacheEntry<T> { value: T; expiresAt: number; }
@@ -512,6 +513,27 @@ app.use(
       "POST /deploy-yield-strategy": {
         accepts: [{ scheme: "exact", price: "$3.00", network, payTo: evmAddress }],
         description: "Deploy capital into yield strategy (fee: $3 + 0.5% of capital)",
+        mimeType: "application/json",
+      },
+      // ---- Alpha / Intelligence Feeds (recurring revenue) ----
+      "GET /whale-alert": {
+        accepts: [{ scheme: "exact", price: "$0.15", network, payTo: evmAddress }],
+        description: "Whale transfer/swap detection on Base — tiered lookback depth",
+        mimeType: "application/json",
+      },
+      "GET /liquidation-signal": {
+        accepts: [{ scheme: "exact", price: "$0.25", network, payTo: evmAddress }],
+        description: "DeFi lending liquidation signals (Aave V3, Moonwell, Seamless)",
+        mimeType: "application/json",
+      },
+      "GET /arb-detection": {
+        accepts: [{ scheme: "exact", price: "$0.20", network, payTo: evmAddress }],
+        description: "Cross-DEX arbitrage signal detection (Uniswap V3 × Aerodrome)",
+        mimeType: "application/json",
+      },
+      "GET /governance-signal": {
+        accepts: [{ scheme: "exact", price: "$0.10", network, payTo: evmAddress }],
+        description: "Governance proposal tracker across Base protocols",
         mimeType: "application/json",
       },
     },
@@ -1091,6 +1113,11 @@ app.get("/health", (_req, res) => {
         "POST /execute-arb": "$0.10 min (1% of profit) — execute arbitrage",
         "GET /yield-optimize": "$0.50 — yield farming opportunity analysis",
         "POST /deploy-yield-strategy": "$3.00 + 0.5% — deploy capital to yield",
+        // Alpha / Intelligence Feeds
+        "GET /whale-alert": "$0.15 — whale transfer/swap detection",
+        "GET /liquidation-signal": "$0.25 — DeFi liquidation signals",
+        "GET /arb-detection": "$0.20 — cross-DEX arbitrage signals",
+        "GET /governance-signal": "$0.10 — governance proposal tracker",
       },
       free: {
         "GET /health": "this endpoint",
@@ -1109,6 +1136,13 @@ const tradeRouter = createTradeRouter(
   (callerAddress) => getCallerTier(callerAddress)
 );
 app.use(tradeRouter);
+
+// ---- Alpha / Intelligence Feeds ----
+const alphaRouter = createAlphaFeedsRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(alphaRouter);
 
 // ---- On-Demand Payment Digest ----
 app.post("/digest", async (_req, res) => {
@@ -1224,6 +1258,11 @@ const server = app.listen(port, () => {
   console.log(`    POST /execute-arb          $0.10 min  1% of profit`);
   console.log(`    GET  /yield-optimize       $0.50      Yield scan`);
   console.log(`    POST /deploy-yield-strategy $3.00 +   0.5% of capital`);
+  console.log(`\n  Alpha / Intelligence Feeds:`);
+  console.log(`    GET  /whale-alert          $0.15      Whale transfer detection`);
+  console.log(`    GET  /liquidation-signal   $0.25      DeFi liquidation signals`);
+  console.log(`    GET  /arb-detection        $0.20      Cross-DEX arb signals`);
+  console.log(`    GET  /governance-signal    $0.10      Governance proposals`);
   console.log(`\n  Free endpoints:`);
   console.log(`    GET  /health                    Service health`);
   console.log(`    GET  /token-info                Token tiers & discounts`);
