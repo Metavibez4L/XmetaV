@@ -1,7 +1,7 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 10 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
@@ -84,17 +84,36 @@
     "chainlink-price-oracle",
     "uniswap-v3-quoter",
     "defillama-integration",
-    "defi-protocol-deposits"
+    "defi-protocol-deposits",
+    "whale-alert-intelligence",
+    "liquidation-monitoring",
+    "cross-dex-arb-detection",
+    "governance-tracking",
+    "alpha-signal-feeds",
+    "cross-chain-bridging",
+    "dapp-orchestration",
+    "defi-composability",
+    "dev-tooling",
+    "eip-7702-smart-eoas",
+    "erc-4337-account-abstraction",
+    "ethereum-standards",
+    "ethereum-wallet-management",
+    "frontend-ux",
+    "gas-economics",
+    "l2-deployment",
+    "safe-multisig",
+    "solidity-security-patterns",
+    "verified-contract-addresses"
   ],
   "fleet": {
     "agents": [
-      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command" },
+      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command", "skills": ["wallets"] },
       { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
       { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
-      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel" },
+      { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
       { "id": "alchemist", "role": "Tokenomics specialist — $XMETAV supply, emissions, staking", "room": "intel", "skills": ["gas", "addresses"] },
       { "id": "midas", "role": "Revenue & growth optimizer — pricing, forecasts, endpoint analytics", "room": "intel", "skills": ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"] },
-      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab" },
+      { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
       { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
       { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
@@ -154,7 +173,11 @@
       "GET /arb-opportunity": "$0.25",
       "POST /execute-arb": "$0.10 min (1% of profit)",
       "GET /yield-optimize": "$0.50",
-      "POST /deploy-yield-strategy": "$3.00 + 0.5% of capital"
+      "POST /deploy-yield-strategy": "$3.00 + 0.5% of capital",
+      "GET /whale-alert": "$0.15",
+      "GET /liquidation-signal": "$0.25",
+      "GET /arb-detection": "$0.20",
+      "GET /governance-signal": "$0.10"
     },
     "tokenDiscounts": {
       "token": "$XMETAV",
