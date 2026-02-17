@@ -15,11 +15,11 @@ export default function PaymentsPage() {
               className="text-[7px] font-mono tracking-widest px-2 py-0.5 rounded"
               style={{ background: '#00f0ff10', color: '#00f0ff', border: '1px solid #00f0ff25' }}
             >
-              16 ENDPOINTS
+              20 ENDPOINTS
             </span>
           </div>
           <p className="text-[11px] font-mono mt-1" style={{ color: '#4a6a8a' }}>
-            // USDC micro-payments on Base · 6-tier staking discounts · endpoint analytics
+            // USDC micro-payments on Base · 6-tier staking discounts · alpha feeds · endpoint analytics
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -50,6 +50,7 @@ interface PaymentsResponse {
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; icon: React.ElementType }> = {
   completed: { color: "#39ff14", bg: "#39ff1410", border: "#39ff1425", icon: CheckCircle2 },
+  settled: { color: "#39ff14", bg: "#39ff1410", border: "#39ff1425", icon: CheckCircle2 },
   pending: { color: "#f59e0b", bg: "#f59e0b10", border: "#f59e0b25", icon: Clock },
   failed: { color: "#ff2d5e", bg: "#ff2d5e10", border: "#ff2d5e25", icon: XCircle },
 };
@@ -245,7 +246,7 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4" style={{ color: "#00f0ff66" }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
-              x402 Gated Endpoints · 16 endpoints
+              x402 Gated Endpoints · 20 endpoints
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -291,6 +292,10 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             { ep: "POST /execute-arb", price: "$0.10+", desc: "Execute arb (1% profit)" },
             { ep: "GET /yield-optimize", price: "$0.50", desc: "Yield farming scan" },
             { ep: "POST /deploy-yield-strategy", price: "$3.00+", desc: "Deploy capital (0.5%)" },
+            { ep: "GET /whale-alert", price: "$0.15", desc: "Whale transfer detection" },
+            { ep: "GET /liquidation-signal", price: "$0.25", desc: "DeFi liquidation signals" },
+            { ep: "GET /arb-detection", price: "$0.20", desc: "Cross-DEX arb signals" },
+            { ep: "GET /governance-signal", price: "$0.10", desc: "Governance proposals" },
           ].map(({ ep, price, desc }) => (
             <div key={ep} className="p-2 rounded" style={{ background: "#060c18" }}>
               <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
