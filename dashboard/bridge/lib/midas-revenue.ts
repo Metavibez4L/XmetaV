@@ -358,7 +358,7 @@ export async function analyzePricing(): Promise<
   const { data: payments } = await supabase
     .from("x402_payments")
     .select("endpoint, amount, status, created_at")
-    .eq("status", "completed");
+    .in("status", ["completed", "settled"]);
 
   const allPayments = payments || [];
   const byEndpoint: Record<string, number[]> = {};

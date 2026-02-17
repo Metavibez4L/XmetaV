@@ -4,6 +4,12 @@ import { requireAuth } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 
+/** Parse amount strings like "$0.10" or "0.10" → number */
+function parseAmount(amt: string | null | undefined): number {
+  if (!amt) return 0;
+  return parseFloat(amt.replace(/[$,]/g, "")) || 0;
+}
+
 /**
  * GET /api/midas?action=report|endpoints|opportunities|pricing|dashboard
  *
@@ -31,7 +37,7 @@ export async function GET(request: NextRequest) {
             supabase
               .from("x402_payments")
               .select("amount, endpoint, agent_id, created_at, status")
-              .eq("status", "completed"),
+              .in("status", ["completed", "settled"]),
             supabase
               .from("revenue_metrics")
               .select("*")
@@ -57,17 +63,17 @@ export async function GET(request: NextRequest) {
 
         const payments = paymentsRes.data || [];
         const totalRevenue = payments.reduce(
-          (sum, p) => sum + parseFloat(p.amount || "0"),
+          (sum, p) => sum + parseAmount(p.amount),
           0
         );
         const last7d = payments.filter((p) => p.created_at >= sevenDaysAgo);
         const revenue7d = last7d.reduce(
-          (sum, p) => sum + parseFloat(p.amount || "0"),
+          (sum, p) => sum + parseAmount(p.amount),
           0
         );
         const last30d = payments.filter((p) => p.created_at >= thirtyDaysAgo);
         const revenue30d = last30d.reduce(
-          (sum, p) => sum + parseFloat(p.amount || "0"),
+          (sum, p) => sum + parseAmount(p.amount),
           0
         );
 
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest) {
         for (const p of payments) {
           const ep = p.endpoint || "unknown";
           endpointRevenue[ep] =
-            (endpointRevenue[ep] || 0) + parseFloat(p.amount || "0");
+            (endpointRevenue[ep] || 0) + parseAmount(p.amount);
         }
         const topEndpoints = Object.entries(endpointRevenue)
           .sort((a, b) => b[1] - a[1])

@@ -16,6 +16,7 @@ import {
   startDigestScheduler,
   stopDigestScheduler,
 } from "./payment-memory.js";
+import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
 
 // ── TTL Cache for expensive lookups ──────────────────────────
 interface CacheEntry<T> { value: T; expiresAt: number; }
@@ -482,6 +483,37 @@ app.use(
             },
           }
         : {}),
+      // ---- Trade Execution Endpoints (%-of-capital pricing) ----
+      "POST /execute-trade": {
+        accepts: [{ scheme: "exact", price: "$0.50", network, payTo: evmAddress }],
+        description: "Generate unsigned swap transaction (fee: 0.5% of trade, min $0.50)",
+        mimeType: "application/json",
+      },
+      "POST /rebalance-portfolio": {
+        accepts: [{ scheme: "exact", price: "$2.00", network, payTo: evmAddress }],
+        description: "Portfolio rebalance analysis + tx bundle (fee: $2 + 0.3% of portfolio)",
+        mimeType: "application/json",
+      },
+      "GET /arb-opportunity": {
+        accepts: [{ scheme: "exact", price: "$0.25", network, payTo: evmAddress }],
+        description: "Scan for cross-DEX arbitrage opportunities",
+        mimeType: "application/json",
+      },
+      "POST /execute-arb": {
+        accepts: [{ scheme: "exact", price: "$0.10", network, payTo: evmAddress }],
+        description: "Execute arbitrage (fee: 1% of profit captured, min $0.10)",
+        mimeType: "application/json",
+      },
+      "GET /yield-optimize": {
+        accepts: [{ scheme: "exact", price: "$0.50", network, payTo: evmAddress }],
+        description: "Analyze yield farming opportunities across Base protocols",
+        mimeType: "application/json",
+      },
+      "POST /deploy-yield-strategy": {
+        accepts: [{ scheme: "exact", price: "$3.00", network, payTo: evmAddress }],
+        description: "Deploy capital into yield strategy (fee: $3 + 0.5% of capital)",
+        mimeType: "application/json",
+      },
     },
     new x402ResourceServer(facilitatorClient).register(
       network,
@@ -1054,16 +1086,31 @@ app.get("/health", (_req, res) => {
               "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)",
             }
           : {}),
+        // Trade Execution
+        "POST /execute-trade": "$0.50 min (0.5% of trade) — generate swap tx bundle",
+        "POST /rebalance-portfolio": "$2.00 + 0.3% — portfolio rebalance analysis",
+        "GET /arb-opportunity": "$0.25 — scan for arbitrage opportunities",
+        "POST /execute-arb": "$0.10 min (1% of profit) — execute arbitrage",
+        "GET /yield-optimize": "$0.50 — yield farming opportunity analysis",
+        "POST /deploy-yield-strategy": "$3.00 + 0.5% — deploy capital to yield",
       },
       free: {
         "GET /health": "this endpoint",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
         "POST /digest": "trigger payment→memory digest (writes to agent memories)",
+        "GET /trade-fees": "fee schedule, examples, and revenue projections",
       },
     },
   });
 });
+
+// ---- Trade Execution Routes ----
+const tradeRouter = createTradeRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(tradeRouter);
 
 // ---- On-Demand Payment Digest ----
 app.post("/digest", async (_req, res) => {
@@ -1161,10 +1208,18 @@ const server = app.listen(port, () => {
     console.log(`    POST /voice/transcribe $0.05   Speech-to-text (Whisper)`);
     console.log(`    POST /voice/synthesize $0.08   Text-to-speech (TTS HD)`);
   }
+  console.log(`\n  Trade Execution (%-of-capital):`);
+  console.log(`    POST /execute-trade        $0.50 min  0.5% of trade value`);
+  console.log(`    POST /rebalance-portfolio  $2.00 +    0.3% of portfolio`);
+  console.log(`    GET  /arb-opportunity       $0.25      Arb scan`);
+  console.log(`    POST /execute-arb          $0.10 min  1% of profit`);
+  console.log(`    GET  /yield-optimize       $0.50      Yield scan`);
+  console.log(`    POST /deploy-yield-strategy $3.00 +   0.5% of capital`);
   console.log(`\n  Free endpoints:`);
   console.log(`    GET  /health                    Service health`);
   console.log(`    GET  /token-info                Token tiers & discounts`);
   console.log(`    GET  /agent/:agentId/payment-info  ERC-8004 agent lookup`);
+  console.log(`    GET  /trade-fees                Fee schedule & projections`);
   console.log();
 
   // Start payment→memory digest scheduler (hourly)
