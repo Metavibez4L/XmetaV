@@ -158,14 +158,10 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
       network,
       status: "settled",
     };
-    // metadata column may not exist yet — try with it, fallback without
     const metaPayload = callerAgent
       ? { callerAgentId: callerAgent.agentId, callerOwner: callerAgent.owner, x402Enabled: callerAgent.x402Enabled }
       : null;
-    const { error } = await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
-    if (error?.message?.includes("metadata")) {
-      await supabase.from("x402_payments").insert(row);
-    }
+    await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
     // ---- Midas endpoint_analytics tracking ----
     trackEndpointAnalytics(endpoint, amount, callerAddress);
 
