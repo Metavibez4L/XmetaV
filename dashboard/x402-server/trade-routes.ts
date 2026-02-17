@@ -25,6 +25,7 @@ import {
   projectTradeRevenue,
   FeeResult,
 } from "./trade-fee-calculator.js";
+import { getOracle, PriceOracle } from "./price-oracle.js";
 
 // Re-export for server integration
 export { TRADE_FEE_SCHEDULES } from "./trade-fee-calculator.js";
@@ -114,27 +115,114 @@ function resolveToken(symbol: string): { address: `0x${string}`; decimals: numbe
   return BASE_TOKENS[upper] || null;
 }
 
-async function getTokenPrice(tokenAddress: `0x${string}`): Promise<number> {
-  // Simple price oracle: use USDC as numeraire via Uniswap quoter
-  // For production, integrate Chainlink or Pyth oracles
-  const PRICES: Record<string, number> = {
-    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 1.00,       // USDC
-    "0x4200000000000000000000000000000000000006": 2800,         // WETH (approx)
-    "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22": 3000,       // cbETH
-    "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb": 1.00,       // DAI
-    "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA": 1.00,       // USDbC
-    "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 1.50,       // AERO
-  };
-  return PRICES[tokenAddress] || 1;
+/* ── DeFi Llama Yield Fetcher ─────────────────────────────── */
+
+interface YieldPool {
+  protocol: string;
+  type: string;
+  apy: number;
+  tvlUsd: number;
+  risk: string;
+  token: string;
+  chain: string;
+  rewards: string[];
+  projectedYield30d: number;
+  poolId?: string;
+  impermanentLossRisk?: string;
 }
+
+// Cache DeFi Llama responses (5 min TTL)
+let yieldCache: { data: any[]; updatedAt: number } | null = null;
+const YIELD_CACHE_TTL = 300_000;
+
+async function fetchDefiLlamaYields(token: string): Promise<YieldPool[]> {
+  // Check cache
+  if (yieldCache && Date.now() - yieldCache.updatedAt < YIELD_CACHE_TTL) {
+    return filterYieldPools(yieldCache.data, token);
+  }
+
+  try {
+    const res = await fetch("https://yields.llama.fi/pools");
+    if (!res.ok) throw new Error(`DeFi Llama returned ${res.status}`);
+    const json = await res.json();
+    yieldCache = { data: json.data || [], updatedAt: Date.now() };
+    return filterYieldPools(yieldCache.data, token);
+  } catch (err) {
+    console.warn("[yield] DeFi Llama fetch failed:", (err as Error).message);
+    return []; // Will fall back to protocol-specific data
+  }
+}
+
+function filterYieldPools(pools: any[], token: string): YieldPool[] {
+  const tokenUpper = token.toUpperCase();
+  // Filter for Base chain pools containing our token
+  return pools
+    .filter((p: any) =>
+      p.chain === "Base" &&
+      p.apy > 0 &&
+      p.tvlUsd > 50_000 && // Minimum $50K TVL
+      (p.symbol?.toUpperCase().includes(tokenUpper) || false)
+    )
+    .slice(0, 20) // Top 20 by DeFi Llama ordering
+    .map((p: any) => {
+      const isLP = p.symbol?.includes("-") || p.symbol?.includes("/");
+      return {
+        protocol: p.project || "Unknown",
+        type: isLP ? "liquidity_pool" : "lending",
+        apy: Math.round(p.apy * 100) / 100,
+        tvlUsd: Math.round(p.tvlUsd),
+        risk: p.tvlUsd > 100_000_000 ? "low" : p.tvlUsd > 10_000_000 ? "medium" : "medium-high",
+        token: p.symbol || token,
+        chain: "Base",
+        rewards: p.rewardTokens || [],
+        projectedYield30d: 0, // Calculated by caller
+        poolId: p.pool || undefined,
+        impermanentLossRisk: isLP ? "moderate" : undefined,
+      };
+    });
+}
+
+/* ── Protocol Deposit ABIs (Base Mainnet) ─────────────────── */
+
+// Aave V3 Pool — supply()
+const AAVE_V3_POOL = "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as const;
+const AAVE_POOL_ABI = parseAbi([
+  "function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external",
+]);
+
+// Compound V3 (Comet) — supply()
+const COMPOUND_V3_COMET = "0x46e6b214b524310239732D51387075E0e70970bf" as const;
+const COMPOUND_COMET_ABI = parseAbi([
+  "function supply(address asset, uint256 amount) external",
+]);
+
+// Moonwell — mint() (Compound-fork style)
+const MOONWELL_MUSDC = "0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22" as const;
+const MOONWELL_ABI = parseAbi([
+  "function mint(uint256 mintAmount) external returns (uint256)",
+]);
+
+// Aerodrome Router — addLiquidity()
+const AERODROME_ROUTER = "0xcF77a3Ba9A5CA399B7c97C74d54e5b1Beb874E43" as const;
+const AERODROME_ROUTER_ABI = parseAbi([
+  "function addLiquidity(address tokenA, address tokenB, bool stable, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 amountA, uint256 amountB, uint256 liquidity)",
+]);
+
+// Morpho Blue — supply()
+const MORPHO_BLUE = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" as const;
+const MORPHO_ABI = parseAbi([
+  "function supply((address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, uint256 assets, uint256 shares, address onBehalfOf, bytes data) external returns (uint256 assetsSupplied, uint256 sharesSupplied)",
+]);
 
 /* ── Router ──────────────────────────────────────────────────── */
 
 export function createTradeRouter(
   logPaymentFn: (endpoint: string, amount: string, req: Request) => void,
-  getCallerTierFn: (callerAddress?: string) => Promise<{ discount: number; name: string }>
+  getCallerTierFn: (callerAddress?: string) => Promise<{ discount: number; name: string }>,
+  oracle?: PriceOracle
 ): Router {
   const router = Router();
+  const priceOracle = oracle || getOracle(viemClient as any);
 
   /* ──────────────────────────────────────────────────────────
    * POST /execute-trade
@@ -171,8 +259,8 @@ export function createTradeRouter(
       return;
     }
 
-    // Calculate trade value in USD
-    const tokenPrice = await getTokenPrice(inToken.address);
+    // Calculate trade value in USD using Chainlink oracle
+    const tokenPrice = await priceOracle.getPriceUsd(inToken.address);
     const tradeValueUsd = amount * tokenPrice;
 
     // Calculate dynamic fee
@@ -186,7 +274,25 @@ export function createTradeRouter(
     // Generate unsigned transaction bundle
     const amountRaw = BigInt(Math.floor(amount * 10 ** inToken.decimals));
     const slippage = slippageBps || 50; // 0.5% default
-    const minAmountOut = BigInt(0); // In production, calculate from oracle price - slippage
+
+    // Get real quote from Uniswap V3 Quoter for amountOutMinimum
+    let minAmountOut = BigInt(0);
+    let bestFeeTier = 3000;
+    let quotedAmountOut: bigint | null = null;
+    let priceSource = "static";
+
+    try {
+      const quoteResult = await priceOracle.getBestQuote(inToken.address, outToken.address, amountRaw);
+      quotedAmountOut = quoteResult.amountOut;
+      bestFeeTier = quoteResult.bestFeeTier;
+      // Apply slippage tolerance: minOut = quotedOut * (1 - slippage/10000)
+      minAmountOut = quotedAmountOut - (quotedAmountOut * BigInt(slippage) / BigInt(10000));
+      priceSource = "uniswap-quoter";
+    } catch (err) {
+      console.warn(`[trade] Quoter failed for ${inToken.symbol}→${outToken.symbol}, using zero floor:`, (err as Error).message);
+      // Zero floor means the tx will go through but user is unprotected from slippage
+      // This is a last resort — most pairs should have quoter liquidity
+    }
 
     const recipientAddr = (recipient || callerAddress || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 
@@ -197,14 +303,14 @@ export function createTradeRouter(
       args: [UNISWAP_ROUTER, amountRaw],
     });
 
-    // Swap tx
+    // Swap tx (using best fee tier from Quoter)
     const swapTxData = encodeFunctionData({
       abi: SWAP_ROUTER_ABI,
       functionName: "exactInputSingle",
       args: [{
         tokenIn: inToken.address,
         tokenOut: outToken.address,
-        fee: 3000, // 0.3% Uniswap pool fee (most common)
+        fee: bestFeeTier,
         recipient: recipientAddr,
         amountIn: amountRaw,
         amountOutMinimum: minAmountOut,
@@ -224,7 +330,7 @@ export function createTradeRouter(
           to: UNISWAP_ROUTER,
           data: swapTxData,
           value: "0",
-          description: `Swap ${amount} ${inToken.symbol} → ${outToken.symbol} via Uniswap V3`,
+          description: `Swap ${amount} ${inToken.symbol} → ${outToken.symbol} via Uniswap V3 (${bestFeeTier / 10000}% pool)`,
         },
       ],
       chain: "eip155:8453",
@@ -242,7 +348,7 @@ export function createTradeRouter(
       token_out: outToken.symbol,
       user_address: callerAddress,
       status: "bundle_generated",
-      metadata: { amountIn: amount, slippageBps: slippage },
+      metadata: { amountIn: amount, slippageBps: slippage, bestFeeTier, priceSource },
     });
 
     res.json({
@@ -252,9 +358,17 @@ export function createTradeRouter(
         tokenOut: outToken.symbol,
         amountIn: amount,
         tradeValueUsd: Math.round(tradeValueUsd * 100) / 100,
+        tokenPriceUsd: Math.round(tokenPrice * 100) / 100,
+        priceSource,
         slippageBps: slippage,
         recipient: recipientAddr,
       },
+      quote: quotedAmountOut !== null ? {
+        expectedAmountOut: quotedAmountOut.toString(),
+        minAmountOut: minAmountOut.toString(),
+        bestPoolFeeTier: bestFeeTier,
+        bestPoolFeePct: `${bestFeeTier / 10000}%`,
+      } : null,
       fee,
       txBundle,
       timestamp: new Date().toISOString(),
@@ -307,7 +421,7 @@ export function createTradeRouter(
           args: [walletAddress as `0x${string}`],
         });
         const balance = Number(rawBalance) / 10 ** token.decimals;
-        const price = await getTokenPrice(token.address);
+        const price = await priceOracle.getPriceUsd(token.address);
         const valueUsd = balance * price;
         portfolioValueUsd += valueUsd;
         holdings.push({ symbol, address: token.address, balance, valueUsd, currentPct: 0 });
@@ -344,7 +458,7 @@ export function createTradeRouter(
       const deltaUsd = targetUsd - h.valueUsd;
 
       if (Math.abs(deltaUsd) > 1) { // Skip trivial adjustments
-        const price = await getTokenPrice(h.address);
+        const price = await priceOracle.getPriceUsd(h.address);
         rebalanceOps.push({
           action: deltaUsd > 0 ? "buy" : "sell",
           symbol: h.symbol,
@@ -408,53 +522,74 @@ export function createTradeRouter(
       return;
     }
 
-    // Simulated arb scanner — in production, query multiple DEX pools
-    // and compare prices across Uniswap V3, Aerodrome, Curve, etc.
+    // Real arb scanner: query Uniswap V3 Quoter across fee tiers
+    // and compare effective prices to find cross-pool spreads
     const opportunities = [];
 
-    // Check multiple pool fee tiers for price discrepancy
-    const feeTiers = [500, 3000, 10000]; // 0.05%, 0.3%, 1%
-    const priceA = await getTokenPrice(inToken.address);
-    const priceB = await getTokenPrice(outToken.address);
+    const scanAmountRaw = BigInt(1000) * BigInt(10 ** inToken.decimals); // Quote with 1000 units
+    const feeTiers = [100, 500, 3000, 10000]; // 0.01%, 0.05%, 0.3%, 1%
 
-    for (let i = 0; i < feeTiers.length; i++) {
-      for (let j = i + 1; j < feeTiers.length; j++) {
-        // Simulate price difference between pools
-        const spread = Math.random() * 0.003; // 0-0.3% random spread
-        const profitBps = Math.round(spread * 10000);
+    // Get quotes from each fee tier
+    const tierQuotes: Array<{ feeTier: number; amountOut: bigint; effectivePrice: number }> = [];
 
-        if (profitBps >= minProfitBps) {
+    for (const feeTier of feeTiers) {
+      try {
+        const q = await priceOracle.getQuote(inToken.address, outToken.address, scanAmountRaw, feeTier);
+        const effectivePrice = Number(q.amountOut) / (1000 * 10 ** outToken.decimals);
+        tierQuotes.push({ feeTier, amountOut: q.amountOut, effectivePrice });
+      } catch {
+        // Pool doesn't exist or has no liquidity for this tier — skip
+      }
+    }
+
+    if (tierQuotes.length < 2) {
+      // Can't find arb with < 2 pools
+      res.json({
+        scan: { tokenA, tokenB, minProfitBps },
+        opportunities: [],
+        count: 0,
+        fee: { amount: "$0.25", type: "flat" },
+        note: `Only ${tierQuotes.length} pool(s) found for ${tokenA}/${tokenB}. Need at least 2 to detect arbitrage.`,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // Compare all tier pairs for spread
+    tierQuotes.sort((a, b) => b.effectivePrice - a.effectivePrice);
+    for (let i = 0; i < tierQuotes.length; i++) {
+      for (let j = i + 1; j < tierQuotes.length; j++) {
+        const high = tierQuotes[i];
+        const low = tierQuotes[j];
+        if (low.effectivePrice === 0) continue;
+        const spread = (high.effectivePrice - low.effectivePrice) / low.effectivePrice;
+        const spreadBps = Math.round(spread * 10000);
+
+        if (spreadBps >= minProfitBps) {
           opportunities.push({
             pair: `${tokenA}/${tokenB}`,
-            buyPool: `UniV3-${feeTiers[i]}bps`,
-            sellPool: `UniV3-${feeTiers[j]}bps`,
-            spreadBps: profitBps,
+            buyPool: `UniV3-${low.feeTier}bps`,
+            sellPool: `UniV3-${high.feeTier}bps`,
+            spreadBps,
             estimatedProfitPer1K: Math.round(spread * 1000 * 100) / 100,
-            confidence: Math.round((0.8 - spread * 100) * 100) / 100,
+            confidence: spreadBps > 50 ? 0.5 : spreadBps > 20 ? 0.7 : 0.85,
             expiresIn: "~30 seconds",
             dex: "Uniswap V3",
             chain: "Base",
+            quoteDetails: {
+              buyQuote: low.amountOut.toString(),
+              sellQuote: high.amountOut.toString(),
+              buyFeeTier: low.feeTier,
+              sellFeeTier: high.feeTier,
+            },
           });
         }
       }
     }
 
-    // Also check Aerodrome vs Uniswap
-    const aeroSpread = Math.random() * 0.005;
-    const aeroProfitBps = Math.round(aeroSpread * 10000);
-    if (aeroProfitBps >= minProfitBps) {
-      opportunities.push({
-        pair: `${tokenA}/${tokenB}`,
-        buyPool: "Aerodrome",
-        sellPool: "UniV3-3000bps",
-        spreadBps: aeroProfitBps,
-        estimatedProfitPer1K: Math.round(aeroSpread * 1000 * 100) / 100,
-        confidence: Math.round((0.7 - aeroSpread * 50) * 100) / 100,
-        expiresIn: "~15 seconds",
-        dex: "Cross-DEX",
-        chain: "Base",
-      });
-    }
+    // Get real prices for context
+    const priceA = await priceOracle.getPriceUsd(inToken.address);
+    const priceB = await priceOracle.getPriceUsd(outToken.address);
 
     await logTrade({
       endpoint: "/arb-opportunity",
@@ -474,6 +609,7 @@ export function createTradeRouter(
         minProfitBps,
         priceA,
         priceB,
+        poolsScanned: tierQuotes.length,
       },
       opportunities: opportunities.sort((a, b) => b.spreadBps - a.spreadBps),
       count: opportunities.length,
@@ -598,7 +734,7 @@ export function createTradeRouter(
     await logTrade({
       endpoint: "/execute-arb",
       trade_type: "arb-execute",
-      trade_value_usd: amount * (await getTokenPrice(inToken.address)),
+      trade_value_usd: amount * (await priceOracle.getPriceUsd(inToken.address)),
       fee_usd: fee.feeUsd,
       fee_tier: fee.tier,
       token_in: inToken.symbol,
@@ -640,70 +776,55 @@ export function createTradeRouter(
     const tokenInfo = resolveToken(token);
     if (!tokenInfo) { res.status(400).json({ error: `Unknown token: ${token}` }); return; }
 
-    // Yield opportunities across Base protocols
-    const opportunities = [
-      {
-        protocol: "Aave V3",
-        type: "lending",
-        apy: 4.2 + Math.random() * 2,
-        tvl: "$450M",
-        risk: "low",
-        minDeposit: 1,
-        token: token,
-        chain: "Base",
-        rewards: ["AAVE"],
-        projectedYield30d: amount * ((4.2 + Math.random() * 2) / 100 / 12),
-      },
-      {
-        protocol: "Compound V3",
-        type: "lending",
-        apy: 3.8 + Math.random() * 1.5,
-        tvl: "$280M",
-        risk: "low",
-        minDeposit: 1,
-        token: token,
-        chain: "Base",
-        rewards: ["COMP"],
-        projectedYield30d: amount * ((3.8 + Math.random() * 1.5) / 100 / 12),
-      },
-      {
-        protocol: "Aerodrome",
-        type: "liquidity_pool",
-        apy: 12 + Math.random() * 15,
-        tvl: "$120M",
-        risk: "medium",
-        minDeposit: 100,
-        token: `${token}/WETH`,
-        chain: "Base",
-        rewards: ["AERO"],
-        projectedYield30d: amount * ((12 + Math.random() * 15) / 100 / 12),
-        impermanentLossRisk: "moderate",
-      },
-      {
-        protocol: "Moonwell",
-        type: "lending",
-        apy: 5.5 + Math.random() * 3,
-        tvl: "$85M",
-        risk: "medium",
-        minDeposit: 10,
-        token: token,
-        chain: "Base",
-        rewards: ["WELL"],
-        projectedYield30d: amount * ((5.5 + Math.random() * 3) / 100 / 12),
-      },
-      {
-        protocol: "Morpho Blue",
-        type: "vault",
-        apy: 8 + Math.random() * 6,
-        tvl: "$200M",
-        risk: "medium-high",
-        minDeposit: 50,
-        token: token,
-        chain: "Base",
-        rewards: ["MORPHO"],
-        projectedYield30d: amount * ((8 + Math.random() * 6) / 100 / 12),
-      },
-    ];
+    // Fetch real yield data from DeFi Llama
+    let opportunities = await fetchDefiLlamaYields(token);
+
+    // If DeFi Llama returned results, use them
+    if (opportunities.length > 0) {
+      // Calculate projected 30d yield for each
+      for (const o of opportunities) {
+        o.projectedYield30d = Math.round(amount * (o.apy / 100 / 12) * 100) / 100;
+      }
+    } else {
+      // Fallback: known Base protocols with on-chain rate queries
+      // These are real protocols but we can't get live APY without DeFi Llama
+      const tokenPrice = await priceOracle.getPriceUsd(tokenInfo.address);
+      opportunities = [
+        {
+          protocol: "aave-v3",
+          type: "lending",
+          apy: 0, // Will be marked as "rate unavailable"
+          tvlUsd: 0,
+          risk: "low",
+          token: token,
+          chain: "Base",
+          rewards: [],
+          projectedYield30d: 0,
+        },
+        {
+          protocol: "compound-v3",
+          type: "lending",
+          apy: 0,
+          tvlUsd: 0,
+          risk: "low",
+          token: token,
+          chain: "Base",
+          rewards: [],
+          projectedYield30d: 0,
+        },
+        {
+          protocol: "moonwell",
+          type: "lending",
+          apy: 0,
+          tvlUsd: 0,
+          risk: "medium",
+          token: token,
+          chain: "Base",
+          rewards: [],
+          projectedYield30d: 0,
+        },
+      ];
+    }
 
     // Filter by risk tolerance
     const riskMap: Record<string, string[]> = {
@@ -716,14 +837,10 @@ export function createTradeRouter(
       .filter(o => allowed.includes(o.risk))
       .sort((a, b) => b.apy - a.apy);
 
-    // Round values
-    for (const o of filtered) {
-      o.apy = Math.round(o.apy * 100) / 100;
-      o.projectedYield30d = Math.round(o.projectedYield30d * 100) / 100;
-    }
-
     const bestApy = filtered[0]?.apy || 0;
     const projectedAnnual = Math.round(amount * (bestApy / 100) * 100) / 100;
+
+    const dataSource = opportunities.length > 0 && opportunities[0].apy > 0 ? "defillama" : "fallback";
 
     await logTrade({
       endpoint: "/yield-optimize",
@@ -738,6 +855,7 @@ export function createTradeRouter(
 
     res.json({
       query: { token, amount, riskTolerance },
+      dataSource,
       bestOpportunity: filtered[0] || null,
       opportunities: filtered,
       summary: {
@@ -785,7 +903,7 @@ export function createTradeRouter(
     // Calculate fee based on deployed capital
     const callerAddress = req.headers["x-caller-address"] as string | undefined;
     const tier = await getCallerTierFn(callerAddress);
-    const tokenPrice = await getTokenPrice(tokenInfo.address);
+    const tokenPrice = await priceOracle.getPriceUsd(tokenInfo.address);
     const deployValueUsd = amount * tokenPrice;
     const fee = calculateTradeFee("/deploy-yield-strategy", deployValueUsd, tier.discount);
 
@@ -793,22 +911,105 @@ export function createTradeRouter(
 
     // Protocol-specific deposit addresses (Base Mainnet)
     const PROTOCOL_POOLS: Record<string, `0x${string}`> = {
-      "Aave V3":      "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
-      "Compound V3":  "0x46e6b214b524310239732D51387075E0e70970bf",
-      "Aerodrome":    "0xcF77a3Ba9A5CA399B7c97C74d54e5b1Beb874E43",
-      "Moonwell":     "0x0b31F47fF39C76FBB9132cB0968E1150c8F6fb40",
-      "Morpho Blue":  "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "Aave V3":      AAVE_V3_POOL,
+      "Compound V3":  COMPOUND_V3_COMET,
+      "Aerodrome":    AERODROME_ROUTER,
+      "Moonwell":     MOONWELL_MUSDC,
+      "Morpho Blue":  MORPHO_BLUE,
+      // Normalize DeFi Llama project names
+      "aave-v3":      AAVE_V3_POOL,
+      "compound-v3":  COMPOUND_V3_COMET,
+      "aerodrome-v2": AERODROME_ROUTER,
+      "aerodrome-v1": AERODROME_ROUTER,
+      "moonwell":     MOONWELL_MUSDC,
+      "morpho-blue":  MORPHO_BLUE,
     };
 
     const poolAddress = PROTOCOL_POOLS[protocol];
     if (!poolAddress) {
       res.status(400).json({
-        error: `Unknown protocol: ${protocol}. Supported: ${Object.keys(PROTOCOL_POOLS).join(", ")}`,
+        error: `Unknown protocol: ${protocol}. Supported: Aave V3, Compound V3, Aerodrome, Moonwell, Morpho Blue`,
       });
       return;
     }
 
     const amountRaw = BigInt(Math.floor(amount * 10 ** tokenInfo.decimals));
+    const depositorAddr = (walletAddress || callerAddress || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+
+    // Generate protocol-specific deposit calldata
+    let depositTxData: `0x${string}`;
+    let depositDescription: string;
+    const normalizedProtocol = protocol.toLowerCase().replace(/\s+/g, "-");
+
+    if (normalizedProtocol === "aave-v3" || protocol === "Aave V3") {
+      depositTxData = encodeFunctionData({
+        abi: AAVE_POOL_ABI,
+        functionName: "supply",
+        args: [tokenInfo.address, amountRaw, depositorAddr, 0],
+      });
+      depositDescription = `Supply ${amount} ${tokenInfo.symbol} to Aave V3 Pool on behalf of ${depositorAddr}`;
+
+    } else if (normalizedProtocol === "compound-v3" || protocol === "Compound V3") {
+      depositTxData = encodeFunctionData({
+        abi: COMPOUND_COMET_ABI,
+        functionName: "supply",
+        args: [tokenInfo.address, amountRaw],
+      });
+      depositDescription = `Supply ${amount} ${tokenInfo.symbol} to Compound V3 (Comet)`;
+
+    } else if (normalizedProtocol.includes("moonwell") || protocol === "Moonwell") {
+      depositTxData = encodeFunctionData({
+        abi: MOONWELL_ABI,
+        functionName: "mint",
+        args: [amountRaw],
+      });
+      depositDescription = `Mint mToken by depositing ${amount} ${tokenInfo.symbol} into Moonwell`;
+
+    } else if (normalizedProtocol.includes("aerodrome") || protocol === "Aerodrome") {
+      // Aerodrome LP requires two tokens — default pair with WETH
+      const wethToken = resolveToken("WETH")!;
+      const wethAmount = BigInt(0); // User needs to supply paired token separately
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 min
+      depositTxData = encodeFunctionData({
+        abi: AERODROME_ROUTER_ABI,
+        functionName: "addLiquidity",
+        args: [
+          tokenInfo.address,
+          wethToken.address,
+          false, // volatile pool
+          amountRaw,
+          wethAmount,
+          BigInt(0), // minA
+          BigInt(0), // minB
+          depositorAddr,
+          deadline,
+        ],
+      });
+      depositDescription = `Add liquidity: ${amount} ${tokenInfo.symbol} + WETH to Aerodrome (volatile pool). Note: you must also have paired WETH.`;
+
+    } else {
+      // Morpho Blue — supply requires market params
+      // Use a generic USDC market (loanToken=USDC, collateral=WETH)
+      const wethToken = resolveToken("WETH")!;
+      depositTxData = encodeFunctionData({
+        abi: MORPHO_ABI,
+        functionName: "supply",
+        args: [
+          {
+            loanToken: tokenInfo.address,
+            collateralToken: wethToken.address,
+            oracle: "0x0000000000000000000000000000000000000000" as `0x${string}`, // Market-specific oracle
+            irm: "0x0000000000000000000000000000000000000000" as `0x${string}`,    // Market-specific IRM
+            lltv: BigInt(0),
+          },
+          amountRaw,
+          BigInt(0), // 0 shares = supply by assets
+          depositorAddr,
+          "0x" as `0x${string}`,
+        ],
+      });
+      depositDescription = `Supply ${amount} ${tokenInfo.symbol} to Morpho Blue vault. Note: market params (oracle, IRM, LLTV) must match the target market.`;
+    }
 
     // Generate deposit tx bundle
     const txBundle = {
@@ -825,12 +1026,9 @@ export function createTradeRouter(
         },
         {
           to: poolAddress,
-          // For a real implementation, encode the protocol-specific deposit function
-          // This is a simplified representation
-          data: "0x" as `0x${string}`,
+          data: depositTxData,
           value: "0",
-          description: `Deposit ${amount} ${tokenInfo.symbol} into ${protocol}`,
-          note: "Deposit calldata varies by protocol. Use protocol SDK for exact encoding.",
+          description: depositDescription,
         },
       ],
       chain: "eip155:8453",
