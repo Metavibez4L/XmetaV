@@ -14,10 +14,15 @@ interface CacheEntry<T> {
 export class TTLCache<T> {
   private store = new Map<string, CacheEntry<T>>();
   private readonly defaultTTL: number;
+  private pruneTimer: ReturnType<typeof setInterval> | null = null;
 
   /** @param ttlMs Default time-to-live in milliseconds */
-  constructor(ttlMs: number) {
+  constructor(ttlMs: number, autoPruneMs?: number) {
     this.defaultTTL = ttlMs;
+    // Auto-prune every autoPruneMs (default: 10x the TTL, min 60s)
+    const interval = autoPruneMs ?? Math.max(ttlMs * 10, 60_000);
+    this.pruneTimer = setInterval(() => this.prune(), interval);
+    if (this.pruneTimer.unref) this.pruneTimer.unref(); // Don't keep process alive
   }
 
   /** Get a cached value, or fetch + cache it if missing/expired */
@@ -55,8 +60,17 @@ export class TTLCache<T> {
     this.store.delete(key);
   }
 
-  /** Clear all entries */
+  /** Clear all entries and stop auto-prune */
   clear(): void {
+    this.store.clear();
+  }
+
+  /** Stop auto-prune timer */
+  destroy(): void {
+    if (this.pruneTimer) {
+      clearInterval(this.pruneTimer);
+      this.pruneTimer = null;
+    }
     this.store.clear();
   }
 

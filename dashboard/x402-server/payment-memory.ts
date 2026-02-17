@@ -411,20 +411,32 @@ export async function writeSessionSummary(): Promise<void> {
 // ── Digest Scheduler ──────────────────────────────────────────
 
 let digestInterval: ReturnType<typeof setInterval> | null = null;
+let digestTimeout: ReturnType<typeof setTimeout> | null = null;
+let digestRunning = false;
 
 /**
  * Start the periodic digest writer. Default: every 60 minutes.
  */
 export function startDigestScheduler(intervalMs = 60 * 60 * 1000): void {
   if (digestInterval) return;
+
+  const safeDigest = async () => {
+    if (digestRunning) return; // Prevent concurrent digests
+    digestRunning = true;
+    try {
+      await generatePaymentDigest();
+    } catch { /* best effort */ }
+    digestRunning = false;
+  };
+
   // Run first digest after 5 minutes (let some data accumulate)
-  setTimeout(() => {
-    generatePaymentDigest().catch(() => {});
+  digestTimeout = setTimeout(() => {
+    digestTimeout = null;
+    safeDigest();
   }, 5 * 60 * 1000);
+
   // Then every intervalMs
-  digestInterval = setInterval(() => {
-    generatePaymentDigest().catch(() => {});
-  }, intervalMs);
+  digestInterval = setInterval(safeDigest, intervalMs);
   console.log(
     `[x402→memory] Digest scheduler started (every ${intervalMs / 60000}min)`
   );
@@ -434,6 +446,10 @@ export function startDigestScheduler(intervalMs = 60 * 60 * 1000): void {
  * Stop the digest scheduler.
  */
 export function stopDigestScheduler(): void {
+  if (digestTimeout) {
+    clearTimeout(digestTimeout);
+    digestTimeout = null;
+  }
   if (digestInterval) {
     clearInterval(digestInterval);
     digestInterval = null;

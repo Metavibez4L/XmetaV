@@ -197,12 +197,12 @@ export async function anchorMemory(
   }
 }
 
-/**
- * Read the latest anchor for an agent from the chain.
- */
-export async function getLatestAnchor(agentId: number) {
-  if (!ANCHOR_ADDRESS) return null;
+// Cache anchor data — on-chain state changes infrequently
+const anchorCache = new Map<number, { data: ReturnType<typeof _fetchAnchor> extends Promise<infer R> ? R : never; expiresAt: number }>();
+const ANCHOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+async function _fetchAnchor(agentId: number) {
+  if (!ANCHOR_ADDRESS) return null;
   try {
     const count = await publicClient.readContract({
       address: ANCHOR_ADDRESS,
@@ -230,6 +230,19 @@ export async function getLatestAnchor(agentId: number) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Read the latest anchor for an agent from the chain.
+ * Cached for 5 minutes to avoid excessive RPC calls during dispatch.
+ */
+export async function getLatestAnchor(agentId: number) {
+  const cached = anchorCache.get(agentId);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+
+  const data = await _fetchAnchor(agentId);
+  anchorCache.set(agentId, { data, expiresAt: Date.now() + ANCHOR_CACHE_TTL });
+  return data;
 }
 
 /**

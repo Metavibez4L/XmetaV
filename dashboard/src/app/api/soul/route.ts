@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
     case "stats": {
       const { data, error } = await admin
         .from("soul_dream_manifestations")
-        .select("status, category");
+        .select("status, category")
+        .order("created_at", { ascending: false })
+        .limit(2000);
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

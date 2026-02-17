@@ -93,16 +93,25 @@ export async function retrieveRelevantMemories(
   const keywords = extractKeywords(taskMessage);
 
   // Fetch a wider window than the old RECENT_LIMIT to score from
+  // Exclude TTL-expired memories: created_at + ttl_hours > now
   const { data, error } = await supabase
     .from("agent_memory")
-    .select("id, agent_id, kind, content, source, created_at")
+    .select("id, agent_id, kind, content, source, ttl_hours, created_at")
     .in("agent_id", [agentId, "_shared"])
     .order("created_at", { ascending: false })
     .limit(config.associationScanWindow);
 
   if (error || !data) return [];
 
-  const entries = data as MemoryEntry[];
+  const now = Date.now();
+  const entries = (data as (MemoryEntry & { ttl_hours?: number | null })[]).filter((m) => {
+    // Skip TTL-expired memories
+    if (m.ttl_hours && m.created_at) {
+      const expiresAt = new Date(m.created_at).getTime() + m.ttl_hours * 3600000;
+      if (now > expiresAt) return false;
+    }
+    return true;
+  });
 
   // Score each memory
   const scored = entries.map((entry) => ({
@@ -149,7 +158,8 @@ async function boostByAssociations(
           .map((id) => `memory_id.eq.${id},related_memory_id.eq.${id}`)
           .join(",")
       )
-      .gte("strength", config.minAssociationStrength);
+      .gte("strength", config.minAssociationStrength)
+      .limit(100);
 
     if (error || !data) return;
 
