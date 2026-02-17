@@ -9,6 +9,13 @@ import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
+import {
+  recordPaymentEvent,
+  generatePaymentDigest,
+  writeSessionSummary,
+  startDigestScheduler,
+  stopDigestScheduler,
+} from "./payment-memory.js";
 
 // ── TTL Cache for expensive lookups ──────────────────────────
 interface CacheEntry<T> { value: T; expiresAt: number; }
@@ -165,6 +172,9 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     // Randomly assign variant (50/50 split); "control" uses current price
     const variant = Math.random() < 0.5 ? "control" : "premium";
     trackABExperiment(endpoint, variant, true, numAmt);
+
+    // ---- Payment → Agent Memory pipeline ----
+    recordPaymentEvent(endpoint, amount, callerAddress || callerAgent?.wallet, callerAgent?.agentId);
   } catch { /* best effort */ }
 }
 
@@ -1049,9 +1059,24 @@ app.get("/health", (_req, res) => {
         "GET /health": "this endpoint",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
+        "POST /digest": "trigger payment→memory digest (writes to agent memories)",
       },
     },
   });
+});
+
+// ---- On-Demand Payment Digest ----
+app.post("/digest", async (_req, res) => {
+  try {
+    await generatePaymentDigest();
+    res.json({
+      status: "ok",
+      message: "Payment digest written to midas, oracle, alchemist, and shared agent memories.",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- ERC-8004 Agent Payment Info (free, public discovery) ----
@@ -1112,7 +1137,7 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
 
 // ---- Start ----
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`\n  XmetaV x402 Payment-Gated API`);
   console.log(`  ─────────────────────────────`);
   console.log(`  Server:    http://localhost:${port}`);
@@ -1122,6 +1147,7 @@ app.listen(port, () => {
   console.log(`  Health:    http://localhost:${port}/health`);
   console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
   console.log(`  Token:     ${XMETAV_TOKEN_ADDRESS ? XMETAV_TOKEN_ADDRESS : "disabled (no XMETAV_TOKEN_ADDRESS)"}`);
+  console.log(`  Memory:    ${supabase ? "enabled (digests every 60min)" : "disabled"}`);
   console.log(`\n  Gated endpoints:`);
   console.log(`    POST /agent-task       $0.10   Dispatch task to agent`);
   console.log(`    POST /intent           $0.05   Resolve goal → commands`);
@@ -1140,4 +1166,22 @@ app.listen(port, () => {
   console.log(`    GET  /token-info                Token tiers & discounts`);
   console.log(`    GET  /agent/:agentId/payment-info  ERC-8004 agent lookup`);
   console.log();
+
+  // Start payment→memory digest scheduler (hourly)
+  startDigestScheduler();
 });
+
+// ── Graceful Shutdown: write session summary to memory ──
+async function gracefulShutdown(signal: string) {
+  console.log(`\n[x402] ${signal} received — writing session summary...`);
+  stopDigestScheduler();
+  await writeSessionSummary();
+  server.close(() => {
+    console.log("[x402] Server closed.");
+    process.exit(0);
+  });
+  // Force exit after 5s if shutdown hangs
+  setTimeout(() => process.exit(0), 5000);
+}
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

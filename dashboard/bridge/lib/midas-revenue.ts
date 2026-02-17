@@ -7,6 +7,12 @@
 
 import { supabase } from "./supabase.js";
 
+/** Parse amount strings like "$0.10" or "0.10" → number */
+function parseAmount(amt: string | null | undefined): number {
+  if (!amt) return 0;
+  return parseFloat(amt.replace(/[$,]/g, "")) || 0;
+}
+
 /* ── Types ─────────────────────────────────────────────────── */
 
 export interface RevenueSnapshot {
@@ -63,27 +69,27 @@ export async function generateRevenueReport(): Promise<RevenueSnapshot> {
   const { data: allPayments } = await supabase
     .from("x402_payments")
     .select("amount, endpoint, agent_id, created_at, status")
-    .eq("status", "completed");
+    .in("status", ["completed", "settled"]);
 
   const payments = allPayments || [];
 
   // Total revenue
   const totalRevenueUsd = payments.reduce(
-    (sum, p) => sum + parseFloat(p.amount || "0"),
+    (sum, p) => sum + parseAmount(p.amount),
     0
   );
 
   // Last 7 days
   const last7d = payments.filter((p) => p.created_at >= sevenDaysAgo);
   const revenue7d = last7d.reduce(
-    (sum, p) => sum + parseFloat(p.amount || "0"),
+    (sum, p) => sum + parseAmount(p.amount),
     0
   );
 
   // Last 30 days
   const last30d = payments.filter((p) => p.created_at >= thirtyDaysAgo);
   const revenue30d = last30d.reduce(
-    (sum, p) => sum + parseFloat(p.amount || "0"),
+    (sum, p) => sum + parseAmount(p.amount),
     0
   );
 
@@ -91,7 +97,7 @@ export async function generateRevenueReport(): Promise<RevenueSnapshot> {
   const endpointRevenue: Record<string, number> = {};
   for (const p of payments) {
     const ep = p.endpoint || "unknown";
-    endpointRevenue[ep] = (endpointRevenue[ep] || 0) + parseFloat(p.amount || "0");
+    endpointRevenue[ep] = (endpointRevenue[ep] || 0) + parseAmount(p.amount);
   }
   const topEndpoint =
     Object.entries(endpointRevenue).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
@@ -100,7 +106,7 @@ export async function generateRevenueReport(): Promise<RevenueSnapshot> {
   const agentRevenue: Record<string, number> = {};
   for (const p of payments) {
     const aid = p.agent_id || "unknown";
-    agentRevenue[aid] = (agentRevenue[aid] || 0) + parseFloat(p.amount || "0");
+    agentRevenue[aid] = (agentRevenue[aid] || 0) + parseAmount(p.amount);
   }
   const topAgent =
     Object.entries(agentRevenue).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
@@ -111,7 +117,7 @@ export async function generateRevenueReport(): Promise<RevenueSnapshot> {
     (p) => p.created_at >= prevWeekStart && p.created_at < sevenDaysAgo
   );
   const prevWeekRevenue = prevWeek.reduce(
-    (sum, p) => sum + parseFloat(p.amount || "0"),
+    (sum, p) => sum + parseAmount(p.amount),
     0
   );
   const growthRateWeek =
@@ -126,7 +132,7 @@ export async function generateRevenueReport(): Promise<RevenueSnapshot> {
     (p) => p.created_at >= prevMonthStart && p.created_at < thirtyDaysAgo
   );
   const prevMonthRevenue = prevMonth.reduce(
-    (sum, p) => sum + parseFloat(p.amount || "0"),
+    (sum, p) => sum + parseAmount(p.amount),
     0
   );
   const growthRateMonth =
@@ -210,9 +216,9 @@ export async function analyzeEndpoints(): Promise<EndpointStats[]> {
       byEndpoint[ep] = { total: 0, paid: 0, amounts: [], recent7d: 0, recent30d: 0 };
     }
     byEndpoint[ep].total++;
-    if (p.status === "completed") {
+    if (p.status === "completed" || p.status === "settled") {
       byEndpoint[ep].paid++;
-      const amt = parseFloat(p.amount || "0");
+      const amt = parseAmount(p.amount);
       byEndpoint[ep].amounts.push(amt);
       if (p.created_at >= sevenDaysAgo) byEndpoint[ep].recent7d += amt;
       if (p.created_at >= thirtyDaysAgo) byEndpoint[ep].recent30d += amt;
@@ -360,7 +366,7 @@ export async function analyzePricing(): Promise<
   for (const p of allPayments) {
     const ep = p.endpoint || "unknown";
     if (!byEndpoint[ep]) byEndpoint[ep] = [];
-    byEndpoint[ep].push(parseFloat(p.amount || "0"));
+    byEndpoint[ep].push(parseAmount(p.amount));
   }
 
   const recommendations = Object.entries(byEndpoint).map(([endpoint, amounts]) => {
