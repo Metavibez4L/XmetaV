@@ -76,7 +76,15 @@
     "revenue-analytics",
     "endpoint-pricing",
     "growth-optimization",
-    "revenue-forecasting"
+    "revenue-forecasting",
+    "trade-execution",
+    "portfolio-rebalancing",
+    "arbitrage-scanning",
+    "yield-optimization",
+    "chainlink-price-oracle",
+    "uniswap-v3-quoter",
+    "defillama-integration",
+    "defi-protocol-deposits"
   ],
   "fleet": {
     "agents": [
@@ -111,6 +119,11 @@
       "address": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
       "standard": "ERC-8004",
       "network": "eip155:8453"
+    },
+    "memoryAnchor": {
+      "address": "0x0D1F695ea1ca6b5Ba22E3bAf6190d8553D9c4D98",
+      "standard": "custom",
+      "network": "eip155:8453"
     }
   },
   "wallet": {
@@ -121,7 +134,7 @@
   "x402Support": {
     "enabled": true,
     "network": "eip155:8453",
-    "payTo": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "payTo": "0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B",
     "acceptedSchemes": ["exact"],
     "denomination": "USDC",
     "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402",
@@ -147,10 +160,12 @@
       "token": "$XMETAV",
       "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
       "tiers": {
-        "Bronze": { "minBalance": 1000, "discount": "10%" },
-        "Silver": { "minBalance": 10000, "discount": "20%" },
-        "Gold": { "minBalance": 100000, "discount": "35%" },
-        "Diamond": { "minBalance": 1000000, "discount": "50%" }
+        "None": { "minBalance": 0, "discount": "0%", "dailyLimit": 5 },
+        "Starter": { "minBalance": 100, "discount": "10%", "dailyLimit": 25 },
+        "Bronze": { "minBalance": 1000, "discount": "15%", "dailyLimit": 50 },
+        "Silver": { "minBalance": 10000, "discount": "25%", "dailyLimit": 200 },
+        "Gold": { "minBalance": 100000, "discount": "50%", "dailyLimit": 1000 },
+        "Diamond": { "minBalance": 1000000, "discount": "75%", "dailyLimit": 5000 }
       }
     }
   }
