@@ -92,7 +92,8 @@ interface TradeLog {
 async function logTrade(trade: TradeLog) {
   if (!supabase) return;
   try {
-    await supabase.from("x402_payments").insert({
+    // Log to x402_payments for unified payment tracking
+    const { data: payment } = await supabase.from("x402_payments").insert({
       endpoint: trade.endpoint,
       amount: `$${trade.fee_usd.toFixed(6)}`,
       agent_id: "trade-engine",
@@ -106,6 +107,27 @@ async function logTrade(trade: TradeLog) {
         token_out: trade.token_out,
         ...trade.metadata,
       },
+    }).select("id").single();
+
+    // Also log to trade_executions for structured trade analytics
+    await supabase.from("trade_executions").insert({
+      payment_id: payment?.id || null,
+      trade_type: trade.trade_type === "swap" ? "swap"
+        : trade.trade_type === "rebalance" ? "rebalance"
+        : trade.trade_type === "arbitrage" ? "arbitrage"
+        : trade.trade_type === "yield-deposit" ? "yield-deposit"
+        : "swap",
+      token_in: trade.token_in || "unknown",
+      token_out: trade.token_out || null,
+      amount_in: String(trade.metadata?.amountIn || "0"),
+      trade_value_usd: trade.trade_value_usd || 0,
+      fee_usd: trade.fee_usd || 0,
+      fee_tier: trade.fee_tier || null,
+      fee_percent: trade.metadata?.feePercent || null,
+      protocol: trade.metadata?.protocol || null,
+      caller_address: trade.user_address || null,
+      status: "simulated",
+      metadata: trade.metadata || {},
     });
   } catch { /* best effort */ }
 }

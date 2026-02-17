@@ -286,11 +286,11 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             { ep: "POST /voice/transcribe", price: "$0.05", desc: "Speech-to-text" },
             { ep: "POST /voice/synthesize", price: "$0.08", desc: "Text-to-speech" },
             { ep: "POST /execute-trade", price: "$0.50+", desc: "Swap tx bundle (0.5%)" },
-            { ep: "POST /rebalance", price: "$2.00+", desc: "Portfolio rebalance (0.3%)" },
+            { ep: "POST /rebalance-portfolio", price: "$2.00+", desc: "Portfolio rebalance (0.3%)" },
             { ep: "GET /arb-opportunity", price: "$0.25", desc: "Arb scan" },
             { ep: "POST /execute-arb", price: "$0.10+", desc: "Execute arb (1% profit)" },
             { ep: "GET /yield-optimize", price: "$0.50", desc: "Yield farming scan" },
-            { ep: "POST /deploy-yield", price: "$3.00+", desc: "Deploy capital (0.5%)" },
+            { ep: "POST /deploy-yield-strategy", price: "$3.00+", desc: "Deploy capital (0.5%)" },
           ].map(({ ep, price, desc }) => (
             <div key={ep} className="p-2 rounded" style={{ background: "#060c18" }}>
               <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>

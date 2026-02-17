@@ -100,7 +100,7 @@ interface TokenTier {
 
 const TIERS: TokenTier[] = [
   { name: "None",      minBalance: 0,           discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
-  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
+  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#a3e635" },
   { name: "Bronze",    minBalance: 1_000,       discount: 0.15, dailyLimit: 50,   color: "#cd7f32" },
   { name: "Silver",    minBalance: 10_000,      discount: 0.25, dailyLimit: 200,  color: "#c0c0c0" },
   { name: "Gold",      minBalance: 100_000,     discount: 0.50, dailyLimit: 1000, color: "#ffd700" },
@@ -794,9 +794,9 @@ app.post("/memory-crystal", async (req, res) => {
     // Find matching memories and return as crystal
     const { data: memories } = await supabase
       .from("agent_memory")
-      .select("id, agent_id, content, memory_type, importance, created_at")
+      .select("id, agent_id, content, kind, source, created_at")
       .ilike("content", `%${query}%`)
-      .order("importance", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(5);
 
     const crystal = {
@@ -880,7 +880,7 @@ app.post("/fusion-chamber", async (req, res) => {
   if (supabase) {
     const { data: memories } = await supabase
       .from("agent_memory")
-      .select("id, content, memory_type, importance")
+      .select("id, content, kind, source")
       .in("id", memoryIds);
 
     if (!memories || memories.length < 2) {
@@ -889,15 +889,13 @@ app.post("/fusion-chamber", async (req, res) => {
 
     // Create a fused memory association
     const fusedContent = memories.map(m => m.content).join(" ⟷ ");
-    const maxImportance = Math.max(...memories.map(m => m.importance || 0));
     const { data: association } = await supabase
       .from("memory_associations")
       .insert({
-        source_memory_id: memories[0].id,
-        target_memory_id: memories[1].id,
-        association_type: catalyst || "fusion",
-        strength: Math.min(1.0, (maxImportance / 10) + 0.3),
-        context: `Fused via x402 chamber: ${fusedContent.slice(0, 200)}`,
+        memory_id: memories[0].id,
+        related_memory_id: memories[1].id,
+        association_type: catalyst === "dream" ? "causal" : "related",
+        strength: Math.min(1.0, 0.7),
       })
       .select("id, association_type, strength, created_at")
       .single();
@@ -907,8 +905,8 @@ app.post("/fusion-chamber", async (req, res) => {
       inputMemories: memoryIds.length,
       catalyst: catalyst || "standard",
       association,
-      crystalClass: maxImportance >= 8 ? "legendary" : maxImportance >= 5 ? "epic" : "rare",
-      xp: Math.floor(maxImportance * 15) + 25,
+      crystalClass: memories.length >= 4 ? "legendary" : memories.length >= 3 ? "epic" : "rare",
+      xp: memories.length * 20 + 25,
       timestamp: new Date().toISOString(),
     });
   } else {
@@ -929,9 +927,9 @@ app.post("/cosmos-explore", async (req, res) => {
   if (supabase) {
     // Pull recent memories, associations, and dream insights
     const [memRes, assocRes, dreamRes] = await Promise.all([
-      supabase.from("agent_memory").select("id, agent_id, content, memory_type, importance, created_at")
+      supabase.from("agent_memory").select("id, agent_id, content, kind, source, created_at")
         .order("created_at", { ascending: false }).limit(exploreDepth * 5),
-      supabase.from("memory_associations").select("id, source_memory_id, target_memory_id, association_type, strength")
+      supabase.from("memory_associations").select("id, memory_id, related_memory_id, association_type, strength")
         .order("strength", { ascending: false }).limit(exploreDepth * 3),
       supabase.from("dream_insights").select("id, category, insight, confidence, created_at")
         .order("created_at", { ascending: false }).limit(exploreDepth),
@@ -947,7 +945,7 @@ app.post("/cosmos-explore", async (req, res) => {
       region: targetRegion,
       depth: exploreDepth,
       islands: Object.entries(islands).map(([agent, count]) => ({ agent, memoryCount: count, terrain: targetRegion })),
-      highways: (assocRes.data || []).map(a => ({ from: a.source_memory_id, to: a.target_memory_id, type: a.association_type, strength: a.strength })),
+      highways: (assocRes.data || []).map(a => ({ from: a.memory_id, to: a.related_memory_id, type: a.association_type, strength: a.strength })),
       dreams: dreamRes.data || [],
       totalMemories: memRes.data?.length || 0,
       totalConnections: assocRes.data?.length || 0,

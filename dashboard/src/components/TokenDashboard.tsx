@@ -343,8 +343,8 @@ export function TokenDashboard() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { title: "x402 Endpoint Discounts", desc: "Up to 50% off all payment-gated agent, intent, swarm, and voice endpoints" },
-            { title: "Higher Daily Limits", desc: "Diamond holders can spend up to $2,000/day vs $5 for non-holders" },
+            { title: "x402 Endpoint Discounts", desc: "Up to 75% off all payment-gated agent, intent, swarm, trade, and voice endpoints" },
+            { title: "Higher Daily Limits", desc: "Diamond holders can spend up to $5,000/day vs $5 for non-holders" },
             { title: "Priority Processing", desc: "Higher-tier requests are prioritized in the agent queue" },
             { title: "On-Chain Identity", desc: "Token linked to ERC-8004 agent identity on Base Mainnet" },
           ].map((benefit) => (
