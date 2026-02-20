@@ -41,3 +41,4 @@ supabase/.temp/
 # Misc
 *.pem
 coverage/
+.openclaw/
