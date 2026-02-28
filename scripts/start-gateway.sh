@@ -11,7 +11,7 @@ mkdir -p "$STATE_DIR"
 echo "▶ Stopping any existing gateway listeners on port $PORT..."
 # Kill openclaw gateway processes and anything holding the port
 pkill -9 -f "openclaw.*gateway" 2>/dev/null || true
-fuser -k ${PORT}/tcp 2>/dev/null || true
+lsof -ti tcp:${PORT} | xargs kill -9 2>/dev/null || true
 sleep 1
 
 echo "▶ Ensuring gateway.mode=local (recommended for WSL2)..."
@@ -28,7 +28,7 @@ echo "  Logs: $STATE_DIR/gateway.log"
 
 echo "▶ Verifying port open..."
 for i in {1..20}; do
-  if timeout 1 bash -lc "</dev/tcp/127.0.0.1/$PORT" >/dev/null 2>&1; then
+  if nc -z 127.0.0.1 "$PORT" 2>/dev/null; then
     echo "✓ Port $PORT is accepting connections"
     exit 0
   fi
