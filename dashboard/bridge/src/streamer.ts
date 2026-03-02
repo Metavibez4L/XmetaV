@@ -1,8 +1,8 @@
 import { supabase } from "../lib/supabase.js";
 
-const CHUNK_SIZE = 160;           // chars per chunk — flush when reached (was 400)
-const FLUSH_INTERVAL_MS = 80;     // flush every 80ms for smoother streaming (was 200)
-const FIRST_FLUSH_MS = 30;        // first chunk fires fast (was 50)
+const CHUNK_SIZE = 80;            // chars per chunk — faster flushing
+const FLUSH_INTERVAL_MS = 40;     // flush every 40ms for 2x smoother streaming
+const FIRST_FLUSH_MS = 15;        // first chunk fires in 15ms
 
 /**
  * Creates a buffered streamer that writes output chunks to agent_responses.
