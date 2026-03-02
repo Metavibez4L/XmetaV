@@ -1,79 +1,81 @@
 # Mac Studio Migration Plan
 
-> **Target:** Mac Studio (M4 Ultra — 96GB / 28 CPU / 60 GPU cores)
-> **Source:** MacBook Air (current dev machine)
-> **Status:** Planning
-> **Last updated:** 2026-02-23
+> **Target:** Mac Studio (M3 Ultra — 96GB / 28 CPU / 60 GPU cores)
+> **Source:** MacBook Air (previous dev machine)
+> **Status:** ✅ COMPLETE — Live since 2026-02-27
+> **Last updated:** 2026-03-02
 
 ---
 
 ## Overview
 
-Migrate all XmetaV services from MacBook Air to Mac Studio. The Studio has the resources to run production infrastructure properly — Postgres, nginx, Ollama, and the x402 server concurrently without fighting the hardware.
+All XmetaV services have been migrated from MacBook Air to Mac Studio. The Studio runs as an always-on headless server in NYC, managed remotely from a MacBook Air in NC via Tailscale VPN.
+
+### What's Running
+
+| Service | Port | Status |
+|---------|------|--------|
+| Next.js Dashboard | 3000 | ✅ Live |
+| Bridge Daemon | 3001 | ✅ Live |
+| x402 Payment Server | 4021 | ✅ Live |
+| OpenClaw Gateway | 18789 | ✅ Live |
+| Ollama | 11434 | ✅ Live (24h hot-keep, 3 models) |
+| SSH | 22 | ✅ Live (Tailscale) |
+| Screen Sharing | 5900 | ✅ Live (Tailscale) |
+| Watchdog | launchd | ✅ Live (5 min checks) |
+
+### Quick Commands
+
+```bash
+cd ~/Documents/xmetav1/XmetaV
+just status     # Check all services
+just all        # Start everything
+just killall    # Stop everything
+just health     # Full system health
+just revenue    # Check x402 payments
+```
 
 ---
 
-## Priority Improvements (Bundle with Migration)
+## Priority Improvements
 
-### Critical (must-have)
+### Critical — ✅ Complete
 
 #### 1. HTTPS/SSL Termination
-- **Current state:** HTTP only — not acceptable for production x402 payments
-- **Plan:** Reverse proxy with proper certs
-  - **Option A:** Caddy (auto-HTTPS with Let's Encrypt, zero config)
-  - **Option B:** nginx + certbot
-- **Tasks:**
-  - [ ] Install Caddy or nginx on Mac Studio
-  - [ ] Configure reverse proxy for x402-server (port 3001 → 443)
-  - [ ] Configure reverse proxy for dashboard (port 3000 → 443)
-  - [ ] Set up auto-renewal for SSL certs
-  - [ ] Configure HSTS headers
-  - [ ] Domain DNS → Mac Studio IP (or Tailscale Funnel)
+- **Status:** Partially addressed — services accessible via Tailscale (encrypted tunnel)
+- **Public exposure:** Not yet public. Currently accessible only via Tailscale VPN.
+- **Phase 2 plan:** `tailscale serve` or Caddy reverse proxy when ready for public access
 
-#### 2. Process Management
-- **Current state:** Running with `npm start` / `npm run dev` — dies on crash, no auto-start
-- **Plan:** LaunchDaemon plists with auto-restart and log rotation
-- **Tasks:**
-  - [ ] Create `ai.xmetav.x402-server.plist` (LaunchDaemon)
-  - [ ] Create `ai.xmetav.bridge.plist` (LaunchDaemon)
-  - [ ] Create `ai.xmetav.dashboard.plist` (LaunchDaemon)
-  - [ ] Configure `KeepAlive: true` + `ThrottleInterval: 10`
-  - [ ] Set up log rotation via `newsyslog` or `logrotate`
-  - [ ] Test crash recovery (kill -9 → auto-restart)
-  - [ ] OpenClaw gateway already has a LaunchAgent — verify it migrates
+#### 2. Process Management — ✅ Complete
+- **Watchdog:** `scripts/watchdog.sh` monitors Tailscale, SSH, Screen Sharing every 5 min
+- **launchd plist:** `~/Library/LaunchAgents/com.xmetav.watchdog.plist` (RunAtLoad)
+- **Ollama hot-keep:** `~/Library/LaunchAgents/com.ollama.env.plist` (24h keep-alive, 3 models, 4 parallel)
+- **Power settings:** sleep 0, autorestart 1, disksleep 0 (always-on headless)
+- **Services:** Started via `just all` — dashboard, bridge, x402, gateway
+- **TODO:** Full LaunchDaemon plists for auto-restart on crash (KeepAlive: true)
 
-#### 3. Database Persistence
-- **Current state:** Supabase (cloud) for most data; x402 payment logs may be in-memory
-- **Plan:** PostgreSQL for transaction records + local caching
-- **Tasks:**
-  - [ ] Install PostgreSQL on Mac Studio
-  - [ ] Migrate Supabase schema locally (or keep Supabase as primary, PG as backup)
-  - [ ] Ensure x402 payment records persist across restarts
-  - [ ] Run existing setup scripts (`scripts/setup-db*.sql`)
-  - [ ] Verify `payment-memory.ts` writes to persistent store
-  - [ ] Set up PG backup schedule (pg_dump daily)
+#### 3. Database Persistence — ✅ Complete (Supabase)
+- **Primary store:** Supabase cloud (24 tables/views, all with Realtime + RLS)
+- **Payment persistence:** `x402_payments` table — 21 payments, $3.39 revenue logged
+- **Memory persistence:** Full 6-layer memory architecture (ephemeral → session → long-term → IPFS → on-chain)
+- **No local PostgreSQL needed** — Supabase handles persistence, bridge writes all critical state
 
 ---
 
-### Important (should-have)
+### Important — In Progress
 
 #### 4. API Authentication & Rate Limiting
-- **Current state:** x402 endpoints rely on payment gating only
-- **Plan:** Add defense-in-depth
-- **Tasks:**
-  - [ ] Add rate limiting middleware (e.g., express-rate-limit)
-  - [ ] Configure per-IP limits (100 req/min general, 10 req/min for payment endpoints)
-  - [ ] Add optional API key auth for premium integrators
-  - [ ] Block common abuse patterns (user-agent filtering, geo blocking if needed)
-  - [ ] Add CORS configuration for dashboard origin only
+- **Current state:** x402 payment gating only, Tailscale-only access
+- **TODO:**
+  - [ ] Add rate limiting middleware (express-rate-limit)
+  - [ ] CORS configuration for dashboard origin
+  - [ ] API key auth for premium integrators
 
 #### 5. Webhook Reliability
-- **Current state:** Fire-and-forget callbacks
-- **Plan:** Reliable delivery with retries
-- **Tasks:**
-  - [ ] Implement idempotency keys on payment endpoints
-  - [ ] Add retry logic with exponential backoff (3 attempts, 1s/5s/30s)
-  - [ ] Dead letter queue for failed callbacks (log to DB for manual review)
+- **Current state:** Fire-and-forget
+- **TODO:**
+  - [ ] Idempotency keys on payment endpoints
+  - [ ] Retry logic with exponential backoff
   - [ ] Webhook signature verification (HMAC-SHA256)
 
 #### 6. Monitoring & Alerting
@@ -115,112 +117,130 @@ Migrate all XmetaV services from MacBook Air to Mac Studio. The Studio has the r
 
 ## Migration Checklist
 
-### Pre-Migration (on MacBook Air)
+### Pre-Migration (on MacBook Air) — ✅ Complete
 
-- [ ] Document all running services and their ports
-- [ ] Export all environment variables / `.env` files
-- [ ] List all installed global packages (`npm list -g`, `brew list`)
-- [ ] Back up wallet private keys securely
-- [ ] Git push all repos to remote (ensure clean state)
-- [ ] Document OpenClaw config (`~/.openclaw/openclaw.json`)
-- [ ] Note Supabase connection strings and API keys
-- [ ] Export Ollama models list
+- [x] Document all running services and their ports
+- [x] Export all environment variables / `.env` files
+- [x] List all installed global packages
+- [x] Back up wallet private keys securely
+- [x] Git push all repos to remote (clean state)
+- [x] Document OpenClaw config
+- [x] Note Supabase connection strings and API keys
+- [x] Export Ollama models list
 
-### Mac Studio Setup
+### Mac Studio Setup — ✅ Complete
 
-- [ ] macOS initial setup + latest updates
-- [ ] Install Homebrew
-- [ ] Install Node.js (v25.x via Homebrew or nvm)
-- [ ] Install Ollama + pull models (`kimi-k2.5:cloud`)
-- [ ] Install PostgreSQL
-- [ ] Install Caddy or nginx
-- [ ] Install OpenClaw (`npm install -g openclaw`)
-- [ ] Clone XmetaV repo
-- [ ] Copy `.env` files from Air
-- [ ] Run `npm install` in dashboard, bridge, x402-server, token
-- [ ] Restore OpenClaw config (`~/.openclaw/openclaw.json`)
-- [ ] Set up SSH keys for GitHub
-- [ ] Enable remote access (Screen Sharing + SSH)
-- [ ] Configure Tailscale for remote access
+- [x] macOS initial setup + latest updates (macOS 26.3)
+- [x] Install Homebrew
+- [x] Install Node.js v25.6.1 via Homebrew
+- [x] Install pnpm v10.30.3 via Homebrew
+- [x] Install just v1.46.0 via Homebrew
+- [x] Install Ollama v0.17.4 (macOS app) + pull models (kimi-k2.5:cloud, qwen2.5:7b-instruct)
+- [x] Configure Ollama hot-keep (24h, 3 models, 4 parallel) via launchd
+- [x] Install OpenClaw v2026.2.17 (npm global)
+- [x] Clone XmetaV repo to `/Users/akualabs/Documents/xmetav1/XmetaV`
+- [x] Copy `.env` files (bridge, x402-server, dashboard)
+- [x] Fix Linux→macOS paths in bridge/.env (NODE_PATH, OPENCLAW_PATH)
+- [x] Fix x402-server/.env (remove FACILITATOR_URL, use CDP auto-auth)
+- [x] Run npm install in dashboard, bridge, x402-server
+- [x] Restore OpenClaw config (`~/.openclaw/openclaw.json`)
+- [x] Set up SSH keys for GitHub (user: akualabs, email: metavibez4l@gmail.com)
+- [x] Enable SSH via `launchctl load -w /System/Library/LaunchDaemons/ssh.plist`
+- [x] Enable Screen Sharing
+- [x] Configure Tailscale (App Store build, system extension, 100.93.86.17)
 
-### Service Migration
+### Service Migration — ✅ Complete
 
-- [ ] Start and test x402-server
-- [ ] Start and test bridge
-- [ ] Start and test dashboard
-- [ ] Start and test OpenClaw gateway
-- [ ] Verify Ollama model inference
-- [ ] Verify Supabase connectivity
-- [ ] Verify on-chain identity anchor still works
-- [ ] Verify wallet balances accessible
-- [ ] Run `openclaw doctor` — all green
+- [x] Start and test dashboard (port 3000)
+- [x] Start and test bridge (port 3001)
+- [x] Start and test x402-server (port 4021)
+- [x] Start and test OpenClaw gateway (port 18789)
+- [x] Verify Ollama model inference (kimi-k2.5:cloud + qwen2.5:7b)
+- [x] Verify Supabase connectivity (realtime subscriptions active)
+- [x] Verify on-chain identity (ERC-8004 #16905 on Base)
+- [x] Verify x402 payments (402 Payment Required confirmed, 21 payments logged)
+- [x] Fix health-check.sh and start-gateway.sh for macOS compatibility
 
-### Post-Migration
+### Post-Migration — ✅ Mostly Complete
 
-- [ ] Install LaunchDaemon plists for all services
-- [ ] Configure nginx/Caddy reverse proxy + SSL
-- [ ] Set up monitoring and health checks
-- [ ] Run full integration test (x402 payment flow end-to-end)
-- [ ] Update DNS / public URLs
-- [ ] Decommission MacBook Air services (keep as dev machine)
-- [ ] Document final architecture in `docs/ARCHITECTURE.md`
-
----
-
-## Wallet Migration
-
-| Wallet | Address | Purpose | Location |
-|--------|---------|---------|----------|
-| **Identity** | `0x4Ba6...` | On-chain anchors (ERC-8004) | OpenClaw config |
-| **Revenue** | `0x21fa...dA0B` | x402 USDC payments | `dashboard/x402-server/.env` |
-
-Both wallets need private keys transferred securely:
-- **Never** copy private keys over plain text / unencrypted channels
-- Use encrypted USB drive or 1Password vault
-- Verify balances on both machines after migration
-- Keep MacBook Air as cold backup until confirmed working
+- [x] Configure power settings (sleep 0, autorestart 1, always-on)
+- [x] Install watchdog (launchd plist, 5 min checks)
+- [x] Set up monitoring (watchdog checks Tailscale, SSH, Screen Sharing)
+- [x] Verify x402 payment flow end-to-end ($3.39 revenue confirmed)
+- [x] MacBook Air kept as remote dev machine (Tailscale connection verified)
+- [x] Create justfile with 18 commands for service management
+- [x] Document architecture in `docs/ARCHITECTURE.md` — updated 2026-03-02
+- [ ] **TODO:** Full LaunchDaemon plists for auto-restart on crash
+- [ ] **TODO:** HTTPS/SSL for public exposure (Caddy or tailscale serve)
+- [ ] **TODO:** Rate limiting middleware
 
 ---
 
-## Network Architecture (Post-Migration)
+## Wallets (Migrated)
+
+| Wallet | Address | Purpose | Status |
+|--------|---------|---------|--------|
+| **Identity / Agent** | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` | On-chain anchors (ERC-8004), agent wallet | ⚠️ Needs ETH for gas |
+| **Revenue** | `0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B` | x402 USDC payments | ✅ Active, receiving |
+
+---
+
+## Network Architecture (Current — Tailscale Only)
+
+```
+MacBook Air (NC) ─── Tailscale VPN ─── Mac Studio (NYC)
+100.122.52.85                            100.93.86.17
+                                          │
+                                          ├── Dashboard    :3000
+                                          ├── Bridge       :3001
+                                          ├── x402 Server  :4021
+                                          ├── Gateway WS   :18789
+                                          ├── Ollama       :11434
+                                          ├── SSH          :22
+                                          └── VNC          :5900
+```
+
+### Phase 2 — Public Exposure (Planned)
 
 ```
 Internet
   │
-  ├── Caddy/nginx (443/HTTPS)
-  │     ├── /api/x402/*  →  x402-server (:3001)
+  ├── Tailscale Funnel or Caddy (443/HTTPS)
+  │     ├── /api/x402/*  →  x402-server (:4021)
   │     ├── /*           →  dashboard (:3000)
   │     └── /ws          →  OpenClaw gateway (:18789)
   │
-  ├── Tailscale (remote access)
+  ├── Tailscale (admin remote access)
   │     ├── SSH (:22)
   │     ├── Screen Sharing (:5900)
-  │     └── Direct service access (dev only)
+  │     └── Direct service access (admin only)
+  │
   │
   └── Local only
         ├── Ollama (:11434)
-        ├── PostgreSQL (:5432)
-        └── Bridge (internal)
+        └── Bridge (internal :3001)
 ```
 
 ---
 
-## Timeline
+## Timeline (Actual)
 
-| Phase | Tasks | Est. Time |
-|-------|-------|-----------|
-| **Prep** | Document current state, back up keys, export configs | 1-2 hours |
-| **Setup** | Install toolchain on Mac Studio | 2-3 hours |
-| **Migrate** | Clone repos, copy configs, start services | 2-3 hours |
-| **Harden** | Plists, nginx, monitoring, backups | 3-4 hours |
-| **Verify** | End-to-end testing, DNS cutover | 1-2 hours |
-| **Total** | | ~10-14 hours |
+| Phase | Tasks | Completed |
+|-------|-------|-----------| 
+| **Prep** | Document state, back up keys, export configs | 2026-02-27 |
+| **Setup** | Install toolchain, configure macOS | 2026-02-27 |
+| **Migrate** | Clone repos, fix paths, start services | 2026-02-27 |
+| **Harden** | Watchdog, power settings, Tailscale SSH/VNC | 2026-02-28 |
+| **x402 Live** | Fix facilitator auth, verify payments | 2026-03-01 |
+| **Tooling** | Install pnpm, just, create justfile, Ollama hot-keep | 2026-03-01 |
+| **Docs** | Full documentation update | 2026-03-02 |
 
 ---
 
 ## Notes
 
-- Keep MacBook Air as development machine — test changes locally before deploying to Studio
-- Consider running Mac Studio headless with Screen Sharing + SSH for remote management
-- Ollama will benefit massively from 96GB unified memory — can run much larger models
-- iMessage integration can be re-enabled on the Studio once migration is stable
+- MacBook Air is now the remote dev machine — test changes locally before deploying to Studio
+- Mac Studio runs headless 24/7 with Screen Sharing + SSH for remote management
+- Ollama benefits massively from 96GB unified memory — models stay hot 24h
+- FileVault is ON — potential lockout risk on reboot if no one enters password locally
+- On-chain anchoring paused until agent wallet is funded with ETH on Base

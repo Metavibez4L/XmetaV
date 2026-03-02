@@ -1,12 +1,17 @@
 # Architecture — XmetaV OpenClaw Command Center
 
-This repo is the operational layer around OpenClaw. It provides a **Control Plane Dashboard** (Next.js + Supabase), a **Bridge Daemon** (Node.js), automation scripts, and documentation to manage OpenClaw agents, swarms, and infrastructure on WSL2/Linux.
+**Last updated:** 2026-03-02  
+**Platform:** Mac Studio (M3 Ultra, 96GB) — macOS 26.3  
+**Location:** NYC (always-on headless server)  
+**Remote access:** Tailscale VPN from MacBook Air (NC)
+
+This repo is the operational layer around OpenClaw. It provides a **Control Plane Dashboard** (Next.js + Supabase), a **Bridge Daemon** (Node.js), an **x402 Payment Server** (Express), automation scripts, and documentation to manage OpenClaw agents, swarms, and infrastructure on macOS.
 
 ## System Overview
 
 ```mermaid
 flowchart TB
-    subgraph DASHBOARD["Control Plane Dashboard (Vercel / localhost:3000)"]
+    subgraph DASHBOARD["Control Plane Dashboard (localhost:3000)"]
         direction LR
         UI_CC["Command Center"]
         UI_CHAT["Agent Chat"]
@@ -15,6 +20,9 @@ flowchart TB
         UI_PAY["Payments"]
         UI_ID["Identity"]
         UI_TOK["$XMETAV Token"]
+        UI_COSMOS["Memory Cosmos"]
+        UI_CONSC["Consciousness"]
+        UI_ARENA["XMETAV HQ"]
     end
 
     subgraph SUPABASE["Supabase (Cloud Postgres + Realtime)"]
@@ -27,21 +35,33 @@ flowchart TB
         TBL_SRUN["swarm_runs"]
         TBL_STASK["swarm_tasks"]
         TBL_X402["x402_payments"]
+        TBL_SOUL["soul_dream_*"]
+        TBL_INTENT["intent_sessions"]
     end
 
-    subgraph BASE["Base Mainnet"]
+    subgraph BASE["Base Mainnet (eip155:8453)"]
         direction LR
         X402["x402 USDC\nPayments"]
         ERC8004["ERC-8004\nIdentity NFT #16905"]
         XMETAV_TOK["$XMETAV ERC-20\n0x5b56...9a54"]
+        ANCHOR["AgentMemoryAnchor\n(on-chain memory)"]
     end
 
-    subgraph LOCAL["Local Machine (WSL2)"]
-        subgraph BRIDGE["Bridge Daemon (Node.js)"]
+    subgraph MACSTUDIO["Mac Studio (M3 Ultra — 96GB, macOS)"]
+        subgraph BRIDGE["Bridge Daemon (:3001)"]
             direction LR
             EXEC["Command\nExecutor"]
             SWEXEC["Swarm\nExecutor"]
             HB["Heartbeat"]
+            SOUL_LIB["Soul\nAgent"]
+            MEM_ENGINE["Memory\nCrystal Engine"]
+        end
+
+        subgraph X402_SRV["x402 Server (:4021)"]
+            direction LR
+            PAY_MW["Payment\nMiddleware"]
+            TIER_MW["Token Tier\nMiddleware"]
+            ERC_MW["ERC-8004\nIdentity MW"]
         end
 
         subgraph XMETAV["XmetaV (This Repo)"]
@@ -50,6 +70,7 @@ flowchart TB
             CONFIGS["Configs"]
             DOCS["Docs"]
             TEMPLATES["Templates"]
+            JUSTFILE["justfile"]
         end
 
         subgraph RUNTIME["OpenClaw Runtime"]
@@ -69,6 +90,7 @@ flowchart TB
                 A_BRIEF["briefing"]
                 A_ORA["oracle"]
                 A_ALCH["alchemist"]
+                A_MIDAS["midas"]
                 A_W3["web3dev"]
                 A_AKUA["akua"]
                 A_AKUA_W["akua_web"]
@@ -77,17 +99,33 @@ flowchart TB
                 A_DYN["dynamic"]
             end
         end
+
+        subgraph INFRA["Infrastructure"]
+            direction LR
+            WATCHDOG["Watchdog\n(launchd)"]
+            TAILSCALE["Tailscale\n100.93.86.17"]
+            SSH["SSH :22"]
+            VNC["Screen Sharing\n:5900"]
+        end
     end
 
     subgraph PROVIDERS["Model Providers"]
         direction LR
-        OLLAMA["Ollama (Local)\n• kimi-k2.5:cloud (256k)\n• qwen2.5:7b-instruct"]
+        OLLAMA["Ollama (:11434)\n• kimi-k2.5:cloud (256k)\n• qwen2.5:7b-instruct\n24h hot-keep, 3 models"]
     end
 
     subgraph EXTERNAL["External Services"]
         direction LR
         GITHUB["GitHub\n(Metavibez4L)"]
-        VERCEL["Vercel\n(Dashboard Host)"]
+        PINATA["Pinata\n(IPFS pinning)"]
+        ALCHEMY["Alchemy\n(Base RPC)"]
+    end
+
+    subgraph REMOTE["MacBook Air (NC)"]
+        direction LR
+        AIR_TS["Tailscale\n100.122.52.85"]
+        AIR_SSH["SSH client"]
+        AIR_VNC["Screen Sharing"]
     end
 
     DASHBOARD <-->|Realtime WS| SUPABASE
@@ -99,20 +137,28 @@ flowchart TB
     MAIN_AGENT --> FLEET
     FLEET --> PROVIDERS
     FACTORY -->|--github| GITHUB
-    DASHBOARD -.->|deployed to| VERCEL
     BRIDGE -->|auto-pay 402| X402
+    BRIDGE -->|pin memories| PINATA
+    BRIDGE -->|anchor hashes| ANCHOR
+    X402_SRV -->|on-chain reads| ALCHEMY
     UI_ID -->|read identity| ERC8004
     UI_PAY -->|payment history| TBL_X402
     UI_TOK -->|balanceOf / tier| XMETAV_TOK
-    XMETAV_TOK -.->|tier discount| X402
+    XMETAV_TOK -.->|tier discount| X402_SRV
+    REMOTE -->|Tailscale VPN| TAILSCALE
+    AIR_SSH -->|ssh :22| SSH
+    AIR_VNC -->|vnc :5900| VNC
 
     style DASHBOARD fill:#0a0e1a,stroke:#00f0ff,color:#00f0ff
     style SUPABASE fill:#1a1a2e,stroke:#3ecf8e,color:#fff
     style BASE fill:#0052ff,stroke:#fff,color:#fff
-    style LOCAL fill:#0d1117,stroke:#e94560,color:#fff
+    style MACSTUDIO fill:#0d1117,stroke:#e94560,color:#fff
     style BRIDGE fill:#16213e,stroke:#00f0ff,color:#fff
+    style X402_SRV fill:#16213e,stroke:#16c79a,color:#fff
     style XMETAV fill:#1a1a2e,stroke:#e94560,color:#fff
     style RUNTIME fill:#16213e,stroke:#e94560,color:#fff
+    style INFRA fill:#1a1a2e,stroke:#f7b731,color:#fff
+    style REMOTE fill:#161b22,stroke:#58a6ff,color:#fff
     style MAIN_AGENT fill:#0f3460,stroke:#e94560,color:#fff
     style FLEET fill:#1a1a3e,stroke:#a29bfe,color:#fff
     style PROVIDERS fill:#222,stroke:#888,color:#fff
@@ -157,8 +203,9 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 ### Bridge Daemon (Node.js)
 
-A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
+A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
 
+- **Port**: 3001
 - **Command Executor**: Subscribes to `agent_commands` via Realtime, spawns `openclaw agent` processes, streams output to `agent_responses`
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
@@ -170,8 +217,9 @@ A local Node.js process (runs on WSL alongside OpenClaw) that bridges the remote
 
 ### x402 Payment Service (Express)
 
-A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase CDP facilitator with JWT auth).
+A standalone Express server that gates XmetaV API endpoints with USDC micro-payments via the x402 protocol (Coinbase CDP facilitator with automatic JWT auth).
 
+- **Port**: 4021
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
 - **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+)
 - **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
@@ -270,6 +318,7 @@ Important practical details:
 - Sessions are persisted as JSONL files.
 - Locks are created as `*.jsonl.lock` to protect concurrent writers.
 - Stale locks (e.g., from a crash) can hang future runs.
+- All agents use macOS-native paths (`~/.openclaw/agents/...`)
 
 ### Agents
 
@@ -278,10 +327,10 @@ Static agents are defined in `openclaw.json`. Dynamic agents can be created at r
 | Agent | Model | Workspace | Tools | Purpose |
 |-------|-------|-----------|-------|---------|
 | `main` (default) | `kimi-k2.5:cloud` (256k) | `~/.openclaw/workspace` | **full** | **Orchestrator** — command center + agent factory + swarm |
-| `basedintern` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | coding | Repo agent — code/tests/commits (lean, fast) |
-| `basedintern_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/basedintern` | full | Same repo — browser/web automation only |
-| `akua` | `kimi-k2.5:cloud` (256k) | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
-| `akua_web` | `kimi-k2.5:cloud` (256k) | `/home/manifest/akua` | full | Same repo — browser/web automation only |
+| `basedintern` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/basedintern` | coding | Repo agent — code/tests/commits (lean, fast) |
+| `basedintern_web` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/basedintern` | full | Same repo — browser/web automation only |
+| `akua` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/akua` | coding | Solidity/Hardhat repo agent |
+| `akua_web` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/akua` | full | Same repo — browser/web automation only |
 | `soul` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dream consolidation, associations |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(per-agent)_ | Created on-demand by Agent Factory |
 
@@ -534,10 +583,30 @@ sequenceDiagram
 
 ## Ports and endpoints
 
-- Dashboard: `http://localhost:3000` (dev) or Vercel URL (prod)
-- Gateway WS: `ws://127.0.0.1:18789`
-- Ollama HTTP: `http://127.0.0.1:11434`
-- Supabase: `https://ptlneqcjsnrxxruutsxm.supabase.co`
+| Service | Port | URL |
+|---------|------|-----|
+| Dashboard | 3000 | `http://localhost:3000` |
+| Bridge | 3001 | `http://localhost:3001` |
+| x402 Server | 4021 | `http://localhost:4021` |
+| Gateway WS | 18789 | `ws://127.0.0.1:18789` |
+| Ollama | 11434 | `http://127.0.0.1:11434` |
+| SSH | 22 | Tailscale: `100.93.86.17:22` |
+| Screen Sharing | 5900 | Tailscale: `100.93.86.17:5900` |
+| Supabase | Cloud | `https://ptlneqcjsnrxxruutsxm.supabase.co` |
+
+## Command runner (just)
+
+The project uses `just` (v1.46.0) as a command runner with a `justfile` at the repo root.
+
+```bash
+just status     # Check all services
+just all        # Start dashboard + bridge + x402
+just killall    # Stop all services
+just push "msg" # Git commit + push to dev
+just revenue    # Check x402 payment revenue
+just health     # Full system health
+just models     # List Ollama models
+```
 
 ## Failure modes (what this repo is designed to prevent)
 

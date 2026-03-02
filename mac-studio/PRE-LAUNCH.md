@@ -1,167 +1,131 @@
 # Pre-Launch Checklist — Before Going Live
 
-> **Status:** Blocked (waiting on Mac Studio setup)
-> **Last updated:** 2026-02-23
-> **Context:** x402 payment rail works (received $5.11 USDC) but is NOT production-ready
+> **Status:** ✅ Phase 1 Complete (Tailscale-only access)
+> **Last updated:** 2026-03-02
+> **Context:** x402 payment rail live on Mac Studio. $3.39 USDC revenue from 21 payments. Phase 2 = public exposure.
 
 ---
 
-## Current State: Works, But Will Break
+## Current State: Live on Tailscale
 
-| Area | Status | Risk |
-|------|--------|------|
-| Payment rail | Working | — |
-| Wallet funded | Yes | — |
-| Trade execution | Basic | Fragile under load |
-| Persistence | **None** | Restart = lost tx history |
-| Auto-restart | **None** | Crash = downtime |
-| HTTPS/SSL | **None** | Most clients will reject |
-| Rate limiting | **None** | Spammer drains funds in minutes |
-| Hardware | MacBook Air | Crashes under concurrent load |
+| Area | Status | Notes |
+|------|--------|-------|
+| Payment rail | ✅ Working | Base Mainnet, CDP facilitator auto-auth |
+| Wallet funded | ✅ Yes | Revenue wallet receiving USDC |
+| Persistence | ✅ Supabase | 24 tables, full memory architecture |
+| Hardware | ✅ Mac Studio M3 Ultra | 96GB, 28 cores, always-on |
+| Remote access | ✅ Tailscale | SSH + Screen Sharing, direct peer-to-peer |
+| Watchdog | ✅ Active | launchd, 5 min checks |
+| Ollama hot-keep | ✅ Active | 24h keep-alive, 3 models, 4 parallel |
+| Trade execution | Basic | Needs more testing under load |
+| HTTPS/SSL | ⬜ Phase 2 | Not needed while Tailscale-only |
+| Rate limiting | ⬜ Phase 2 | Not needed while Tailscale-only |
+| Auto-restart | ⬜ Partial | Watchdog monitors, no KeepAlive plists yet |
 
-**Bottom line:** Fine for testing with trusted users. Not safe for real revenue.
+**Bottom line:** Fully operational for development and trusted testing via Tailscale. Phase 2 (public) needs HTTPS + rate limiting.
 
 ---
 
-## Must-Have Before Go-Live
+## Phase 1 Checklist — ✅ Complete
 
-### 1. Database (Payment Persistence)
+### 1. Database (Payment Persistence) — ✅ Done
+- [x] Supabase cloud as primary store (24 tables/views)
+- [x] `x402_payments` table logging all payments (21 transactions, $3.39 revenue)
+- [x] `x402_daily_spend` view for daily aggregations
+- [x] Full 6-layer memory architecture operational
 
-> Without this: restart = lost transaction history, can't verify who paid what, risk of double-charging
+### 2. Process Management — ✅ Partial
+- [x] Watchdog script (Tailscale, SSH, VNC checks every 5 min)
+- [x] Watchdog launchd plist (RunAtLoad)
+- [x] Ollama env launchd plist (hot-keep config)
+- [x] `justfile` with 18 commands (`just all`, `just killall`, `just status`)
+- [x] Power settings: never sleep, auto-restart after power failure
+- [ ] **TODO:** Full LaunchDaemon plists with KeepAlive for dashboard, bridge, x402
 
-- [ ] Install PostgreSQL on Mac Studio
-- [ ] Create `x402_payments` table (tx hash, amount, sender, endpoint, timestamp, status)
-- [ ] Create `x402_sessions` table (active sessions, rate limit tracking)
-- [ ] Migrate payment-memory from in-memory to Postgres
-- [ ] Add payment verification queries (lookup by tx hash, prevent replays)
-- [ ] Backfill any test transactions from current logs
+### 3. Monitoring — ✅ Partial
+- [x] `just status` — check all 5 services in one command
+- [x] `just health` — full system health (services + power + disk + memory)
+- [x] `just revenue` — x402 payment revenue totals
+- [x] Watchdog log at `/tmp/xmetav-watchdog.log`
+- [ ] **TODO:** Automated alerts (Discord/email) on service down
 
-**Schema sketch:**
-```sql
-CREATE TABLE x402_payments (
-  id SERIAL PRIMARY KEY,
-  tx_hash TEXT UNIQUE NOT NULL,
-  sender_address TEXT NOT NULL,
-  amount_usdc DECIMAL(18,6) NOT NULL,
-  endpoint TEXT NOT NULL,
-  status TEXT DEFAULT 'confirmed',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+---
 
-CREATE TABLE x402_rate_limits (
-  sender_address TEXT PRIMARY KEY,
-  request_count INT DEFAULT 0,
-  window_start TIMESTAMPTZ DEFAULT NOW(),
-  blocked_until TIMESTAMPTZ
-);
-```
+## Phase 2 Checklist — Public Exposure (Not Started)
 
-### 2. Process Management (Auto-Restart)
+### 4. HTTPS / SSL
+> Required before exposing x402 endpoints to the internet
 
-> Without this: crash or reboot = downtime, lost revenue, no one monitoring at 3 AM
-
-- [ ] Create LaunchDaemon plist for x402-server
-- [ ] Create LaunchDaemon plist for bridge server
-- [ ] Create LaunchDaemon plist for Ollama
-- [ ] Create LaunchDaemon plist for OpenClaw gateway
-- [ ] Test: kill process → verify auto-restart within 10s
-- [ ] Test: reboot Mac Studio → verify all services come back
-- [ ] Add health check endpoint (`/health`) that returns service status
-
-**LaunchDaemon location:** `/Library/LaunchDaemons/com.xmetav.x402.plist`
-
-### 3. HTTPS / SSL
-
-> Without this: most browsers, API clients, and agent frameworks refuse to connect
-
-- [ ] **Option A (recommended):** Tailscale Funnel — free auto-HTTPS, zero config
-- [ ] **Option B:** nginx reverse proxy + Let's Encrypt cert
-- [ ] **Option C:** Caddy (auto-HTTPS built in)
+- [ ] **Option A (recommended):** `tailscale serve` — free auto-HTTPS via Tailscale Funnel
+- [ ] **Option B:** Caddy reverse proxy (auto-HTTPS with Let's Encrypt)
 - [ ] Verify: `curl https://your-endpoint/health` returns 200
-- [ ] Update all x402 endpoint URLs to HTTPS
+- [ ] Update endpoint URLs to HTTPS
 - [ ] Redirect HTTP → HTTPS
 
-### 4. Rate Limiting
+### 5. Rate Limiting
+> Required before public access
 
-> Without this: one bad actor floods your endpoints, drains wallet, crashes server
+- [ ] `express-rate-limit` middleware on x402-server
+- [ ] Per-address limits (100 req/min general, 10 req/min payment endpoints)
+- [ ] Global rate limit (1,000 req/min)
+- [ ] 429 response with Retry-After header
+- [ ] CORS configuration (dashboard origin only)
 
-- [ ] Implement per-address rate limiting (e.g., 100 req/min per sender)
-- [ ] Implement global rate limiting (e.g., 1,000 req/min total)
-- [ ] Add automatic blocking for abusive patterns
-- [ ] Return 429 status with retry-after header
-- [ ] Log rate limit events for monitoring
-
-### 5. Monitoring & Alerts
-
-> Without this: problems happen silently, you find out when users complain
-
-- [ ] Set up uptime monitoring (ping `/health` every 60s)
-- [ ] Alert on: service down, high error rate, wallet balance low
-- [ ] Daily revenue summary (automated email or Discord message)
-- [ ] Log rotation (don't fill disk with logs)
-- [ ] Disk space monitoring (alert at 80% usage)
-
----
-
-## Nice-to-Have Before Go-Live
-
-- [ ] Request logging with structured JSON (for debugging)
-- [ ] Revenue dashboard page in Next.js app
-- [ ] Webhook notifications for large payments (>$1)
-- [ ] Graceful shutdown (finish in-flight requests before stopping)
-- [ ] Backup strategy for Postgres (daily pg_dump)
-- [ ] API documentation / endpoint catalog page
-- [ ] Terms of service for API consumers
+### 6. Request Validation
+- [ ] Input validation on all POST bodies
+- [ ] API key auth option for premium integrators
+- [ ] Abuse pattern blocking
 
 ---
 
 ## Go-Live Sequence
 
 ```
-Step 1: Mac Studio remote access     ← REMOTE-ACCESS.md
-Step 2: Migrate services to Studio   ← MIGRATION.md
-Step 3: Database setup (Postgres)    ← this checklist
-Step 4: LaunchDaemons (auto-restart) ← this checklist
-Step 5: HTTPS (Tailscale Funnel)     ← this checklist
-Step 6: Rate limiting                ← this checklist
-Step 7: Monitoring                   ← this checklist
-Step 8: Smoke test all endpoints     ← manual verification
-Step 9: Enable Tier 1 pricing        ← revenue/REVENUE.md
-Step 10: Announce & go live          🚀
+Phase 1 (DONE):
+  ✅ Mac Studio remote access (Tailscale)
+  ✅ Migrate services to Studio
+  ✅ Database persistence (Supabase)
+  ✅ Watchdog + power management
+  ✅ x402 payment flow verified
+  ✅ Tooling (pnpm, just, Ollama hot-keep)
+
+Phase 2 (NEXT):
+  ⬜ HTTPS (tailscale serve or Caddy)
+  ⬜ Rate limiting
+  ⬜ Full LaunchDaemon plists
+  ⬜ Automated alerts
+  ⬜ Smoke test all endpoints
+  ⬜ Fund agent wallet (ETH for on-chain anchoring)
+  ⬜ Announce & go live 🚀
 ```
 
 ---
 
-## Quick Validation Before Each Step
-
-After completing each must-have, run this sanity check:
+## Quick Validation
 
 ```bash
-# From MacBook Air in NC
-ssh studio << 'EOF'
-  echo "=== Services ==="
-  curl -s localhost:3001/health | jq .
-  curl -s localhost:3000 | head -1
-  openclaw health
+# From Mac Studio (or SSH from MacBook Air)
+cd ~/Documents/xmetav1/XmetaV
 
-  echo "=== Database ==="
-  psql -d xmetav -c "SELECT count(*) FROM x402_payments;"
+just status       # All services UP?
+just revenue      # Payments flowing?
+just health       # Full system health
 
-  echo "=== SSL ==="
-  curl -s https://$(tailscale status --json | jq -r '.Self.DNSName'):3001/health
-
-  echo "=== Rate Limits ==="
-  for i in {1..5}; do curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/health; done
-
-  echo "=== Disk ==="
-  df -h / | tail -1
-EOF
+# Manual checks
+curl -s http://localhost:4021/health | head -5    # x402 server
+curl -s http://localhost:3001/health              # Bridge
+curl -s http://localhost:3000 | head -1           # Dashboard
+ollama list                                        # Models loaded
+tailscale status                                   # VPN connected
 ```
 
 ---
 
 ## Related Docs
 
-- [REMOTE-ACCESS.md](REMOTE-ACCESS.md) — Priority 1: get remote access working
-- [MIGRATION.md](MIGRATION.md) — Full service migration plan
+- [REMOTE-ACCESS.md](REMOTE-ACCESS.md) — Tailscale SSH + Screen Sharing setup
+- [TAILSCALE-SETUP.md](TAILSCALE-SETUP.md) — Air-to-Studio Tailscale guide
+- [MIGRATION.md](MIGRATION.md) — Full migration plan (✅ complete)
 - [../revenue/REVENUE.md](../revenue/REVENUE.md) — Revenue tiers and pricing
+- [../docs/STATUS.md](../docs/STATUS.md) — Full system status
+- [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) — System architecture
