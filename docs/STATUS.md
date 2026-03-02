@@ -14,7 +14,7 @@ This file captures the **known-good** runtime settings for the Mac Studio produc
 
 ```bash
 # One-command status check (requires just)
-cd ~/Documents/xmetav1/XmetaV && just status
+cd ~/xmetav1/XmetaV && just status
 
 # Full health check (services + power + disk + memory)
 just health
@@ -55,21 +55,24 @@ openclaw --version
 | **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
-| **OpenClaw** | 2026.2.17 | npm global |
+| **OpenClaw** | 2026.3.1 | npm global |
 
 ## Active Services
 
-| Service | Port | Status | Start Command |
-|---------|------|--------|---------------|
-| **Dashboard** (Next.js) | 3000 | Active | `just dashboard` |
-| **Bridge Daemon** | 3001 | Active | `just bridge` |
-| **x402 Server** | 4021 | Active | `just x402` |
-| **OpenClaw Gateway** | 18789 | Active | `just gateway` |
-| **Ollama** | 11434 | Active | macOS app (auto-start) |
+| Service | Port | Status | Start Command | Auto-Restart |
+|---------|------|--------|---------------|-------------|
+| **Dashboard** (Next.js) | 3000 | Active | `just dashboard` | ✅ LaunchAgent (KeepAlive) |
+| **Bridge Daemon** | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
+| **x402 Server** | 4021 | Active | `just x402` | ✅ LaunchAgent (KeepAlive) |
+| **OpenClaw Gateway** | 18789 | Active | `just gateway` | ✅ launchd (native) |
+| **Ollama** | 11434 | Active | macOS app (auto-start) | ✅ launchd (native) |
+
+All services auto-restart on crash and survive reboots via LaunchAgent plists.
 
 Start all: `just all`  
 Stop all: `just killall`  
-Status: `just status`
+Status: `just status`  
+Restart one: `launchctl kickstart -k gui/$(id -u)/com.xmetav.<service>`
 
 ## Ollama Configuration
 
@@ -96,7 +99,7 @@ Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across
 - Workspace(s): per-agent (`openclaw agents list`)
 - Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local`)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
-- Repo: `/Users/akualabs/Documents/xmetav1/XmetaV` (branch: `dev`)
+- Repo: `/Users/akualabs/xmetav1/XmetaV` (branch: `dev`) — symlinked at `~/Documents/xmetav1`
 - Git remote: `github.com/Metavibez4L/XmetaV.git`
 
 ## Remote Access (Tailscale + SSH + Screen Sharing)
@@ -128,6 +131,38 @@ ssh akualabs@100.93.86.17
 | powernap | 1 (enabled) |
 
 Configured via `sudo pmset` — Mac Studio runs headless 24/7.
+
+## LaunchAgent Auto-Restart
+
+All three core services run as LaunchAgents with `KeepAlive: true` and `RunAtLoad: true`. They auto-restart on crash and start on boot.
+
+| Plist | Service | Wrapper Script | Logs |
+|-------|---------|---------------|------|
+| `com.xmetav.dashboard.plist` | Dashboard :3000 | `/usr/local/bin/xmetav/launchd-dashboard.sh` | `/tmp/xmetav-dashboard.{log,err}` |
+| `com.xmetav.bridge.plist` | Bridge :3001 | `/usr/local/bin/xmetav/launchd-bridge.sh` | `/tmp/xmetav-bridge.{log,err}` |
+| `com.xmetav.x402.plist` | x402 :4021 | `/usr/local/bin/xmetav/launchd-x402.sh` | `/tmp/xmetav-x402.{log,err}` |
+
+**Key details:**
+- Repo lives at `~/xmetav1/` (not `~/Documents/`) to bypass macOS Sequoia TCC restrictions on launchd
+- Wrapper scripts use absolute paths with `cd /tmp` as cwd (dashboard uses project cwd for Turbopack)
+- Bridge and x402 use `DOTENV_CONFIG_PATH` to load `.env` from correct location
+- All use `tsx watch` for auto-reload on code changes (dashboard uses Next.js HMR)
+- Dashboard's "Start/Stop Bridge" button uses `launchctl` (not `spawn`) to avoid duplicate processes
+
+```bash
+# Restart a service
+launchctl kickstart -k gui/$(id -u)/com.xmetav.bridge
+
+# Check logs
+tail -f /tmp/xmetav-bridge.log
+tail -f /tmp/xmetav-bridge.err
+
+# Reload after plist changes
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.xmetav.bridge.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.xmetav.bridge.plist
+```
+
+Source plists and scripts are versioned in `scripts/launchd/` and `scripts/launchd-*.sh`.
 
 ## Watchdog
 

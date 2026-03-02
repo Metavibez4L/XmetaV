@@ -21,9 +21,14 @@ Before planning, here's what's **already done** vs what's **not**:
 | RLS on soul/swaps tables (4 tables, 5 policies) | ✅ Done | `setup-db-soul.sql`, `setup-db-swaps-log.sql` |
 | Power management (never sleep, auto-restart) | ✅ Done | `pmset` configured |
 | `justfile` (18 commands) | ✅ Done | `just status`, `just all`, etc. |
-| PM2 / LaunchDaemon auto-restart | ❌ Not done | Services require manual start |
+| LaunchAgent auto-restart (all 3 services) | ✅ Done | `com.xmetav.{dashboard,bridge,x402}.plist` — KeepAlive + RunAtLoad |
 | RLS on x402_payments, agent_memory, agent_commands | ❌ Not done | Critical tables unprotected |
 | SSE/WebSocket streaming | ❌ Not done | Still using Supabase polling |
+| Middleware `getSession()` optimization | ✅ Done | Replaced `getUser()` — saves ~130ms per request |
+| `useBridgeControl` visibility-aware polling | ✅ Done | 5s→15s interval, pauses on hidden tabs |
+| CSS animation GPU optimization | ✅ Done | `will-change`, hover-only spin, `prefers-reduced-motion` |
+| `optimizePackageImports` expanded | ✅ Done | Added `@supabase/supabase-js`, `viem` |
+| Bridge manager → launchctl | ✅ Done | Dashboard buttons use `launchctl` instead of `spawn` |
 | Structured logging (Pino) | ❌ Not done | Console.log scattered |
 | Secrets consolidation | ❌ Not done | Multiple .env files |
 | Redis/caching layer | ❌ Not done | No in-memory cache beyond TTL |
@@ -36,7 +41,7 @@ Before planning, here's what's **already done** vs what's **not**:
 
 | # | Optimization | Impact | Effort | Priority | ETA |
 |---|-------------|--------|--------|----------|-----|
-| 1 | LaunchDaemon auto-restart (all services) | High | Low | **P0** | 1 hr |
+| 1 | ~~LaunchDaemon auto-restart (all services)~~ | High | Low | **P0 ✅** | Done |
 | 2 | RLS on critical tables | High | Low | **P0** | 30 min |
 | 3 | Structured logging (Pino) | Medium | Low | **P1** | 2 hr |
 | 4 | Secrets consolidation (.env → single source) | Medium | Low | **P1** | 1 hr |
@@ -53,33 +58,28 @@ Before planning, here's what's **already done** vs what's **not**:
 
 ## P0 — Do Now
 
-### 1. LaunchDaemon Auto-Restart (All Services)
+### 1. ✅ LaunchAgent Auto-Restart (All Services) — COMPLETE
 
-**Problem:** Bridge, dashboard, and x402 require manual restart after crash or reboot.
-**Current:** Watchdog only monitors infrastructure (Tailscale/SSH/VNC), not app services.
+**Implemented:** 2026-03-02
 
-**Plan:**
-```
-Create LaunchAgent plists with KeepAlive for:
-  - com.xmetav.dashboard.plist  → npm run dev (port 3000)
-  - com.xmetav.bridge.plist     → npm run dev (port 3001)
-  - com.xmetav.x402.plist       → npx tsx index.ts (port 4021)
+All three services run as LaunchAgents with `KeepAlive: true` + `RunAtLoad: true`:
+- `com.xmetav.dashboard.plist` → Next.js dev (:3000)
+- `com.xmetav.bridge.plist` → tsx watch (:3001)
+- `com.xmetav.x402.plist` → tsx watch (:4021)
 
-Location: ~/Library/LaunchAgents/
-KeepAlive: true
-RunAtLoad: true
-WorkingDirectory: <service dir>
-StandardOutPath: /tmp/xmetav-<service>.log
-StandardErrorPath: /tmp/xmetav-<service>.err
-```
+**Key decisions:**
+- Repo moved to `~/xmetav1/` (symlink at `~/Documents/xmetav1`) — macOS Sequoia TCC blocks launchd from `~/Documents`
+- Wrapper scripts in `/usr/local/bin/xmetav/` use absolute paths
+- Bridge and x402 use `DOTENV_CONFIG_PATH` since cwd is `/tmp`
+- Dashboard `bridge-manager.ts` refactored to use `launchctl` instead of `spawn`
+- All services use `tsx watch` for auto-reload on code changes
 
-**Validation:**
-```bash
-# Kill a service, verify it comes back within 10s
-kill $(lsof -ti:3001)
-sleep 10
-curl -s localhost:3001/health  # should work
-```
+**Also completed (performance):**
+- Middleware: `getSession()` replaces `getUser()` — ~130ms saved per request
+- `useBridgeControl`: poll interval 5s→15s + visibility-aware pause
+- `optimizePackageImports`: added `@supabase/supabase-js`, `viem`
+- CSS: `will-change` on animations, hover-only spin, `prefers-reduced-motion`
+- Sidebar + useIntentSession: `useMemo` for `createClient()`
 
 ---
 

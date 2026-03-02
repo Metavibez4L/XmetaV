@@ -102,6 +102,7 @@ flowchart TB
 
         subgraph INFRA["Infrastructure"]
             direction LR
+            LAUNCHD["LaunchAgent\nAuto-Restart\n(KeepAlive)"]
             WATCHDOG["Watchdog\n(launchd)"]
             TAILSCALE["Tailscale\n100.93.86.17"]
             SSH["SSH :22"]
@@ -137,6 +138,9 @@ flowchart TB
     MAIN_AGENT --> FLEET
     FLEET --> PROVIDERS
     FACTORY -->|--github| GITHUB
+    LAUNCHD -->|KeepAlive| DASH
+    LAUNCHD -->|KeepAlive| BRIDGE
+    LAUNCHD -->|KeepAlive| X402_SRV
     BRIDGE -->|auto-pay 402| X402
     BRIDGE -->|pin memories| PINATA
     BRIDGE -->|anchor hashes| ANCHOR
@@ -210,9 +214,10 @@ A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
-- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, sets session offline, removes PID file
+- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, sets session offline
 - **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next
 - **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
+- **Dashboard Integration**: `bridge-manager.ts` uses `launchctl` to start/stop/status the bridge service (no more spawned child processes)
 - **Location**: `dashboard/bridge/`
 
 ### x402 Payment Service (Express)
@@ -230,6 +235,22 @@ A standalone Express server that gates XmetaV API endpoints with USDC micro-paym
 - **Settlement**: USDC on Base Mainnet
 - **Facilitator**: `@coinbase/x402` CDP facilitator with `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` JWT auth
 - **Location**: `dashboard/x402-server/`
+
+### Service Management (LaunchAgent)
+
+All three core services are managed by macOS `launchd` via LaunchAgent plists with `KeepAlive: true` and `RunAtLoad: true`.
+
+| Service | Plist Label | Wrapper Script |
+|---------|-------------|---------------|
+| Dashboard :3000 | `com.xmetav.dashboard` | `/usr/local/bin/xmetav/launchd-dashboard.sh` |
+| Bridge :3001 | `com.xmetav.bridge` | `/usr/local/bin/xmetav/launchd-bridge.sh` |
+| x402 :4021 | `com.xmetav.x402` | `/usr/local/bin/xmetav/launchd-x402.sh` |
+
+- **Auto-restart**: Services restart automatically on crash (ThrottleInterval: 10s)
+- **Boot persistence**: All services start on login via `RunAtLoad`
+- **Repo path**: `~/xmetav1/XmetaV` — moved from `~/Documents/` to bypass macOS Sequoia TCC restrictions on launchd
+- **tsx watch**: Bridge and x402 use `tsx watch` for auto-reload on file changes
+- **Source**: Plist copies in `scripts/launchd/`, wrapper scripts in `scripts/launchd-*.sh`
 
 ### ERC-8004 Agent Identity
 
