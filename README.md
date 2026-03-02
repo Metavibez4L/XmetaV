@@ -1,8 +1,8 @@
 # XmetaV -- OpenClaw Command Center
 
-> **Your central hub for managing OpenClaw agents, gateways, and infrastructure on WSL2/Linux**
+> **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
+Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
 
 ```
  ___   ___                    __           ___   ___
@@ -23,7 +23,7 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
  |   dashboard: Next.js + Supabase (cyberpunk)   |
  |   models:  kimi-k2.5:cloud (256k, all agents) |
  |   gateway: ws://127.0.0.1:18789              |
- |   engine:  Ollama + CUDA  |  RTX 4070        |
+ |   engine:  Ollama  |  M3 Ultra (60 GPU cores) |
  |_______________________________________________|
 ```
 
@@ -60,7 +60,7 @@ Last updated: **2026-02-15** | OpenClaw 2026.2.14 | XmetaV Command Center v23
 - GitHub integration for automated repo creation and pushing
 - Full tool calling (exec, read, write, process, browser, web, cron, gateway, sessions)
 - OpenClaw-managed browser automation
-- Ollama integration with GPU acceleration (RTX 4070 + CUDA)
+- Ollama integration with Apple Silicon GPU acceleration (M3 Ultra, 60 GPU cores)
 
 ---
 
@@ -121,7 +121,7 @@ XmetaV/
 |   +-- swarm.sh              # Swarm — multi-agent orchestration (CLI)
 |
 |-- configs/                  # Configuration files & templates
-|   +-- openclaw.json.fixed   # Known-good config for WSL2 + Ollama
+|   +-- openclaw.json.fixed   # Known-good config for macOS + Ollama
 |
 |-- templates/                # Agent identity & swarm templates
 |   |-- agents/               # Per-template identity files
@@ -177,13 +177,14 @@ XmetaV/
 
 | Requirement | Version | Check Command |
 |-------------|---------|---------------|
-| OpenClaw CLI | 2026.2.14+ | `openclaw --version` |
-| Node.js | 22.x | `node --version` |
-| Ollama | Latest (native install) | `ollama --version` |
-| NVIDIA GPU | CUDA support | `nvidia-smi` |
-| WSL2 (if Windows) | 2.0+ | `wsl --version` |
+| OpenClaw CLI | 2026.2.17+ | `openclaw --version` |
+| Node.js | 25.x | `node --version` |
+| Ollama | 0.17.4+ (macOS app) | `ollama --version` |
+| just | 1.46+ | `just --version` |
+| pnpm | 10.x | `pnpm --version` |
+| macOS | 26.x (Apple Silicon) | `sw_vers` |
 
-> **Important**: Use the **native Ollama installer** (`curl -fsSL https://ollama.com/install.sh | sh`), NOT the snap version. Snap Ollama lacks proper CUDA/GPU support and will run on CPU only.
+> **Platform**: Mac Studio M3 Ultra (96GB, 28 CPU cores, 60 GPU cores). Ollama runs as a macOS app with Apple Silicon GPU acceleration — no CUDA needed.
 
 ### 1. Clone & Setup
 
@@ -919,7 +920,7 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 - **Agent Identity System** — Created `IDENTITY.md` + `SOUL.md` for all sub-agents (web3dev, oracle, briefing, alchemist, sentinel). Agents now have full self-awareness: who they are, what commands they have, their team, operating principles, and communication style
 - **Main Agent Memory** — Persistent daily session (`dash_main_YYYYMMDD`) gives main conversation context across commands within a day. Falls back to unique session ID when lock is held (concurrent commands don't deadlock)
 - **Noise Filter v3** — Added `[diagnostic]`, `[heartbeat]`, `[bridge]`, `[swarm]`, `[intent-tracker]`, `[voice/...]`, and session-lock errors to output filter. Agent responses now show only actual content
-- **Voice STT Overhaul** — Chrome's built-in Web Speech API (`SpeechRecognition`) as default STT, bypassing WSL2 audio degradation. Whisper-1 fallback with `language: "en"`. Removed prompt/temperature that caused hallucination loops
+- **Voice STT Overhaul** — Chrome's built-in Web Speech API (`SpeechRecognition`) as default STT. Whisper-1 fallback with `language: "en"`. Removed prompt/temperature that caused hallucination loops
 - **Operator Cleanup** — Removed `operator` from agent tables, spawn list, and ERC-8004 registration (operator is the human user, not an agent)
 - **Web3 Lab** — Dedicated cubicle for web3dev with orange floor tint and glass partitions (cols 7-9, rows 2-5)
 - **Fleet Count** — 10 autonomous agents (main, sentinel, briefing, oracle, alchemist, web3dev, akua, akua_web, basedintern, basedintern_web) + dynamic
@@ -1086,7 +1087,7 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ### 2026-02-03
 - Initial setup with OpenClaw 2026.2.1
-- Added `openclaw-fix.sh` -- complete WSL2 fix script
+- Added `openclaw-fix.sh` -- complete fix script
 - Configured Ollama with `qwen2.5:7b-instruct`
 - Created documentation structure
 
@@ -1109,5 +1110,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for WSL2 | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
+  <sub>Built for Mac Studio M3 Ultra | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
 </p>
