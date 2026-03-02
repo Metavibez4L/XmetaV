@@ -6,27 +6,30 @@ import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
 import { refreshSitrep } from "./heartbeat.js";
+import { TTLCache } from "../lib/ttl-cache.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
 export const running = new Map<string, ChildProcess>();
 
-async function isAgentEnabled(agentId: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from("agent_controls")
-      .select("enabled")
-      .eq("agent_id", agentId)
-      .single();
+/** Cache agent enabled status for 30s — avoids DB query on every command */
+const agentEnabledCache = new TTLCache<boolean>(30_000);
 
-    // If table doesn't exist or row doesn't exist, default to enabled.
-    if (error) {
+async function isAgentEnabled(agentId: string): Promise<boolean> {
+  return agentEnabledCache.getOrFetch(`enabled:${agentId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from("agent_controls")
+        .select("enabled")
+        .eq("agent_id", agentId)
+        .single();
+
+      if (error) return true;
+      return data?.enabled !== false;
+    } catch {
       return true;
     }
-    return data?.enabled !== false;
-  } catch {
-    return true;
-  }
+  });
 }
 
 export async function executeCommand(command: {
@@ -36,12 +39,17 @@ export async function executeCommand(command: {
 }) {
   const { id, agent_id, message } = command;
 
-  // Check if this agent already has a running command
-  if (running.has(agent_id)) {
-    console.log(`[executor] Agent "${agent_id}" is busy, queueing command ${id}`);
-    // Leave as pending -- will be picked up when current finishes
+  // CONCURRENCY: Allow up to 4 concurrent commands per agent (96GB RAM)
+  const MAX_CONCURRENT = 4;
+  const currentRuns = [...running.entries()].filter(([_, child]) => child.exitCode === null).length;
+  const agentRuns = [...running.entries()].filter(([aid, child]) => aid === agent_id && child.exitCode === null).length;
+  
+  if (agentRuns >= MAX_CONCURRENT) {
+    console.log(`[executor] Agent "${agent_id}" has ${agentRuns} running commands (max ${MAX_CONCURRENT}), queueing command ${id}`);
     return;
   }
+  
+  console.log(`[executor] Concurrent: ${currentRuns} total, ${agentRuns} for ${agent_id} (max ${MAX_CONCURRENT})`);
 
   // Check if agent is enabled
   const enabled = await isAgentEnabled(agent_id);
@@ -247,12 +255,13 @@ export async function executeCommand(command: {
   let rawOutput = "";
 
   // Token batching: collect small rapid-fire tokens before flushing to reduce
-  // DB write pressure. Flushes after 6 tokens or 15ms — whichever comes first.
+  // DB write pressure. Flushes after 3 tokens or 8ms — whichever comes first.
+  // Optimized for 96GB RAM Mac Studio (low latency priority)
   let tokenBatch = "";
   let tokenCount = 0;
   let batchTimer: ReturnType<typeof setTimeout> | null = null;
-  const BATCH_TOKENS = 6;
-  const BATCH_MS = 15;
+  const BATCH_TOKENS = 3;
+  const BATCH_MS = 8;
 
   function flushTokenBatch() {
     if (batchTimer) { clearTimeout(batchTimer); batchTimer = null; }

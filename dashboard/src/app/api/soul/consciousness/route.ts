@@ -59,26 +59,48 @@ export async function GET(request: NextRequest) {
 
     /* ── Synthesis Stats ─────────────────────── */
     case "synthesis_stats": {
-      const { data, error } = await admin
-        .from("insight_shards")
-        .select("pattern_type, shard_class, created_at");
+      // Use SQL aggregation instead of fetching all rows
+      const [totalRes, recent24hRes] = await Promise.all([
+        admin.rpc("exec_sql", { query: "SELECT pattern_type, shard_class, count(*)::int as cnt FROM insight_shards GROUP BY pattern_type, shard_class" }).catch(() => null),
+        admin.from("insight_shards").select("id", { count: "exact", head: true })
+          .gte("created_at", new Date(Date.now() - 86400000).toISOString()),
+      ]);
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      // Fallback: if RPC not available, do bounded select
+      if (!totalRes?.data) {
+        const { data } = await admin.from("insight_shards")
+          .select("pattern_type, shard_class, created_at")
+          .order("created_at", { ascending: false })
+          .limit(1000);
 
-      const rows = data ?? [];
+        const rows = data ?? [];
+        const byPattern: Record<string, number> = {};
+        const byClass: Record<string, number> = {};
+        let recent24h = 0;
+        const now = Date.now();
+
+        for (const shard of rows) {
+          byPattern[shard.pattern_type] = (byPattern[shard.pattern_type] || 0) + 1;
+          byClass[shard.shard_class] = (byClass[shard.shard_class] || 0) + 1;
+          if (now - new Date(shard.created_at).getTime() < 86400000) recent24h++;
+        }
+
+        return NextResponse.json({
+          stats: { totalShards: rows.length, byPattern, byClass, recentAwakenings: recent24h },
+        });
+      }
+
       const byPattern: Record<string, number> = {};
       const byClass: Record<string, number> = {};
-      let recent24h = 0;
-      const now = Date.now();
-
-      for (const shard of rows) {
-        byPattern[shard.pattern_type] = (byPattern[shard.pattern_type] || 0) + 1;
-        byClass[shard.shard_class] = (byClass[shard.shard_class] || 0) + 1;
-        if (now - new Date(shard.created_at).getTime() < 24 * 60 * 60 * 1000) recent24h++;
+      let totalShards = 0;
+      for (const row of (totalRes.data as Array<{pattern_type: string; shard_class: string; cnt: number}>)) {
+        byPattern[row.pattern_type] = (byPattern[row.pattern_type] || 0) + row.cnt;
+        byClass[row.shard_class] = (byClass[row.shard_class] || 0) + row.cnt;
+        totalShards += row.cnt;
       }
 
       return NextResponse.json({
-        stats: { totalShards: rows.length, byPattern, byClass, recentAwakenings: recent24h },
+        stats: { totalShards, byPattern, byClass, recentAwakenings: recent24hRes?.count ?? 0 },
       });
     }
 
@@ -101,7 +123,9 @@ export async function GET(request: NextRequest) {
     case "prediction_stats": {
       const { data, error } = await admin
         .from("predictive_contexts")
-        .select("trigger_type, was_useful, used_at");
+        .select("trigger_type, was_useful, used_at")
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -153,11 +177,13 @@ export async function GET(request: NextRequest) {
     case "reforge_stats": {
       const { data: decayData } = await admin
         .from("memory_decay")
-        .select("decay_score, is_archived");
+        .select("decay_score, is_archived")
+        .limit(5000);
 
       const { data: reforged } = await admin
         .from("reforged_crystals")
-        .select("source_count");
+        .select("source_count")
+        .limit(1000);
 
       const entries = decayData ?? [];
       const archived = entries.filter((d) => d.is_archived).length;

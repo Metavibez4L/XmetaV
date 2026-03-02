@@ -1,5 +1,8 @@
 # Agents — Operating Guide
 
+> **Platform:** Mac Studio M3 Ultra · macOS 26.3 · Ollama 0.17.4 · OpenClaw 2026.2.17
+> **Quick start:** `just all` (start services) · `just status` (health) · `just killall` (stop)
+
 This doc covers how to manage OpenClaw agents on this system.
 
 For per-agent runbooks, see `docs/agents/`:
@@ -18,15 +21,15 @@ For per-agent runbooks, see `docs/agents/`:
 - Browser automation (CLI): `openclaw browser open https://example.com`
 - **Create agent**: `./scripts/create-agent.sh --id myagent --template coding --web`
 - **Create agent + GitHub**: `./scripts/create-agent.sh --id myagent --template coding --github --private --web`
-- **Build app**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent`
-- **Build app + GitHub**: `./scripts/build-app.sh --type node --workspace /home/manifest/myagent --github`
+- **Build app**: `./scripts/build-app.sh --type node --workspace ~/.openclaw/agents/myagent`
+- **Build app + GitHub**: `./scripts/build-app.sh --type node --workspace ~/.openclaw/agents/myagent --github`
 - **Fleet status**: `./scripts/manage-agents.sh status`
 - **Swarm parallel**: `./scripts/swarm.sh --parallel basedintern "task1" akua "task2"`
 - **Swarm pipeline**: `./scripts/swarm.sh --pipeline agent1 "step1" agent2 "step2"`
 - **Swarm collab**: `./scripts/swarm.sh --collab "review task" basedintern akua`
 - **Swarm status**: `./scripts/swarm.sh --status`
-- **Dashboard**: `cd dashboard && npm run dev` → http://localhost:3000
-- **Bridge daemon**: `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot)
+- **Dashboard**: `just dash` or `cd dashboard && npm run dev` → http://localhost:3000
+- **Bridge daemon**: `just bridge` or `cd dashboard/bridge && npm run dev` (local watch)
 - **Dashboard swarms**: http://localhost:3000/swarms (create, monitor, cancel)
 - **Dashboard fleet**: http://localhost:3000/fleet (enable/disable agents)
 - **x402 payments**: See `capabilities/x402-payments.md`
@@ -236,10 +239,10 @@ The repo agents are configured in `~/.openclaw/openclaw.json`:
 
 | Agent | Tools | Workspace | Purpose |
 |-------|-------|-----------|---------|
-| `basedintern` | `coding` (exec, read, write, process) | `/home/manifest/basedintern` | 90% of work |
-| `basedintern_web` | `full` (all tools + browser + web) | `/home/manifest/basedintern` | Web automation only |
-| `akua` | `coding` (exec, read, write, process) | `/home/manifest/akua` | 90% of work |
-| `akua_web` | `full` (all tools + browser + web) | `/home/manifest/akua` | Web automation only |
+| `basedintern` | `coding` (exec, read, write, process) | `~/.openclaw/agents/basedintern` | 90% of work |
+| `basedintern_web` | `full` (all tools + browser + web) | `~/.openclaw/agents/basedintern` | Web automation only |
+| `akua` | `coding` (exec, read, write, process) | `~/.openclaw/agents/akua` | 90% of work |
+| `akua_web` | `full` (all tools + browser + web) | `~/.openclaw/agents/akua` | Web automation only |
 
 All repo agents use model `ollama/kimi-k2.5:cloud` (256k context, maxTokens 8192).
 
@@ -267,10 +270,10 @@ For full details, see `docs/agents/dynamic.md`.
   --description "Web research and data gathering"
 
 # Scaffold a Node.js app in its workspace
-./scripts/build-app.sh --type node --workspace /home/manifest/researcher
+./scripts/build-app.sh --type node --workspace ~/.openclaw/agents/researcher
 
 # Scaffold + push to GitHub
-./scripts/build-app.sh --type node --workspace /home/manifest/researcher --github
+./scripts/build-app.sh --type node --workspace ~/.openclaw/agents/researcher --github
 
 # Check the fleet
 ./scripts/manage-agents.sh list

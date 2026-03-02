@@ -1,41 +1,92 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-02-15  
-**System:** metavibez4L (WSL2)  
-**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)
+**Last verified:** 2026-03-02  
+**System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
+**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)  
+**Platform:** macOS 26.3 (Sequoia)  
+**Uptime:** Always-on headless server (NYC)  
+**Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
 
-This file captures the **known-good** runtime settings for this machine and the quickest commands to verify everything is healthy.
+This file captures the **known-good** runtime settings for the Mac Studio production server and the quickest commands to verify everything is healthy.
 
 ---
 
 ## Quick Health Check
 
 ```bash
-# One-command system fix and verification
-./scripts/openclaw-fix.sh
+# One-command status check (requires just)
+cd ~/Documents/xmetav1/XmetaV && just status
 
-# Check all components
-./scripts/health-check.sh
+# Full health check (services + power + disk + memory)
+just health
+
+# Check x402 revenue
+just revenue
 
 # Verify OpenClaw
 openclaw health
-openclaw --version  # Expected: 2026.2.14
+openclaw --version
 
-# Supabase tables sanity (service role / admin only)
-# - agent_memory is the persistent memory bus used by the bridge
-# - shared memory entries use agent_id = "_shared"
-#
-# Example SQL in Supabase editor:
-#   select agent_id, kind, created_at from agent_memory order by created_at desc limit 10;
-#   select count(*) from agent_memory;
+# Manual health check
+./scripts/health-check.sh
 ```
 
 ---
 
+## Hardware
+
+| Spec | Value |
+|------|-------|
+| **Model** | Mac Studio (Mac15,14) |
+| **Chip** | Apple M3 Ultra |
+| **CPU** | 28 cores (20P + 8E) |
+| **GPU** | 60 cores (Metal) |
+| **Memory** | 96 GB unified |
+| **Storage** | 1 TB SSD (926 GB capacity, ~2% used) |
+| **Serial** | M3PG6NJT7Y |
+| **OS** | macOS 26.3 (Build 25D125) |
+
 ## Versions
 
-- OpenClaw: `openclaw --version` (expected: 2026.2.14)
-- Node: `node --version` (expected: 22.x)
-- Ollama: `ollama --version` (native install recommended; snap often breaks CUDA)
+| Tool | Version | Install Method |
+|------|---------|---------------|
+| **Node** | 25.6.1 | Homebrew |
+| **npm** | 11.9.0 | Bundled with Node |
+| **pnpm** | 10.30.3 | Homebrew |
+| **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
+| **Git** | 2.53.0 | Homebrew |
+| **just** | 1.46.0 | Homebrew |
+| **OpenClaw** | 2026.2.17 | npm global |
+
+## Active Services
+
+| Service | Port | Status | Start Command |
+|---------|------|--------|---------------|
+| **Dashboard** (Next.js) | 3000 | Active | `just dashboard` |
+| **Bridge Daemon** | 3001 | Active | `just bridge` |
+| **x402 Server** | 4021 | Active | `just x402` |
+| **OpenClaw Gateway** | 18789 | Active | `just gateway` |
+| **Ollama** | 11434 | Active | macOS app (auto-start) |
+
+Start all: `just all`  
+Stop all: `just killall`  
+Status: `just status`
+
+## Ollama Configuration
+
+| Setting | Value |
+|---------|-------|
+| OLLAMA_KEEP_ALIVE | 24h (models stay hot) |
+| OLLAMA_MAX_LOADED_MODELS | 3 (concurrent models in memory) |
+| OLLAMA_NUM_PARALLEL | 4 (parallel request handling) |
+
+Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across reboots.
+
+### Loaded Models
+
+| Model | Size | Context | Purpose |
+|-------|------|---------|---------|
+| `kimi-k2.5:cloud` | Cloud | 262K (256k) | Primary agent model — all fleet agents |
+| `qwen2.5:7b-instruct` | 4.7 GB | 32K | Local fallback / lightweight tasks |
 
 ## Active profile and paths
 
@@ -43,27 +94,72 @@ openclaw --version  # Expected: 2026.2.14
 - State dir: `~/.openclaw/`
 - Config file: `~/.openclaw/openclaw.json`
 - Workspace(s): per-agent (`openclaw agents list`)
-- Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local` — agents use `--local` flag, gateway is fallback for channels)
+- Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local`)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
+- Repo: `/Users/akualabs/Documents/xmetav1/XmetaV` (branch: `dev`)
+- Git remote: `github.com/Metavibez4L/XmetaV.git`
+
+## Remote Access (Tailscale + SSH + Screen Sharing)
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Tailscale** | Active | System extension, App Store build v1.94.2 |
+| **Studio IP** | `100.93.86.17` | Tailscale mesh IP |
+| **Air IP** | `100.122.52.85` | MacBook Air mesh IP |
+| **SSH** | Active | Port 22, native macOS SSH over Tailscale |
+| **Screen Sharing** | Active | Port 5900, VNC over Tailscale |
+| **Account** | Metavibez4L@ | Tailscale account |
+| **Connection** | Direct | No relay, direct peer-to-peer |
+
+```bash
+# From MacBook Air:
+ssh akualabs@100.93.86.17
+# Screen Sharing: vnc://100.93.86.17
+```
+
+## Power Management (Always-On Server)
+
+| Setting | Value |
+|---------|-------|
+| sleep | 0 (never) |
+| displaysleep | 10 min |
+| disksleep | 0 (never) |
+| autorestart | 1 (auto-restart after power failure) |
+| powernap | 1 (enabled) |
+
+Configured via `sudo pmset` — Mac Studio runs headless 24/7.
+
+## Watchdog
+
+Automated health monitor checking every 5 minutes:
+
+- **Script:** `scripts/watchdog.sh`
+- **Plist:** `~/Library/LaunchAgents/com.xmetav.watchdog.plist`
+- **Log:** `/tmp/xmetav-watchdog.log`
+- **Monitors:** Tailscale, SSH (port 22), Screen Sharing (port 5900), sleep settings
+
+```bash
+just logs-watchdog
+```
 
 ## Configured agents (this machine)
 
-This command center is set up for **multiple isolated agents**, all powered by **Kimi K2.5** (256k context):
+This command center runs **multiple isolated agents**, all powered by **Kimi K2.5** (256k context):
 
 | Agent | Model | Workspace | Tools | Role |
 |-------|-------|-----------|-------|------|
 | `main` * | `kimi-k2.5:cloud` | `~/.openclaw/workspace` | **full** | **Orchestrator** — agent factory + swarm |
-| `sentinel` | `kimi-k2.5:cloud` | `/home/manifest/sentinel` | coding | **Fleet Ops** — lifecycle, spawn coordination, health |
+| `sentinel` | `kimi-k2.5:cloud` | `~/.openclaw/agents/sentinel` | coding | **Fleet Ops** — lifecycle, spawn coordination, health |
 | `soul` | `kimi-k2.5:cloud` | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dreams, associations |
-| `basedintern` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | coding | TypeScript/Node.js repo agent |
-| `basedintern_web` | `kimi-k2.5:cloud` | `/home/manifest/basedintern` | full | Same repo — browser/web only |
-| `akua` | `kimi-k2.5:cloud` | `/home/manifest/akua` | coding | Solidity/Hardhat repo agent |
-| `akua_web` | `kimi-k2.5:cloud` | `/home/manifest/akua` | full | Same repo — browser/web only |
-| `briefing` | `kimi-k2.5:cloud` | `/home/manifest/briefing` | coding | **Context Curator** — continuity, health, memory |
-| `oracle` | `kimi-k2.5:cloud` | `/home/manifest/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
-| `alchemist` | `kimi-k2.5:cloud` | `/home/manifest/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
-| `midas` | `kimi-k2.5:cloud` | `/home/manifest/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
-| `web3dev` | `kimi-k2.5:cloud` | `/home/manifest/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
+| `briefing` | `kimi-k2.5:cloud` | `~/.openclaw/agents/briefing` | coding | **Context Curator** — continuity, health, memory |
+| `oracle` | `kimi-k2.5:cloud` | `~/.openclaw/agents/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
+| `alchemist` | `kimi-k2.5:cloud` | `~/.openclaw/agents/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
+| `midas` | `kimi-k2.5:cloud` | `~/.openclaw/agents/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
+| `web3dev` | `kimi-k2.5:cloud` | `~/.openclaw/agents/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
+| `basedintern` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | coding | TypeScript/Node.js repo agent |
+| `basedintern_web` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | full | Same repo — browser/web only |
+| `akua` | `kimi-k2.5:cloud` | `~/.openclaw/agents/akua` | coding | Solidity/Hardhat repo agent |
+| `akua_web` | `kimi-k2.5:cloud` | `~/.openclaw/agents/akua` | full | Same repo — browser/web only |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(varies)_ | Created on-demand by Agent Factory |
 
 \* = default agent
@@ -315,11 +411,13 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 
 ### Dashboard status
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Dashboard (Next.js) | Active | `cd dashboard && npm run dev` (localhost:3000) |
-| Bridge Daemon | Active when running | `cd dashboard/bridge && npm run dev` (local watch) or `npm start` (one-shot) |
-| Supabase | Active | Project: `ptlneqcjsnrxxruutsxm` |
+| Component | Port | Status | Start |
+|-----------|------|--------|-------|
+| Dashboard (Next.js) | 3000 | Active | `just dashboard` |
+| Bridge Daemon | 3001 | Active | `just bridge` |
+| x402 Server | 4021 | Active | `just x402` |
+| OpenClaw Gateway | 18789 | Active | `just gateway` |
+| Supabase | Cloud | Active | Project: `ptlneqcjsnrxxruutsxm` |
 
 ### Supabase tables
 
@@ -673,6 +771,102 @@ ls ~/.openclaw/workspace/skills/
 
 ---
 
+## Layered Memory Architecture (Verified 2026-03-01)
+
+XmetaV implements a complete 6-layer memory architecture — all layers are live and operational on the Mac Studio.
+
+### Layer Summary
+
+| Layer | Status | Components | Tables |
+|-------|--------|-----------|--------|
+| **1. Ephemeral** | ✅ Live | In-process TTL caches, circuit breakers, pin queues, dream flags | 0 (in-memory) |
+| **2. Session / Midterm** | ✅ Live | Command lifecycle, intent sessions, 72h TTL auto-expiry | 4 |
+| **3. Long-Term Persistent** | ✅ Live | Soul agent (12 modules), memory crystals, associations, dreams | 16 |
+| **4. IPFS / Off-Chain** | ✅ Live | Pinata JSON pinning, batch queue (5min), circuit breaker | 0 (external) |
+| **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, auto-detect milestones | 2 (cache) |
+| **6. Cost Monitoring** | ✅ Live | 6-tier token system, x402 payment tracking, revenue analytics | 2 |
+
+**Total:** 24 Supabase tables/views, 30+ source files, 12 Soul modules
+
+### Layer 1 — Ephemeral (In-Process)
+
+| Component | File | Notes |
+|-----------|------|-------|
+| TTL cache | `bridge/lib/ttl-cache.ts` | Generic `TTLCache<T>` with per-key expiration |
+| Anchor read cache | `bridge/lib/memory-anchor.ts` | 5-minute TTL for RPC calls |
+| Circuit breaker | `bridge/lib/circuit-breaker.ts` | Failure counters for Pinata IPFS |
+| Command timeouts | `bridge/src/intent-tracker.ts` | In-memory `Map`/`Set` for active timeouts |
+| Pin queue | `bridge/lib/ipfs-pinata.ts` | Batched IPFS pins, flushed every 5 min |
+| Dream state | `bridge/lib/soul/dream.ts` | `lastDreamTime`, `isDreaming` flags |
+| Noise filter | `bridge/lib/agent-memory.ts` | `extractOutcomeSummary()` strips 27 noise patterns |
+
+### Layer 2 — Session / Midterm (Supabase + TTL)
+
+| Table | Purpose |
+|-------|---------|
+| `agent_sessions` | Per-agent online/idle/busy/offline with heartbeats |
+| `agent_commands` | Command lifecycle: pending → running → completed/failed |
+| `agent_responses` | Streamed output chunks linked to commands |
+| `intent_sessions` | Multi-command goal tracking with retry + timeout |
+
+Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_expired_memories()` DB function.
+
+### Layer 3 — Long-Term Persistent (Soul Agent + Crystals)
+
+**Soul Agent Modules (12):**
+
+| Module | File | Purpose |
+|--------|------|---------|
+| Context orchestrator | `soul/context.ts` | Keyword-scored + association-boosted retrieval |
+| Keyword retrieval | `soul/retrieval.ts` | Scores memories by keyword match × kind weight + recency |
+| Association builder | `soul/associations.ts` | Builds up to 5 associations per memory |
+| Dream mode | `soul/dream.ts` | Triggers after 6h idle, clusters memories, generates insights |
+| Lucid dream proposals | `soul/dream-proposals.ts` | 7 categories of autonomous evolution proposals |
+| Dream synthesis | `soul/synthesis.ts` | Fuses 3+ related anchors into insight shards |
+| Predictive loading | `soul/predictive.ts` | Analyzes 14 days of command history for temporal patterns |
+| Memory reforging | `soul/reforge.ts` | Decay scoring (72h half-life), compression into legendary crystals |
+
+**Memory Crystal System (Materia Engine):**
+- Crystals with XP, 30 levels, star ratings (1-6★), class evolution (anchor → godhand)
+- 5 FF7-style fusion recipes, keyword-triggered summoning, limit breaks
+- Full game engine: `bridge/lib/memory-crystal.ts` (811 lines)
+
+**Long-Term Tables (16):** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `shared_memory` (view)
+
+### Layer 4 — IPFS / Off-Chain
+
+| Component | File | Notes |
+|-----------|------|-------|
+| Pinata JSON pinning | `bridge/lib/ipfs-pinata.ts` | `pinJSON()` with circuit breaker (3 failures → cooldown) |
+| Batch pin queue | Same | Batches every 5 min, reduces API calls ~80% |
+| Gateway URL builder | Same | `https://gateway.pinata.cloud/ipfs/{cid}` |
+| IPFS URI resolution | `src/lib/erc8004-scout.ts` | Resolves `ipfs://` URIs through gateway |
+
+### Layer 5 — On-Chain Anchoring
+
+| Component | File | Notes |
+|-----------|------|-------|
+| Anchor client | `bridge/lib/memory-anchor.ts` | Pin → keccak256 → `AgentMemoryAnchor` contract on Base |
+| Auto-detect | `bridge/lib/agent-memory.ts` | `anchorIfSignificant()` — keyword matching for milestones/decisions/incidents |
+| ERC-8004 identity | `erc8004/register.ts` | Agent NFT #16905 on Base Mainnet |
+| Oracle scout | `src/lib/erc8004-scout.ts` | On-chain agent discovery + capability scoring |
+
+**Contract:** `AgentMemoryAnchor` on Base (chain 8453)  
+**Agent ID:** 16905  
+**Status:** ⚠️ Wallet `0x4Ba6...` needs ETH on Base for gas — code is proven, anchoring paused until funded.
+
+### Layer 6 — Cost Monitoring
+
+| Component | File | Notes |
+|-----------|------|-------|
+| Token tiers | `src/lib/token-tiers.ts` | 6 tiers: None (0%) → Diamond (75% discount) |
+| Payment tracking | `x402_payments` table | All payments logged with endpoint, amount, tx_hash |
+| Daily spend view | `x402_daily_spend` | Aggregated daily totals per agent |
+| Revenue analytics | `bridge/lib/midas-revenue.ts` | Revenue tracking + settlement status |
+| Dream pricing | `soul/dream-proposals.ts` | Soul proposes x402 pricing adjustments |
+
+---
+
 ## Soul Agent (v18 — Lucid Dreaming)
 
 Memory orchestrator providing context curation, association building, dream consolidation, lucid dreaming (autonomous evolution), and fleet-wide memory retrieval learning.
@@ -971,13 +1165,23 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | Supabase `x402_payments` table | Active | Payment logging with daily spend view |
 | Dashboard `/payments` page | Active | Wallet status, history, gated endpoints |
 
+### Revenue (Live)
+
+- **Total payments:** 21
+- **Total revenue:** $3.39 USDC
+- **Network:** Base Mainnet (eip155:8453)
+- **Pay-to wallet:** `0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B`
+
+Check live: `just revenue`
+
 ### Network Configuration
 
 | Setting | Value | Network |
 |---------|-------|---------|
 | `NETWORK` | `eip155:8453` | **Base Mainnet** ✅ |
-| `FACILITATOR_URL` | `https://api.cdp.coinbase.com/platform/v2/x402` | Production |
-| `EVM_ADDRESS` | `0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80` | Receives USDC |
+| `FACILITATOR` | `@coinbase/x402` CDP | Auto-auth via `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` |
+| `EVM_ADDRESS` | `0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B` | Receives USDC |
+| `PORT` | `4021` | x402 server port |
 
 ### Gated endpoints (x402-server)
 
@@ -993,6 +1197,12 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 | `POST /cosmos-explore` | $0.20 | Explore the Memory Cosmos world |
 | `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
 | `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
+| `POST /execute-trade` | $0.50+ | Swap tx bundle (0.5% of trade) |
+| `POST /rebalance-portfolio` | $2.00+ | Portfolio rebalance (0.3% of capital) |
+| `GET /arb-opportunity` | $0.25 | Arbitrage opportunity scan |
+| `POST /execute-arb` | $0.10+ | Execute arbitrage (1% of profit) |
+| `GET /yield-optimize` | $0.50 | Yield farming optimization scan |
+| `POST /deploy-yield-strategy` | $3.00+ | Deploy yield capital (0.5% of capital) |
 
 ### Free endpoints (x402-server)
 
@@ -1000,6 +1210,9 @@ XmetaV gates agent API endpoints with USDC micro-payments via the x402 protocol 
 |----------|-------------|
 | `GET /health` | Server status and endpoint listing |
 | `GET /token-info` | $XMETAV token contract address and tier table |
+| `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
+| `GET /digest` | Trigger payment digest & memory write |
+| `GET /trade-fees` | Trade fee schedule & revenue projections |
 
 ### Environment variables
 

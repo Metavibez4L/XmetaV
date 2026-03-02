@@ -80,10 +80,34 @@ export const MemoryGraph = React.memo(function MemoryGraph({
     const cx = cw / 2;
     const cy = ch / 2;
 
-    // Use the most recent 80 memories for performance
-    const recent = memories.slice(0, 80);
+    // Prioritize memories that have associations (entangle strings)
+    // so the graph always shows connected nodes, then fill with recent unlinked ones
+    const MAX_NODES = 80;
+    const memById = new Map(memories.map((m) => [m.id, m]));
 
-    recent.forEach((m, i) => {
+    // 1. Collect all memory IDs referenced by associations
+    const linkedIds = new Set<string>();
+    for (const a of associations) {
+      if (memById.has(a.memory_id)) linkedIds.add(a.memory_id);
+      if (memById.has(a.related_memory_id)) linkedIds.add(a.related_memory_id);
+    }
+
+    // 2. Add linked memories first (these get entangle strings)
+    const selected: typeof memories = [];
+    const usedIds = new Set<string>();
+    for (const id of linkedIds) {
+      if (selected.length >= MAX_NODES) break;
+      const m = memById.get(id);
+      if (m) { selected.push(m); usedIds.add(id); }
+    }
+
+    // 3. Fill remaining slots with the most recent unlinked memories
+    for (const m of memories) {
+      if (selected.length >= MAX_NODES) break;
+      if (!usedIds.has(m.id)) { selected.push(m); usedIds.add(m.id); }
+    }
+
+    selected.forEach((m) => {
       const offset = AGENT_CLUSTER_OFFSET[m.agent_id] ?? { x: 0, y: 0 };
       nodeMap.set(m.id, {
         id: m.id,

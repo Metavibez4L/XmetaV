@@ -402,4 +402,12 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     model: "ollama/kimi-k2.5:cloud",
     skills: ["revenue", "pricing", "growth", "forecast", "gas", "standards", "addresses", "concepts"],
   },
+  {
+    id: "sentinel",
+    name: "Sentinel (Security & Monitoring)",
+    workspace: "/home/manifest/sentinel",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["security", "monitoring", "alerts"],
+  },
 ];

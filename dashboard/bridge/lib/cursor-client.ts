@@ -1,7 +1,16 @@
 // Cursor Cloud Agents API client for the bridge daemon
 // Mirror of dashboard/src/lib/cursor-client.ts adapted for bridge ESM
+// Includes circuit breaker for resilience
+
+import { CircuitBreaker } from "./circuit-breaker.js";
 
 const BASE_URL = "https://api.cursor.com";
+
+// Circuit breaker: 3 failures → 30s cooldown
+const cursorBreaker = new CircuitBreaker("cursor-api", {
+  failThreshold: 3,
+  resetTimeout: 30_000,
+});
 
 export interface CursorAgentPrompt {
   text: string;
@@ -50,16 +59,18 @@ export class CursorClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers: this.headers(),
-      body: body ? JSON.stringify(body) : undefined,
+    return cursorBreaker.call(async () => {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers: this.headers(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Cursor API ${method} ${path} failed (${res.status}): ${text}`);
+      }
+      return res.json() as Promise<T>;
     });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Cursor API ${method} ${path} failed (${res.status}): ${text}`);
-    }
-    return res.json() as Promise<T>;
   }
 
   async launchAgent(options: LaunchAgentOptions): Promise<CursorAgentResponse> {

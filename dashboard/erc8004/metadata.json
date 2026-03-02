@@ -1,14 +1,14 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 10 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
     {
       "type": "x402",
       "url": "http://localhost:4021",
-      "description": "x402 payment-gated API — agent-task, intent, fleet-status, swarm endpoints (USDC on Base)"
+      "description": "x402 payment-gated API — agent orchestration, trade execution, yield optimization, arbitrage, swarm, voice, memory endpoints (USDC on Base)"
     },
     {
       "type": "dashboard",
@@ -90,7 +90,20 @@
     "revenue-analytics",
     "endpoint-pricing",
     "growth-optimization",
-    "revenue-forecasting"
+    "revenue-forecasting",
+    "trade-execution",
+    "portfolio-rebalancing",
+    "arbitrage-scanning",
+    "yield-optimization",
+    "chainlink-price-oracle",
+    "uniswap-v3-quoter",
+    "defillama-integration",
+    "defi-protocol-deposits",
+    "whale-alert-intelligence",
+    "liquidation-monitoring",
+    "cross-dex-arb-detection",
+    "governance-tracking",
+    "alpha-signal-feeds"
   ],
   "fleet": {
     "agents": [
@@ -140,7 +153,7 @@
   "x402Support": {
     "enabled": true,
     "network": "eip155:8453",
-    "payTo": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
+    "payTo": "0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B",
     "acceptedSchemes": ["exact"],
     "denomination": "USDC",
     "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402",
@@ -149,19 +162,33 @@
       "POST /intent": "$0.05",
       "GET /fleet-status": "$0.01",
       "POST /swarm": "$0.50",
+      "POST /memory-crystal": "$0.05",
+      "POST /neural-swarm": "$0.10",
+      "POST /fusion-chamber": "$0.15",
+      "POST /cosmos-explore": "$0.20",
       "POST /voice/transcribe": "$0.05",
       "POST /voice/synthesize": "$0.08",
-      "GET /midas/dashboard": "$0.02",
-      "GET /midas/report": "$0.05"
+      "POST /execute-trade": "$0.50 min (0.5% of trade)",
+      "POST /rebalance-portfolio": "$2.00 + 0.3% of portfolio",
+      "GET /arb-opportunity": "$0.25",
+      "POST /execute-arb": "$0.10 min (1% of profit)",
+      "GET /yield-optimize": "$0.50",
+      "POST /deploy-yield-strategy": "$3.00 + 0.5% of capital",
+      "GET /whale-alert": "$0.15",
+      "GET /liquidation-signal": "$0.25",
+      "GET /arb-detection": "$0.20",
+      "GET /governance-signal": "$0.10"
     },
     "tokenDiscounts": {
       "token": "$XMETAV",
       "address": "0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54",
       "tiers": {
-        "Bronze": { "minBalance": 1000, "discount": "10%" },
-        "Silver": { "minBalance": 10000, "discount": "20%" },
-        "Gold": { "minBalance": 100000, "discount": "35%" },
-        "Diamond": { "minBalance": 1000000, "discount": "50%" }
+        "None": { "minBalance": 0, "discount": "0%", "dailyLimit": 5 },
+        "Starter": { "minBalance": 100, "discount": "10%", "dailyLimit": 25 },
+        "Bronze": { "minBalance": 1000, "discount": "15%", "dailyLimit": 50 },
+        "Silver": { "minBalance": 10000, "discount": "25%", "dailyLimit": 200 },
+        "Gold": { "minBalance": 100000, "discount": "50%", "dailyLimit": 1000 },
+        "Diamond": { "minBalance": 1000000, "discount": "75%", "dailyLimit": 5000 }
       }
     }
   }

@@ -60,9 +60,9 @@ select
   agent_id,
   date_trunc('day', created_at) as day,
   count(*) as payment_count,
-  sum(amount::numeric) as total_amount,
+  sum(NULLIF(regexp_replace(amount, '[^0-9.]', '', 'g'), '')::numeric) as total_amount,
   currency
 from x402_payments
-where status = 'completed'
+where status in ('completed', 'settled')
 group by agent_id, date_trunc('day', created_at), currency
 order by day desc;

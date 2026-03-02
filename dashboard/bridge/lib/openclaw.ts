@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
 import { randomUUID } from "crypto";
-import { existsSync } from "fs";
+import { existsSync, realpathSync } from "fs";
 
 /** Allowed agent IDs to prevent arbitrary execution */
 const ALLOWED_AGENTS = new Set([
@@ -83,11 +83,18 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   // Run from the XmetaV project root so the agent has direct repo context
   const projectRoot = process.env.XMETAV_ROOT || resolve(process.env.HOME || "/home/manifest", "XmetaV");
 
-  const child = spawn(openclawPath, args, {
+  // Resolve the actual openclaw script for direct node invocation.
+  // On macOS, spawn() can fail with ENOENT on symlinked #!/usr/bin/env scripts,
+  // so we spawn node directly with the resolved script path instead.
+  const resolvedOpenclaw = existsSync(openclawPath)
+    ? realpathSync(openclawPath)
+    : openclawPath;
+
+  const child = spawn(nodePath, [resolvedOpenclaw, ...args], {
     cwd: projectRoot,
     env: {
       ...process.env,
-      PATH: `${resolve(nodePath, "..")}:${process.env.PATH}`,
+      PATH: `${resolve(nodePath, "..")}:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

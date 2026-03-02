@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
@@ -8,6 +9,38 @@ import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
+import {
+  recordPaymentEvent,
+  generatePaymentDigest,
+  writeSessionSummary,
+  startDigestScheduler,
+  stopDigestScheduler,
+} from "./payment-memory.js";
+import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
+import { createAlphaFeedsRouter, ALPHA_FEE_SCHEDULES } from "./alpha-feeds.js";
+
+// ── TTL Cache for expensive lookups ──────────────────────────
+interface CacheEntry<T> { value: T; expiresAt: number; }
+class SimpleCache<T> {
+  private store = new Map<string, CacheEntry<T>>();
+  constructor(private ttlMs: number) {}
+  async getOrFetch(key: string, fn: () => Promise<T>, ttl?: number): Promise<T> {
+    const e = this.store.get(key);
+    if (e && Date.now() < e.expiresAt) return e.value;
+    const v = await fn();
+    this.store.set(key, { value: v, expiresAt: Date.now() + (ttl ?? this.ttlMs) });
+    return v;
+  }
+  invalidate(key: string) { this.store.delete(key); }
+  clear() { this.store.clear(); }
+}
+
+// Cache: token tier lookups (60s TTL — balance rarely changes)
+const tierCache = new SimpleCache<{ name: string; minBalance: number; discount: number; dailyLimit: number; color: string }>(60_000);
+// Cache: ERC-8004 identity resolution (5min TTL — on-chain identity is stable)
+const identityCache = new SimpleCache<{ agentId: string; owner: string; wallet: string; tokenURI: string; x402Enabled?: boolean } | null>(300_000);
+// Cache: fleet-status (30s TTL — acceptable staleness)
+const fleetCache = new SimpleCache<unknown>(30_000);
 
 // ============================================================
 // XmetaV x402 Payment-Gated API
@@ -68,7 +101,7 @@ interface TokenTier {
 
 const TIERS: TokenTier[] = [
   { name: "None",      minBalance: 0,           discount: 0,    dailyLimit: 5,    color: "#4a6a8a" },
-  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#cd7f32" },
+  { name: "Starter",   minBalance: 100,         discount: 0.10, dailyLimit: 25,   color: "#a3e635" },
   { name: "Bronze",    minBalance: 1_000,       discount: 0.15, dailyLimit: 50,   color: "#cd7f32" },
   { name: "Silver",    minBalance: 10_000,      discount: 0.25, dailyLimit: 200,  color: "#c0c0c0" },
   { name: "Gold",      minBalance: 100_000,     discount: 0.50, dailyLimit: 1000, color: "#ffd700" },
@@ -88,21 +121,24 @@ const viemClient = XMETAV_TOKEN_ADDRESS
 
 async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
   if (!viemClient || !XMETAV_TOKEN_ADDRESS || !callerAddress) return TIERS[0];
-  try {
-    const raw = await viemClient.readContract({
-      address: XMETAV_TOKEN_ADDRESS,
-      abi: ERC20_BALANCE_ABI,
-      functionName: "balanceOf",
-      args: [callerAddress as `0x${string}`],
-    });
-    const balance = Number(raw / BigInt(10 ** 18));
-    return getTier(balance);
-  } catch {
-    return TIERS[0];
-  }
+  return tierCache.getOrFetch(`tier:${callerAddress}`, async () => {
+    try {
+      const raw = await viemClient.readContract({
+        address: XMETAV_TOKEN_ADDRESS,
+        abi: ERC20_BALANCE_ABI,
+        functionName: "balanceOf",
+        args: [callerAddress as `0x${string}`],
+      });
+      const balance = Number(raw / BigInt(10 ** 18));
+      return getTier(balance);
+    } catch {
+      return TIERS[0];
+    }
+  });
 }
 
 const app = express();
+app.use(compression());  // gzip — ~60% bandwidth reduction
 app.use(express.json());
 
 // ---- Payment logging helper ----
@@ -122,14 +158,10 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
       network,
       status: "settled",
     };
-    // metadata column may not exist yet — try with it, fallback without
     const metaPayload = callerAgent
       ? { callerAgentId: callerAgent.agentId, callerOwner: callerAgent.owner, x402Enabled: callerAgent.x402Enabled }
       : null;
-    const { error } = await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
-    if (error?.message?.includes("metadata")) {
-      await supabase.from("x402_payments").insert(row);
-    }
+    await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
     // ---- Midas endpoint_analytics tracking ----
     trackEndpointAnalytics(endpoint, amount, callerAddress);
 
@@ -138,6 +170,9 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     // Randomly assign variant (50/50 split); "control" uses current price
     const variant = Math.random() < 0.5 ? "control" : "premium";
     trackABExperiment(endpoint, variant, true, numAmt);
+
+    // ---- Payment → Agent Memory pipeline ----
+    recordPaymentEvent(endpoint, amount, callerAddress || callerAgent?.wallet, callerAgent?.agentId);
   } catch { /* best effort */ }
 }
 
@@ -275,29 +310,39 @@ declare global {
 app.use(async (req, _res, next) => {
   const agentIdHeader = req.headers["x-agent-id"] as string | undefined;
   if (!agentIdHeader) return next();
-  try {
-    const agentId = BigInt(agentIdHeader);
-    const [owner, uri, wallet] = await Promise.all([
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
-      erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
-    ]);
-    let x402Enabled = false;
-    if (uri) {
-      try {
-        const meta = await fetch(uri).then(r => r.json());
-        x402Enabled = meta?.x402Support?.enabled === true;
-      } catch { /* metadata fetch optional */ }
+
+  // Cached ERC-8004 resolution — avoids 3 RPC calls per request
+  const resolved = await identityCache.getOrFetch(`agent:${agentIdHeader}`, async () => {
+    try {
+      const agentId = BigInt(agentIdHeader);
+      const [owner, uri, wallet] = await Promise.all([
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "ownerOf", args: [agentId] }),
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "tokenURI", args: [agentId] }),
+        erc8004Client.readContract({ address: ERC8004_REGISTRY, abi: ERC8004_ABI, functionName: "getAgentWallet", args: [agentId] }),
+      ]);
+      let x402Enabled = false;
+      if (uri) {
+        try {
+          const meta = await fetch(uri).then(r => r.json());
+          x402Enabled = meta?.x402Support?.enabled === true;
+        } catch { /* metadata fetch optional */ }
+      }
+      return {
+        agentId: agentId.toString(),
+        owner: owner as string,
+        wallet: wallet as string,
+        tokenURI: uri as string,
+        x402Enabled,
+      };
+    } catch {
+      return null;
     }
-    req.callerAgent = {
-      agentId: agentId.toString(),
-      owner: owner as string,
-      wallet: wallet as string,
-      tokenURI: uri as string,
-      x402Enabled,
-    };
-    console.log(`[ERC-8004] Resolved caller agent #${agentId} — owner: ${owner}, x402: ${x402Enabled}`);
-  } catch {
+  });
+
+  if (resolved) {
+    req.callerAgent = resolved;
+    console.log(`[ERC-8004] Resolved caller agent #${agentIdHeader} — owner: ${resolved.owner}, x402: ${resolved.x402Enabled}`);
+  } else {
     console.log(`[ERC-8004] Agent #${agentIdHeader} not found in registry, proceeding without identity`);
   }
   next();
@@ -435,6 +480,58 @@ app.use(
             },
           }
         : {}),
+      // ---- Trade Execution Endpoints (%-of-capital pricing) ----
+      "POST /execute-trade": {
+        accepts: [{ scheme: "exact", price: "$0.50", network, payTo: evmAddress }],
+        description: "Generate unsigned swap transaction (fee: 0.5% of trade, min $0.50)",
+        mimeType: "application/json",
+      },
+      "POST /rebalance-portfolio": {
+        accepts: [{ scheme: "exact", price: "$2.00", network, payTo: evmAddress }],
+        description: "Portfolio rebalance analysis + tx bundle (fee: $2 + 0.3% of portfolio)",
+        mimeType: "application/json",
+      },
+      "GET /arb-opportunity": {
+        accepts: [{ scheme: "exact", price: "$0.25", network, payTo: evmAddress }],
+        description: "Scan for cross-DEX arbitrage opportunities",
+        mimeType: "application/json",
+      },
+      "POST /execute-arb": {
+        accepts: [{ scheme: "exact", price: "$0.10", network, payTo: evmAddress }],
+        description: "Execute arbitrage (fee: 1% of profit captured, min $0.10)",
+        mimeType: "application/json",
+      },
+      "GET /yield-optimize": {
+        accepts: [{ scheme: "exact", price: "$0.50", network, payTo: evmAddress }],
+        description: "Analyze yield farming opportunities across Base protocols",
+        mimeType: "application/json",
+      },
+      "POST /deploy-yield-strategy": {
+        accepts: [{ scheme: "exact", price: "$3.00", network, payTo: evmAddress }],
+        description: "Deploy capital into yield strategy (fee: $3 + 0.5% of capital)",
+        mimeType: "application/json",
+      },
+      // ---- Alpha / Intelligence Feeds (recurring revenue) ----
+      "GET /whale-alert": {
+        accepts: [{ scheme: "exact", price: "$0.15", network, payTo: evmAddress }],
+        description: "Whale transfer/swap detection on Base — tiered lookback depth",
+        mimeType: "application/json",
+      },
+      "GET /liquidation-signal": {
+        accepts: [{ scheme: "exact", price: "$0.25", network, payTo: evmAddress }],
+        description: "DeFi lending liquidation signals (Aave V3, Moonwell, Seamless)",
+        mimeType: "application/json",
+      },
+      "GET /arb-detection": {
+        accepts: [{ scheme: "exact", price: "$0.20", network, payTo: evmAddress }],
+        description: "Cross-DEX arbitrage signal detection (Uniswap V3 × Aerodrome)",
+        mimeType: "application/json",
+      },
+      "GET /governance-signal": {
+        accepts: [{ scheme: "exact", price: "$0.10", network, payTo: evmAddress }],
+        description: "Governance proposal tracker across Base protocols",
+        mimeType: "application/json",
+      },
     },
     new x402ResourceServer(facilitatorClient).register(
       network,
@@ -715,9 +812,9 @@ app.post("/memory-crystal", async (req, res) => {
     // Find matching memories and return as crystal
     const { data: memories } = await supabase
       .from("agent_memory")
-      .select("id, agent_id, content, memory_type, importance, created_at")
+      .select("id, agent_id, content, kind, source, created_at")
       .ilike("content", `%${query}%`)
-      .order("importance", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(5);
 
     const crystal = {
@@ -801,7 +898,7 @@ app.post("/fusion-chamber", async (req, res) => {
   if (supabase) {
     const { data: memories } = await supabase
       .from("agent_memory")
-      .select("id, content, memory_type, importance")
+      .select("id, content, kind, source")
       .in("id", memoryIds);
 
     if (!memories || memories.length < 2) {
@@ -810,15 +907,13 @@ app.post("/fusion-chamber", async (req, res) => {
 
     // Create a fused memory association
     const fusedContent = memories.map(m => m.content).join(" ⟷ ");
-    const maxImportance = Math.max(...memories.map(m => m.importance || 0));
     const { data: association } = await supabase
       .from("memory_associations")
       .insert({
-        source_memory_id: memories[0].id,
-        target_memory_id: memories[1].id,
-        association_type: catalyst || "fusion",
-        strength: Math.min(1.0, (maxImportance / 10) + 0.3),
-        context: `Fused via x402 chamber: ${fusedContent.slice(0, 200)}`,
+        memory_id: memories[0].id,
+        related_memory_id: memories[1].id,
+        association_type: catalyst === "dream" ? "causal" : "related",
+        strength: Math.min(1.0, 0.7),
       })
       .select("id, association_type, strength, created_at")
       .single();
@@ -828,8 +923,8 @@ app.post("/fusion-chamber", async (req, res) => {
       inputMemories: memoryIds.length,
       catalyst: catalyst || "standard",
       association,
-      crystalClass: maxImportance >= 8 ? "legendary" : maxImportance >= 5 ? "epic" : "rare",
-      xp: Math.floor(maxImportance * 15) + 25,
+      crystalClass: memories.length >= 4 ? "legendary" : memories.length >= 3 ? "epic" : "rare",
+      xp: memories.length * 20 + 25,
       timestamp: new Date().toISOString(),
     });
   } else {
@@ -850,9 +945,9 @@ app.post("/cosmos-explore", async (req, res) => {
   if (supabase) {
     // Pull recent memories, associations, and dream insights
     const [memRes, assocRes, dreamRes] = await Promise.all([
-      supabase.from("agent_memory").select("id, agent_id, content, memory_type, importance, created_at")
+      supabase.from("agent_memory").select("id, agent_id, content, kind, source, created_at")
         .order("created_at", { ascending: false }).limit(exploreDepth * 5),
-      supabase.from("memory_associations").select("id, source_memory_id, target_memory_id, association_type, strength")
+      supabase.from("memory_associations").select("id, memory_id, related_memory_id, association_type, strength")
         .order("strength", { ascending: false }).limit(exploreDepth * 3),
       supabase.from("dream_insights").select("id, category, insight, confidence, created_at")
         .order("created_at", { ascending: false }).limit(exploreDepth),
@@ -868,7 +963,7 @@ app.post("/cosmos-explore", async (req, res) => {
       region: targetRegion,
       depth: exploreDepth,
       islands: Object.entries(islands).map(([agent, count]) => ({ agent, memoryCount: count, terrain: targetRegion })),
-      highways: (assocRes.data || []).map(a => ({ from: a.source_memory_id, to: a.target_memory_id, type: a.association_type, strength: a.strength })),
+      highways: (assocRes.data || []).map(a => ({ from: a.memory_id, to: a.related_memory_id, type: a.association_type, strength: a.strength })),
       dreams: dreamRes.data || [],
       totalMemories: memRes.data?.length || 0,
       totalConnections: assocRes.data?.length || 0,
@@ -1007,14 +1102,56 @@ app.get("/health", (_req, res) => {
               "POST /voice/synthesize": "$0.08 — text-to-speech (TTS HD)",
             }
           : {}),
+        // Trade Execution
+        "POST /execute-trade": "$0.50 min (0.5% of trade) — generate swap tx bundle",
+        "POST /rebalance-portfolio": "$2.00 + 0.3% — portfolio rebalance analysis",
+        "GET /arb-opportunity": "$0.25 — scan for arbitrage opportunities",
+        "POST /execute-arb": "$0.10 min (1% of profit) — execute arbitrage",
+        "GET /yield-optimize": "$0.50 — yield farming opportunity analysis",
+        "POST /deploy-yield-strategy": "$3.00 + 0.5% — deploy capital to yield",
+        // Alpha / Intelligence Feeds
+        "GET /whale-alert": "$0.15 — whale transfer/swap detection",
+        "GET /liquidation-signal": "$0.25 — DeFi liquidation signals",
+        "GET /arb-detection": "$0.20 — cross-DEX arbitrage signals",
+        "GET /governance-signal": "$0.10 — governance proposal tracker",
       },
       free: {
         "GET /health": "this endpoint",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
+        "POST /digest": "trigger payment→memory digest (writes to agent memories)",
+        "GET /trade-fees": "fee schedule, examples, and revenue projections",
       },
     },
   });
+});
+
+// ---- Trade Execution Routes ----
+const tradeRouter = createTradeRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(tradeRouter);
+
+// ---- Alpha / Intelligence Feeds ----
+const alphaRouter = createAlphaFeedsRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(alphaRouter);
+
+// ---- On-Demand Payment Digest ----
+app.post("/digest", async (_req, res) => {
+  try {
+    await generatePaymentDigest();
+    res.json({
+      status: "ok",
+      message: "Payment digest written to midas, oracle, alchemist, and shared agent memories.",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- ERC-8004 Agent Payment Info (free, public discovery) ----
@@ -1051,17 +1188,28 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
       } catch { /* metadata fetch failed — ok, just report what we have */ }
     }
 
+    // Extract x402Support details from metadata for structured response
+    const x402Support = metadata?.x402Support as Record<string, unknown> | undefined;
+
     res.json({
       agentId: agentId.toString(),
       owner: owner as string,
-      agentWallet: agentWallet as string,
+      wallet: agentWallet as string,
       tokenURI: tokenURI as string,
       x402Enabled,
-      acceptedSchemes: x402Enabled ? ["exact"] : [],
-      network: "eip155:8453",
-      pricing: x402Enabled && metadata
-        ? (metadata as Record<string, unknown>)
-        : null,
+      x402Support: x402Enabled && x402Support ? {
+        enabled: true,
+        network: x402Support.network || "eip155:8453",
+        payTo: x402Support.payTo,
+        acceptedSchemes: x402Support.acceptedSchemes || ["exact"],
+        denomination: x402Support.denomination || "USDC",
+        facilitator: x402Support.facilitator,
+        pricing: x402Support.pricing || {},
+        tokenDiscounts: x402Support.tokenDiscounts || null,
+      } : null,
+      capabilities: metadata?.capabilities || [],
+      services: metadata?.services || [],
+      contracts: metadata?.contracts || {},
       registry: ERC8004_REGISTRY,
       timestamp: new Date().toISOString(),
     });
@@ -1075,7 +1223,7 @@ app.get("/agent/:agentId/payment-info", async (req, res) => {
 
 // ---- Start ----
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`\n  XmetaV x402 Payment-Gated API`);
   console.log(`  ─────────────────────────────`);
   console.log(`  Server:    http://localhost:${port}`);
@@ -1085,6 +1233,7 @@ app.listen(port, () => {
   console.log(`  Health:    http://localhost:${port}/health`);
   console.log(`  Voice:     ${openai ? "enabled" : "disabled (no OPENAI_API_KEY)"}`);
   console.log(`  Token:     ${XMETAV_TOKEN_ADDRESS ? XMETAV_TOKEN_ADDRESS : "disabled (no XMETAV_TOKEN_ADDRESS)"}`);
+  console.log(`  Memory:    ${supabase ? "enabled (digests every 60min)" : "disabled"}`);
   console.log(`\n  Gated endpoints:`);
   console.log(`    POST /agent-task       $0.10   Dispatch task to agent`);
   console.log(`    POST /intent           $0.05   Resolve goal → commands`);
@@ -1098,9 +1247,40 @@ app.listen(port, () => {
     console.log(`    POST /voice/transcribe $0.05   Speech-to-text (Whisper)`);
     console.log(`    POST /voice/synthesize $0.08   Text-to-speech (TTS HD)`);
   }
+  console.log(`\n  Trade Execution (%-of-capital):`);
+  console.log(`    POST /execute-trade        $0.50 min  0.5% of trade value`);
+  console.log(`    POST /rebalance-portfolio  $2.00 +    0.3% of portfolio`);
+  console.log(`    GET  /arb-opportunity       $0.25      Arb scan`);
+  console.log(`    POST /execute-arb          $0.10 min  1% of profit`);
+  console.log(`    GET  /yield-optimize       $0.50      Yield scan`);
+  console.log(`    POST /deploy-yield-strategy $3.00 +   0.5% of capital`);
+  console.log(`\n  Alpha / Intelligence Feeds:`);
+  console.log(`    GET  /whale-alert          $0.15      Whale transfer detection`);
+  console.log(`    GET  /liquidation-signal   $0.25      DeFi liquidation signals`);
+  console.log(`    GET  /arb-detection        $0.20      Cross-DEX arb signals`);
+  console.log(`    GET  /governance-signal    $0.10      Governance proposals`);
   console.log(`\n  Free endpoints:`);
   console.log(`    GET  /health                    Service health`);
   console.log(`    GET  /token-info                Token tiers & discounts`);
   console.log(`    GET  /agent/:agentId/payment-info  ERC-8004 agent lookup`);
+  console.log(`    GET  /trade-fees                Fee schedule & projections`);
   console.log();
+
+  // Start payment→memory digest scheduler (hourly)
+  startDigestScheduler();
 });
+
+// ── Graceful Shutdown: write session summary to memory ──
+async function gracefulShutdown(signal: string) {
+  console.log(`\n[x402] ${signal} received — writing session summary...`);
+  stopDigestScheduler();
+  await writeSessionSummary();
+  server.close(() => {
+    console.log("[x402] Server closed.");
+    process.exit(0);
+  });
+  // Force exit after 5s if shutdown hangs
+  setTimeout(() => process.exit(0), 5000);
+}
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

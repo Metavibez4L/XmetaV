@@ -73,13 +73,13 @@ export function LiveLogs() {
         .limit(100);
 
       if (data) {
-        const initialLogs: LogEntry[] = data.map((r) => ({
+        const initialLogs: LogEntry[] = data.map((r: any) => ({
           id: r.id,
           timestamp: r.created_at,
-          agent: r.agent || "unknown",
-          level: r.error ? "error" : "info",
-          message: cleanAgentOutput(r.output?.slice(0, 500) || "No output"),
-          metadata: { session_id: r.session_id },
+          agent: r.agent || r.agent_id || "unknown",
+          level: r.error ? "error" : r.is_final === false ? "debug" : "info",
+          message: cleanAgentOutput((r.output || r.content)?.slice(0, 500) || "No output"),
+          metadata: { session_id: r.session_id || r.command_id },
         }));
         setLogs(initialLogs.reverse());
       }
@@ -104,10 +104,10 @@ export function LiveLogs() {
           const newLog: LogEntry = {
             id: payload.new.id,
             timestamp: payload.new.created_at,
-            agent: payload.new.agent || "unknown",
-            level: payload.new.error ? "error" : "info",
-            message: cleanAgentOutput(payload.new.output?.slice(0, 500) || "No output"),
-            metadata: { session_id: payload.new.session_id },
+            agent: payload.new.agent || payload.new.agent_id || "unknown",
+            level: payload.new.error ? "error" : payload.new.is_final === false ? "debug" : "info",
+            message: cleanAgentOutput((payload.new.output || payload.new.content)?.slice(0, 500) || "No output"),
+            metadata: { session_id: payload.new.session_id || payload.new.command_id },
           };
           setLogs((prev) => [...prev.slice(-999), newLog]);
         }

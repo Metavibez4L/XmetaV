@@ -9,7 +9,7 @@ Reference for integrating **x402** — Coinbase's open payment protocol — with
 | Component | Status |
 |-----------|--------|
 | x402 Server | **Live** on port 4021 (Base Mainnet, USDC, CDP JWT auth) |
-| Payment middleware | 6 gated endpoints |
+| Payment middleware | 16 gated endpoints |
 | ERC-8004 identity middleware | **Active** — resolves caller agent via `X-Agent-Id` header |
 | On-chain metadata | Agent #16905, `x402Support.enabled: true` in tokenURI |
 | Payment logging | Writes to `x402_payments` Supabase table (with caller identity) |
@@ -25,8 +25,18 @@ Reference for integrating **x402** — Coinbase's open payment protocol — with
 | `POST /intent` | $0.05 | Resolve goal → agent commands |
 | `GET /fleet-status` | $0.01 | Live fleet status (8 agents) |
 | `POST /swarm` | $0.50 | Multi-agent swarm dispatch |
+| `POST /memory-crystal` | $0.05 | Summon memory crystal from cosmos |
+| `POST /neural-swarm` | $0.10 | Neural swarm delegation across agents |
+| `POST /fusion-chamber` | $0.15 | Fuse memory crystals in Materia chamber |
+| `POST /cosmos-explore` | $0.20 | Explore the Memory Cosmos world |
 | `POST /voice/transcribe` | $0.05 | Speech-to-text (Whisper) |
 | `POST /voice/synthesize` | $0.08 | Text-to-speech (TTS HD) |
+| `POST /execute-trade` | $0.50+ | Swap tx bundle (0.5% of trade) |
+| `POST /rebalance-portfolio` | $2.00+ | Portfolio rebalance (0.3% of capital) |
+| `GET /arb-opportunity` | $0.25 | Arbitrage opportunity scan |
+| `POST /execute-arb` | $0.10+ | Execute arbitrage (1% of profit) |
+| `GET /yield-optimize` | $0.50 | Yield farming optimization scan |
+| `POST /deploy-yield-strategy` | $3.00+ | Deploy yield capital (0.5% of capital) |
 
 ### Free Endpoints
 
@@ -35,6 +45,8 @@ Reference for integrating **x402** — Coinbase's open payment protocol — with
 | `GET /health` | Service health + pricing summary |
 | `GET /token-info` | Token tier info & discounts |
 | `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
+| `GET /digest` | Trigger payment digest & memory write |
+| `GET /trade-fees` | Trade fee schedule & revenue projections |
 
 ## ERC-8004 Identity Resolution
 

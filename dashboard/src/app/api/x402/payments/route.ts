@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const { data: spendData } = await supabase
     .from("x402_payments")
     .select("amount, currency")
-    .eq("status", "completed")
+    .in("status", ["completed", "settled"])
     .gte("created_at", new Date(Date.now() - 86400000).toISOString());
 
   const todaySpend = (spendData || []).reduce(
