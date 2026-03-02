@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -31,7 +31,7 @@ interface SidebarProps {
 
 export const Sidebar = React.memo(function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();

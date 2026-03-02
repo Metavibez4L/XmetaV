@@ -71,20 +71,38 @@ export function useBridgeControl() {
 
   useEffect(() => {
     let mounted = true;
-    fetchStatus().then((data) => {
-      if (!mounted || !data) return;
-      // Poll only if supported.
-      if (!data.supported) return;
-      if (pollRef.current) return;
-      pollRef.current = setInterval(fetchStatus, 5000);
-    });
 
-    return () => {
-      mounted = false;
+    const startPolling = () => {
+      if (pollRef.current) return;
+      pollRef.current = setInterval(fetchStatus, 15_000);
+    };
+    const stopPolling = () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
+    };
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        fetchStatus();
+        startPolling();
+      }
+    };
+
+    fetchStatus().then((data) => {
+      if (!mounted || !data) return;
+      if (!data.supported) return;
+      startPolling();
+    });
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      mounted = false;
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [fetchStatus]);
 
