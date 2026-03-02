@@ -38,8 +38,8 @@ Quick reference for everything you can do with your OpenClaw Command Center.
 │    dynamic_*     - Created on-demand    │
 ├─────────────────────────────────────────┤
 │  Model:    kimi-k2.5:cloud (256k ctx)   │
-│  Provider: Ollama (native + CUDA)       │
-│  GPU:      RTX 4070 (42-54 tok/s)       │
+│  Provider: Ollama (macOS native)         │
+│  GPU:      M3 Ultra (60 GPU cores)       │
 ├─────────────────────────────────────────┤
 │  Features:                              │
 │    ✓ Swarm orchestration (p/p/c)        │
