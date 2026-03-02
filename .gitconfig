@@ -1,0 +1,16 @@
+[remote "origin"]
+	url = https://github.com/Metavibez4L/XmetaV.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "akualabs"]
+	url = https://github.com/Metavibez4L/akualabs.git
+	fetch = +refs/heads/*:refs/remotes/akualabs/*
+[branch "dev"]
+	remote = origin
+	merge = refs/heads/dev
+	pushRemote = origin
+[alias]
+	push-both = push origin dev && push akualabs dev
+	sync = fetch origin && fetch akualabs
+	web3dev-branch = checkout -b feature/web3dev/
+[push]
+	default = current
