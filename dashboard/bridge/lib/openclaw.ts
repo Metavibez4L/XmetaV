@@ -17,6 +17,7 @@ const ALLOWED_AGENTS = new Set([
   "akua_web",
   "basedintern",
   "basedintern_web",
+  "vox",
 ]);
 
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
