@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-03-02  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)  
+**XmetaV Version:** v24 (Tooling + Benchmarks + Live x402 Verified)  
 **Platform:** macOS 26.3 (Sequoia)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -89,10 +89,37 @@ Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across
 
 ### Loaded Models
 
-| Model | Size | Context | Purpose |
-|-------|------|---------|---------|
-| `kimi-k2.5:cloud` | Cloud | 262K (256k) | Primary agent model — all fleet agents |
-| `qwen2.5:7b-instruct` | 4.7 GB | 32K | Local fallback / lightweight tasks |
+| Model | Size | Context | Purpose | Hot-Keep |
+|-------|------|---------|---------|----------|
+| `kimi-k2.5:cloud` | Cloud (remote) | 262K | Primary agent model — all 12 fleet agents | N/A (cloud-proxied, no local VRAM) |
+| `qwen2.5:7b-instruct` | 4.7 GB (19.7GB VRAM) | 32K | Local fallback | ✅ Pinned (`keep_alive:-1`, expires ~2318) |
+
+Use `just cold-check` to verify models. Use `just warm` to re-pin after Ollama restart.
+
+### Service Response Benchmarks (post-restart 2026-03-02)
+
+| Service | Endpoint | Response Time |
+|---------|----------|---------------|
+| Dashboard :3000 | `/` | **7ms** |
+| Bridge :3001 | `/health` | **1ms** |
+| x402 :4021 | `/health` | **1ms** |
+| Gateway :18789 | `/health` | **1.5ms** |
+| Ollama (qwen local) | inference (2 tokens) | **190ms** (load: 85ms) |
+| Ollama (kimi cloud) | inference (2 tokens) | **2.9s** (network) |
+
+### x402 Live Payment Test (2026-03-02)
+
+All endpoints verified with real USDC on **Base Mainnet**:
+
+| Endpoint | Price | HTTP | Time | Status |
+|----------|-------|------|------|--------|
+| `GET /fleet-status` | $0.01 | 200 | 1,547ms | ✅ Paid |
+| `POST /memory-crystal` | $0.05 | 200 | 1,407ms | ✅ Paid |
+| `POST /intent` | $0.05 | 200 | 1,081ms | ✅ Paid |
+| `POST /agent-task` | $0.10 | 200 | 1,161ms | ✅ Paid |
+
+Wallet: `0x4Ba6...Cc80` — USDC spent: **$0.11** — Pass rate: **4/4 (100%)**  
+Test script: `cd dashboard && DOTENV_CONFIG_PATH=bridge/.env npx tsx scripts/test-x402-live.ts`
 
 ## Active profile and paths
 

@@ -310,3 +310,7 @@ just rls-check                 # RLS policy audit (TODO: add to justfile)
 | Date | Change |
 |------|--------|
 | 2026-03-02 | Initial plan created. Audited current state. |
+| 2026-03-02 | P0 #1 done: LaunchAgent auto-restart + perf optimizations. |
+| 2026-03-02 | Ollama KEEP_ALIVE → -1. Justfile rewritten (24 recipes, launchd-native). |
+| 2026-03-02 | Default agent model → kimi-k2.5:cloud. All 12 agents verified. |
+| 2026-03-02 | x402 live USDC test: 4/4 endpoints passed, $0.11 spent on Base Mainnet. |
