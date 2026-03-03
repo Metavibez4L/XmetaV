@@ -274,6 +274,7 @@ This command center runs **multiple isolated agents**, all powered by **Kimi K2.
 | `oracle` | `kimi-k2.5:cloud` | `~/.openclaw/agents/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
 | `alchemist` | `kimi-k2.5:cloud` | `~/.openclaw/agents/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
 | `midas` | `kimi-k2.5:cloud` | `~/.openclaw/agents/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
+| `vox` | `kimi-k2.5:cloud` | `~/.openclaw/agents/vox` | coding | **Brand & Campaigns** — content strategy, voice calibration, competitor analysis |
 | `web3dev` | `kimi-k2.5:cloud` | `~/.openclaw/agents/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | `basedintern` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | full | Same repo — browser/web only |
@@ -290,6 +291,7 @@ Detailed agent runbooks (index: [`docs/agents/README.md`](agents/README.md)):
 - `docs/agents/oracle.md`
 - `docs/agents/alchemist.md`
 - `docs/agents/midas.md`
+- `docs/agents/vox.md`
 - `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`

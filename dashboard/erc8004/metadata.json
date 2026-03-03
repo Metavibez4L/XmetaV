@@ -1,7 +1,7 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 10 specialized agents across intel, development, operations, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 11 specialized agents across intel, development, operations, branding, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), brand voice & campaigns (vox), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
@@ -103,7 +103,12 @@
     "liquidation-monitoring",
     "cross-dex-arb-detection",
     "governance-tracking",
-    "alpha-signal-feeds"
+    "alpha-signal-feeds",
+    "brand-voice-management",
+    "content-strategy",
+    "campaign-generation",
+    "voice-calibration",
+    "competitor-analysis"
   ],
   "fleet": {
     "agents": [
@@ -116,11 +121,12 @@
       { "id": "web3dev", "role": "Blockchain developer — Solidity, Hardhat, Base deployments", "room": "web3Lab", "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"] },
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
       { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
-      { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" }
+      { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" },
+      { "id": "vox", "role": "Brand voice & campaign specialist — content strategy, voice calibration, competitor analysis", "room": "opsOutreach", "skills": ["content-strategy", "voice-calibration", "competitor-analysis"] }
     ],
     "model": "ollama/kimi-k2.5:cloud",
     "meetingCapacity": 8,
-    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul"]
+    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul", "opsOutreach"]
   },
   "contracts": {
     "token": {

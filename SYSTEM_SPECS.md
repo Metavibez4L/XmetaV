@@ -46,7 +46,7 @@
 
 ---
 
-## Agent Fleet (10 Active)
+## Agent Fleet (11 Active)
 
 | Agent | Role | Status |
 |-------|------|--------|
@@ -60,6 +60,7 @@
 | akua | Solidity | ✅ |
 | basedintern | TypeScript | ✅ |
 | midas | Revenue | ✅ |
+| vox | Brand & Campaigns | ✅ |
 
 ---
 

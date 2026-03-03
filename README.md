@@ -14,7 +14,7 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v25
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  12 (+ dynamic)                     |
+ |   agents:  13 (+ dynamic)                     |
  |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
@@ -457,6 +457,33 @@ Manages agent lifecycles and fleet health. Coordinates agent spawning, monitors 
 
 See [docs/agents/sentinel.md](docs/agents/sentinel.md) for full documentation.
 
+### Agent: `vox` (brand & campaigns)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Brand voice & X campaign specialist — content strategy, voice calibration, competitor analysis |
+| **Workspace** | `~/.openclaw/agents/vox` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `content-strategy`, `voice-calibration`, `competitor-analysis` |
+| **Room** | OPS Outreach |
+| **Color** | Cyan (`#06b6d4`) |
+
+Generates tweet threads, audits brand voice consistency, monitors competitor messaging, and creates content calendars. Integrates with midas (revenue milestones), oracle (market events), briefing (SITREP recaps), and soul (engagement memory). Commands: `campaign`, `voice --audit`, `calendar`, `competitor`, `crisis`, `report`, `health`.
+
+```bash
+# Generate a campaign thread
+./scripts/agent-task.sh vox "Create a thread about our memory anchoring system"
+
+# Voice consistency audit
+./scripts/vox-agent.sh --voice
+
+# Weekly content calendar
+./scripts/vox-agent.sh --calendar
+```
+
+See [docs/agents/vox.md](docs/agents/vox.md) for full documentation.
+
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
 | Property | `basedintern` | `basedintern_web` |
@@ -837,7 +864,8 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
-### 2026-03-03 (v25) — Sentinel Monitoring Engine + Bridge v1.5.0
+### 2026-03-03 (v25) — Sentinel Monitoring Engine + Vox Branding Agent + Bridge v1.5.0
+- **Vox Branding Agent** — New brand voice & campaign specialist (`vox`). Content strategy, voice calibration, competitor monitoring. Room: OPS Outreach. Color: Cyan (`#06b6d4`). Skills: `content-strategy`, `voice-calibration`, `competitor-analysis`. Arena desk at col 1, row 5.5. Meeting seat 105°. Connections: main, midas, oracle, briefing, soul. Runner: `scripts/vox-agent.sh`. x402 pricing: campaign $0.15, voice audit $0.25, competitor $0.20, calendar $0.30, crisis $0.50
 - **Sentinel Monitoring Engine** — Full autonomous monitoring system embedded in the Bridge Daemon with 6 interconnected modules:
   - **EventMonitor** — Event-driven service health checks with adaptive polling (5s–120s) and Supabase Realtime subscriptions
   - **AlertManager** — Anti-fatigue alerting with escalation levels (immediate → warning → critical) and configurable cooldowns

@@ -410,4 +410,12 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     model: "ollama/kimi-k2.5:cloud",
     skills: ["security", "monitoring", "alerts"],
   },
+  {
+    id: "vox",
+    name: "Vox (Brand & Campaigns)",
+    workspace: "/home/manifest/vox",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["content-strategy", "voice-calibration", "competitor-analysis"],
+  },
 ];

@@ -1,4 +1,4 @@
-export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops" | "soul";
+export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops" | "soul" | "opsOutreach";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -55,6 +55,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     room: "soul",
     tile: { col: 0.5, row: 3.5 },
     size: 30,
+  },
+
+  // ── OPS OUTREACH (left side, between soul and intel) ───────────
+  {
+    id: "vox",
+    label: "VOX",
+    color: 0x06b6d4,
+    colorHex: "#06b6d4",
+    room: "opsOutreach",
+    tile: { col: 1, row: 5.5 },
+    size: 26,
   },
 
   // ── INTEL ROOM (bottom-left, glass enclosed) ────────────────────
@@ -164,6 +175,7 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "sentinel", angle: 300 },        // upper-right (near operator)
   { agentId: "soul", angle: 195 },              // lower-left (observer seat)
   { agentId: "midas", angle: 165 },              // between oracle & alchemist
+  { agentId: "vox", angle: 105 },                // ops outreach seat
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -199,4 +211,10 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["midas", "alchemist"],
   ["midas", "main"],
   ["midas", "soul"],
+  // Vox branding connections
+  ["vox", "main"],
+  ["vox", "midas"],
+  ["vox", "oracle"],
+  ["vox", "briefing"],
+  ["vox", "soul"],
 ];
