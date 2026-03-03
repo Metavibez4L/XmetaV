@@ -1,176 +1,124 @@
-# Changes Summary - March 2, 2026
+# Changes Summary — March 3, 2026
 
 ## System Status: ACTIVE
-
-### Recent Commits (Last 5)
-1. **31b3ed1** - refactor: bridge-manager uses launchctl instead of spawn
-2. **4a519aa** - fix: add watch mode to x402 launchd script for auto-reload
-3. **3612a66** - feat: LaunchAgent auto-restart for dashboard, bridge, x402
-4. **aaf1f6b** - docs: add full-system optimization plan with priority matrix
-5. **3f2af0e** - chore: add system specs report
+**XmetaV Version:** v25 (Sentinel Engine + Bridge v1.5.0)
 
 ---
 
-## Major Changes
+## Major Changes (March 3, 2026)
 
-### 1. LaunchAgent Auto-Restart Services
-**New:** Mac launchd services for automatic service management
+### 1. Sentinel Monitoring Engine (NEW)
 
-| Service | Plist File | Status | PID |
-|---------|-----------|--------|-----|
-| **Bridge** | com.xmetav.bridge.plist | ✅ Running | 13083 |
-| **Dashboard** | com.xmetav.dashboard.plist | ✅ Running | 23243 |
-| **x402** | com.xmetav.x402.plist | ✅ Running | 16106 |
-| **Watchdog** | com.xmetav.watchdog.plist | ⚠️ Not loaded | - |
+Full autonomous monitoring system integrated into the Bridge Daemon (v1.5.0). Six interconnected modules provide event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing.
 
-**Location:** `/Users/akualabs/Library/LaunchAgents/`
+**Modules:**
 
-**Features:**
-- Auto-restart on crash
-- 10-second throttle between restarts
-- Logs to `/tmp/xmetav.*.log`
-- Managed via `launchctl`
-
-### 2. Bridge Manager Refactor
-**File:** `dashboard/src/lib/bridge-manager.ts`
-
-**Changes:**
-- ❌ Removed: `spawn()` for direct process management
-- ✅ Added: `launchctl` integration for service control
-- Dashboard buttons now control launchd services
-- No more conflicting processes
-- Simplified state management
-
-**New Methods:**
-```typescript
-// Uses launchctl instead of spawn
-launchctl('start', 'com.xmetav.bridge')
-launchctl('stop', 'com.xmetav.bridge')
-launchctl('list', 'com.xmetav.bridge')
-```
-
-### 3. Launchd Scripts
-**New Scripts:**
-- `scripts/launchd-bridge.sh` - Bridge service wrapper
-- `scripts/launchd-dashboard.sh` - Dashboard service wrapper  
-- `scripts/launchd-x402.sh` - x402 service wrapper
+| Module | File | Purpose |
+|--------|------|---------|
+| **EventMonitor** | `bridge/lib/sentinel/event-monitor.ts` | Event-driven service monitoring with adaptive polling (5s–120s) |
+| **AlertManager** | `bridge/lib/sentinel/alert-manager.ts` | Anti-fatigue alerting with escalation & cooldowns |
+| **SelfHealer** | `bridge/lib/sentinel/self-healer.ts` | Automated remediation for downed services |
+| **PredictiveHealth** | `bridge/lib/sentinel/predictive-health.ts` | macOS resource collection, trend prediction, z-score anomaly detection |
+| **DistributedTracer** | `bridge/lib/sentinel/distributed-tracer.ts` | End-to-end request tracing with P95 latency, throughput, error rate |
+| **Sentinel (orchestrator)** | `bridge/lib/sentinel/index.ts` | Wires all sub-systems, singleton lifecycle |
 
 **Features:**
-- Automatic npm install on start
-- Watch mode for development
-- Logging to /tmp/
-- Port conflict detection
+- Monitors 6 services: bridge, dashboard, x402, ollama, gateway, tailscale
+- Supabase Realtime subscriptions on `agent_sessions` and `sentinel_incidents`
+- Self-healing actions: restart downed services via `launchctl`, clean stale locks, rotate large logs
+- Predictive: CPU/memory/disk/load trend analysis with linear regression + anomaly detection (z-score threshold: 3)
+- Distributed tracing: span-based request tracking with P95 latency metrics
+- Alert escalation: 1st fail → immediate, 3rd → warning (5min cooldown), 5th → critical (15min cooldown)
+- Auto-triggers SITREP on critical alerts
+- HTTP endpoint: `GET /sentinel` on Bridge health server (:3001)
 
-### 4. Branch Status
+### 2. Bridge Daemon v1.5.0
 
-| Branch | Status | Description |
-|--------|--------|-------------|
-| **dev** | ✅ Active | Current working branch |
-| **master** | ⚠️ Behind | Needs merge from dev |
+Upgraded from v1.4.0 to v1.5.0 with Sentinel integration:
+- Sentinel starts with bridge, stops on SIGTERM/SIGINT
+- New `/sentinel` HTTP endpoint returns full health report
+- Graceful shutdown includes sentinel cleanup
 
-**Action Needed:**
-```bash
-git checkout master
-git merge dev
-git push origin master
-git push akualabs master
+### 3. Sentinel Database Schema (4 New Tables)
+
+| Table | Purpose | RLS |
+|-------|---------|-----|
+| `sentinel_incidents` | Alert/incident tracking with severity and resolution | Authenticated: SELECT + Service role: ALL |
+| `sentinel_healing_log` | Self-healing action audit trail | Authenticated: SELECT + Service role: ALL |
+| `sentinel_traces` | Distributed trace spans with timing data | Authenticated: SELECT + Service role: ALL |
+| `sentinel_resource_snapshots` | System resource snapshots (CPU, memory, disk, load) | Authenticated: SELECT + Service role: ALL |
+
+All tables have Realtime enabled, indexes on `created_at`, and RLS policies.
+
+**Migration:** `dashboard/scripts/setup-db-sentinel.sql`
+
+### 4. Dashboard API Route
+
+- **`GET /api/sentinel`** — Authenticated endpoint returning sentinel health data (health, incidents, healing log, resources, traces)
+
+### 5. Watchdog LaunchAgent
+
+- **Plist:** `scripts/launchd/com.xmetav.watchdog.plist`
+- **Interval:** Every 5 minutes (StartInterval: 300)
+- **Script:** `scripts/watchdog.sh`
+
+### 6. Dashboard CWD Fix
+
+- **File:** `scripts/launchd-dashboard.sh`
+- **Fix:** Changed working directory from `cd /tmp` to `cd "${REPO}/dashboard"` — resolves Tailwind CSS / PostCSS build errors under launchd
+
+### 7. Service Status
+
+All services verified running with auto-restart:
+
+| Service | Port | Status |
+|---------|------|--------|
+| Dashboard | 3000 | ✅ Running (LaunchAgent) |
+| Bridge | 3001 | ✅ Running (v1.5.0 + Sentinel) |
+| x402 | 4021 | ✅ Running (LaunchAgent) |
+| Ollama | 11434 | ✅ System service |
+
+---
+
+## Files Added/Modified
+
+**New Files:**
+```
+dashboard/bridge/lib/sentinel/alert-manager.ts
+dashboard/bridge/lib/sentinel/event-monitor.ts
+dashboard/bridge/lib/sentinel/self-healer.ts
+dashboard/bridge/lib/sentinel/predictive-health.ts
+dashboard/bridge/lib/sentinel/distributed-tracer.ts
+dashboard/bridge/lib/sentinel/index.ts
+dashboard/src/app/api/sentinel/route.ts
+dashboard/scripts/setup-db-sentinel.sql
+scripts/launchd/com.xmetav.watchdog.plist
 ```
 
-### 5. Service Health
-
-| Service | Port | Process | Status |
-|---------|------|---------|--------|
-| Dashboard | 3000 | 23243 | ✅ Running |
-| Bridge | 3001 | 13083 | ✅ Running |
-| x402 | 4021 | 16106 | ✅ Running |
-| Ollama | 11434 | - | ✅ System service |
-
-### 6. Files Modified
-
-**Recent Changes:**
+**Modified Files:**
 ```
-dashboard/src/lib/bridge-manager.ts (169 lines changed)
-scripts/launchd-bridge.sh (new)
-scripts/launchd-dashboard.sh (new)
-scripts/launchd-x402.sh (new)
-scripts/launchd/com.xmetav.bridge.plist (new)
-scripts/launchd/com.xmetav.dashboard.plist (new)
-scripts/launchd/com.xmetav.x402.plist (new)
+dashboard/bridge/src/index.ts (v1.4.0 → v1.5.0, Sentinel integration)
+scripts/launchd-dashboard.sh (cwd fix: /tmp → ${REPO}/dashboard)
 ```
 
 ---
 
 ## Verification
 
-### Launchctl Commands
 ```bash
-# Check service status
+# Sentinel health endpoint
+curl -s http://localhost:3001/sentinel | jq .
+
+# Check all services
 launchctl list | grep com.xmetav
 
-# Start/stop services
-launchctl start com.xmetav.bridge
-launchctl stop com.xmetav.bridge
+# View sentinel logs
+tail -f /tmp/xmetav-bridge.log | grep -i sentinel
 
-# View logs
-tail -f /tmp/xmetav.bridge.log
-tail -f /tmp/xmetav.x402.log
-tail -f /tmp/xmetav.dashboard.log
+# Verify DB tables
+# sentinel_incidents, sentinel_healing_log, sentinel_traces, sentinel_resource_snapshots
 ```
-
-### Dashboard Control
-The Start/Stop Bridge buttons in the dashboard now:
-1. Control launchd services (not spawn processes)
-2. Show real service status from launchctl
-3. Auto-detect if service is managed by launchd
 
 ---
 
-## Next Steps
-
-1. **Merge dev to master**
-   ```bash
-   git checkout master
-   git merge dev
-   git push origin master akualabs master
-   ```
-
-2. **Test Dashboard Buttons**
-   - Start Bridge → Should trigger launchctl
-   - Stop Bridge → Should stop launchd service
-   - Status should reflect launchctl state
-
-3. **Verify Services**
-   - All 3 services running via launchd
-   - Auto-restart working
-   - Logs being written to /tmp/
-
-4. **Optional: Remove Old Scripts**
-   - Clean up any manual start scripts
-   - Standardize on launchd management
-
----
-
-## Architecture Change
-
-### Before
-```
-Dashboard → spawn() → Bridge Process
-         → spawn() → x402 Process
-```
-
-### After
-```
-Dashboard → launchctl → LaunchAgent → Bridge Service
-         → launchctl → LaunchAgent → x402 Service
-```
-
-**Benefits:**
-- ✅ Auto-restart on crash
-- ✅ No orphaned processes
-- ✅ System-managed lifecycle
-- ✅ Simplified dashboard code
-- ✅ Consistent logging
-
----
-
-*Generated: 2026-03-02*
+*Generated: 2026-03-03*

@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
+Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v25
 
 ```
  ___   ___                    __           ___   ___
@@ -837,6 +837,28 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 
 ## Changelog
 
+### 2026-03-03 (v25) — Sentinel Monitoring Engine + Bridge v1.5.0
+- **Sentinel Monitoring Engine** — Full autonomous monitoring system embedded in the Bridge Daemon with 6 interconnected modules:
+  - **EventMonitor** — Event-driven service health checks with adaptive polling (5s–120s) and Supabase Realtime subscriptions
+  - **AlertManager** — Anti-fatigue alerting with escalation levels (immediate → warning → critical) and configurable cooldowns
+  - **SelfHealer** — Automated remediation for downed services via `launchctl kickstart`, stale lock cleanup, log rotation
+  - **PredictiveHealth** — macOS resource collection (CPU, memory, disk, load), linear regression trend prediction, z-score anomaly detection
+  - **DistributedTracer** — Span-based request tracing with P95 latency, throughput, and error rate metrics
+  - **Sentinel Orchestrator** — Singleton lifecycle manager wiring all sub-systems, auto-heals on service:down events, triggers SITREP on critical alerts
+- **Bridge Daemon v1.5.0** — Upgraded from v1.4.0 with Sentinel integration, new `/sentinel` health endpoint, graceful Sentinel shutdown on SIGTERM/SIGINT
+- **4 New Supabase Tables** — `sentinel_incidents` (alert tracking), `sentinel_healing_log` (remediation audit), `sentinel_traces` (distributed spans), `sentinel_resource_snapshots` (system resources); all with RLS, indexes, and Realtime
+- **Dashboard Sentinel API** — `GET /api/sentinel` authenticated endpoint returning health, incidents, healing log, resources, and traces
+- **Watchdog LaunchAgent** — `com.xmetav.watchdog.plist` running every 5 minutes via launchd
+- **Dashboard CWD Fix** — Fixed `launchd-dashboard.sh` working directory (`/tmp` → `${REPO}/dashboard`) resolving Tailwind CSS / PostCSS build errors under launchd
+
+### 2026-03-02 (v24) — Tooling + Benchmarks + Live x402 Verified
+- **LaunchAgent Auto-Restart** — All three core services (dashboard, bridge, x402) managed by macOS launchd with KeepAlive + RunAtLoad. Auto-restart on crash with 10s throttle
+- **Bridge Manager Refactor** — Replaced `spawn()` with `launchctl` integration for service control from dashboard UI
+- **Launchd Wrapper Scripts** — `launchd-bridge.sh`, `launchd-dashboard.sh`, `launchd-x402.sh` with auto npm install, watch mode, port conflict detection
+- **Live x402 Payment Verification** — All 4 core endpoints verified with real USDC on Base Mainnet (100% pass rate, $0.11 total)
+- **Service Benchmarks** — Sub-10ms response times across all local services (Dashboard 7ms, Bridge 1ms, x402 1ms, Gateway 1.5ms)
+- **System Specs Report** — Comprehensive `SYSTEM_SPECS.md` with hardware, services, fleet, performance metrics, and health scoring
+
 ### 2026-02-15 (v23) — Optimization Pass (Security + Performance + Build)
 - **API Security Hardening** — Auth guards (`requireAuth()`) on all 5 data API routes (`/api/soul`, `/api/agents/memory`, `/api/midas`, `/api/erc8004/identity`, `/api/anchors`). UUID validation and limit clamping on user-supplied params. New shared utility `src/lib/api-auth.ts` with `requireAuth()`, `isValidUUID()`, `clampLimit()`
 - **RLS Policies on Dream Tables** — Added authenticated SELECT policies to `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` (were service-role only). Added DB indexes on `agent_memory(source)` and `memory_associations(memory_id, related_memory_id)`
@@ -1110,5 +1132,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for Mac Studio M3 Ultra | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
+  <sub>Built for Mac Studio M3 Ultra | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting | Sentinel Monitoring Engine</sub>
 </p>

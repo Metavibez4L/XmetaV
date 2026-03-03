@@ -1,6 +1,6 @@
-# System Specs Report: Akualabs v2.0
+# System Specs Report: Akualabs v2.1
 
-**Generated:** 2026-03-02  
+**Generated:** 2026-03-03  
 **System:** Mac Studio M3 Ultra  
 **Status:** Production Ready
 
@@ -24,7 +24,7 @@
 | Service | Port | Status | PID | Uptime |
 |---------|------|--------|-----|--------|
 | **x402 Server** | 4021 | ✅ Online | 66040 | Active |
-| **Bridge** | 3001 | ✅ Online | 65703 | ~4.5 hours |
+| **Bridge** | 3001 | ✅ Online | - | v1.5.0 + Sentinel |
 | **Dashboard** | 3000 | ✅ Online | 49675 | Active |
 
 ---
@@ -60,6 +60,21 @@
 | akua | Solidity | ✅ |
 | basedintern | TypeScript | ✅ |
 | midas | Revenue | ✅ |
+
+---
+
+## Sentinel Monitoring Engine
+
+| Module | Status | Purpose |
+|--------|--------|--------|
+| **EventMonitor** | ✅ Active | Service health checks (adaptive 5s–120s polling) |
+| **AlertManager** | ✅ Active | Anti-fatigue alerting with escalation |
+| **SelfHealer** | ✅ Active | Automated service remediation |
+| **PredictiveHealth** | ✅ Active | Resource trends + anomaly detection |
+| **DistributedTracer** | ✅ Active | Request tracing with P95 latency |
+
+**Endpoint:** `GET http://localhost:3001/sentinel`  
+**DB Tables:** `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`
 
 ---
 
@@ -128,15 +143,16 @@
 
 ---
 
-## Health Score: 8.5/10
+## Health Score: 9.0/10
 
 | Category | Score | Notes |
 |----------|-------|-------|
 | **Services** | 10/10 | All online |
 | **Performance** | 9/10 | Optimized |
-| **Code Quality** | 6/10 | TypeScript errors |
+| **Monitoring** | 9/10 | Sentinel engine active |
+| **Code Quality** | 7/10 | TypeScript errors reduced |
 | **Security** | 9/10 | .env secured |
-| **Infrastructure** | 9/10 | 96GB headroom |
+| **Infrastructure** | 10/10 | 96GB headroom + auto-healing |
 
 ---
 

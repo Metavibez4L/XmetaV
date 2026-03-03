@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-02  
+**Last verified:** 2026-03-03  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v24 (Tooling + Benchmarks + Live x402 Verified)  
+**XmetaV Version:** v25 (Sentinel Engine + Bridge v1.5.0)  
 **Platform:** macOS 26.3 (Sequoia)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -62,7 +62,7 @@ openclaw --version
 | Service | Port | Status | Start Command | Auto-Restart |
 |---------|------|--------|---------------|-------------|
 | **Dashboard** (Next.js) | 3000 | Active | `just dashboard` | ✅ LaunchAgent (KeepAlive) |
-| **Bridge Daemon** | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
+| **Bridge Daemon** (v1.5.0 + Sentinel) | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
 | **x402 Server** | 4021 | Active | `just x402` | ✅ LaunchAgent (KeepAlive) |
 | **OpenClaw Gateway** | 18789 | Active | `just gateway` | ✅ launchd (native) |
 | **Ollama** | 11434 | Active | macOS app (auto-start) | ✅ launchd (native) |
@@ -205,6 +205,60 @@ Automated health monitor checking every 5 minutes:
 
 ```bash
 just logs-watchdog
+```
+
+## Sentinel Monitoring Engine (v1.5.0)
+
+Autonomous monitoring system embedded in the Bridge Daemon. Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
+
+### Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **EventMonitor** | `bridge/lib/sentinel/event-monitor.ts` | Service monitoring with adaptive polling (5s–120s), Supabase Realtime subscriptions |
+| **AlertManager** | `bridge/lib/sentinel/alert-manager.ts` | Anti-fatigue alerting with escalation (immediate → warning → critical) and cooldowns |
+| **SelfHealer** | `bridge/lib/sentinel/self-healer.ts` | Automated remediation: restart services, clean stale locks, rotate logs |
+| **PredictiveHealth** | `bridge/lib/sentinel/predictive-health.ts` | macOS resource collection, linear regression trends, z-score anomaly detection |
+| **DistributedTracer** | `bridge/lib/sentinel/distributed-tracer.ts` | Span-based request tracing with P95 latency, throughput, error rate |
+| **Sentinel** | `bridge/lib/sentinel/index.ts` | Orchestrator singleton wiring all sub-systems |
+
+### Monitored Services
+
+| Service | Check Method |
+|---------|-------------|
+| bridge | `launchctl list` |
+| dashboard | `launchctl list` |
+| x402 | `launchctl list` |
+| ollama | HTTP `GET http://127.0.0.1:11434/api/tags` |
+| gateway | HTTP `GET http://127.0.0.1:18789/health` |
+| tailscale | `tailscale status` |
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `http://localhost:3001/sentinel` | GET | Full sentinel health report (JSON) |
+| `/api/sentinel` | GET | Dashboard-authenticated sentinel data (health, incidents, healing, resources, traces) |
+
+### DB Tables
+
+| Table | Purpose |
+|-------|---------|
+| `sentinel_incidents` | Alert/incident tracking with severity and resolution |
+| `sentinel_healing_log` | Self-healing action audit trail |
+| `sentinel_traces` | Distributed trace spans with timing data |
+| `sentinel_resource_snapshots` | System resource snapshots (CPU, memory, disk, load) |
+
+Migration: `dashboard/scripts/setup-db-sentinel.sql`
+
+### Verification
+
+```bash
+# Sentinel health report
+curl -s http://localhost:3001/sentinel | jq .
+
+# Check sentinel logs
+tail -f /tmp/xmetav-bridge.log | grep -i sentinel
 ```
 
 ## Configured agents (this machine)
@@ -510,6 +564,10 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `limit_breaks` | Limit break event tracking | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_achievements` | Achievement/quest progression | Authenticated: SELECT, INSERT, UPDATE |
 | `daily_quests` | Daily quest generation | Authenticated: SELECT, INSERT, UPDATE |
+| `sentinel_incidents` | Sentinel alert/incident tracking | Authenticated: SELECT + Service role: ALL |
+| `sentinel_healing_log` | Self-healing action audit trail | Authenticated: SELECT + Service role: ALL |
+| `sentinel_traces` | Distributed trace spans | Authenticated: SELECT + Service role: ALL |
+| `sentinel_resource_snapshots` | System resource snapshots (CPU/mem/disk/load) | Authenticated: SELECT + Service role: ALL |
 
 All tables have Realtime enabled for live updates.
 
@@ -851,7 +909,7 @@ XmetaV implements a complete 6-layer memory architecture — all layers are live
 | **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, auto-detect milestones | 2 (cache) |
 | **6. Cost Monitoring** | ✅ Live | 6-tier token system, x402 payment tracking, revenue analytics | 2 |
 
-**Total:** 24 Supabase tables/views, 30+ source files, 12 Soul modules
+**Total:** 28 Supabase tables/views, 30+ source files, 12 Soul modules, 6 Sentinel modules
 
 ### Layer 1 — Ephemeral (In-Process)
 

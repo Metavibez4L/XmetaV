@@ -1,6 +1,6 @@
 # Architecture — XmetaV OpenClaw Command Center
 
-**Last updated:** 2026-03-02  
+**Last updated:** 2026-03-03  
 **Platform:** Mac Studio (M3 Ultra, 96GB) — macOS 26.3  
 **Location:** NYC (always-on headless server)  
 **Remote access:** Tailscale VPN from MacBook Air (NC)
@@ -37,6 +37,10 @@ flowchart TB
         TBL_X402["x402_payments"]
         TBL_SOUL["soul_dream_*"]
         TBL_INTENT["intent_sessions"]
+        TBL_SINC["sentinel_incidents"]
+        TBL_SHEAL["sentinel_healing_log"]
+        TBL_STRC["sentinel_traces"]
+        TBL_SRES["sentinel_resource_snapshots"]
     end
 
     subgraph BASE["Base Mainnet (eip155:8453)"]
@@ -48,13 +52,14 @@ flowchart TB
     end
 
     subgraph MACSTUDIO["Mac Studio (M3 Ultra — 96GB, macOS)"]
-        subgraph BRIDGE["Bridge Daemon (:3001)"]
+        subgraph BRIDGE["Bridge Daemon v1.5.0 (:3001)"]
             direction LR
             EXEC["Command\nExecutor"]
             SWEXEC["Swarm\nExecutor"]
             HB["Heartbeat"]
             SOUL_LIB["Soul\nAgent"]
             MEM_ENGINE["Memory\nCrystal Engine"]
+            SENTINEL_ENG["Sentinel\nEngine"]
         end
 
         subgraph X402_SRV["x402 Server (:4021)"]
@@ -201,11 +206,11 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables (authenticated SELECT on all user-facing tables; dream tables have both authenticated SELECT and service-role ALL)
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`
 - **Indexes**: `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` composite
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
-### Bridge Daemon (Node.js)
+### Bridge Daemon (Node.js — v1.5.0)
 
 A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
 
@@ -214,7 +219,8 @@ A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
-- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, sets session offline
+- **Sentinel Engine**: Autonomous monitoring system with event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing (see below)
+- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, stops Sentinel engine, sets session offline
 - **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next
 - **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
 - **Dashboard Integration**: `bridge-manager.ts` uses `launchctl` to start/stop/status the bridge service (no more spawned child processes)
@@ -251,6 +257,20 @@ All three core services are managed by macOS `launchd` via LaunchAgent plists wi
 - **Repo path**: `~/xmetav1/XmetaV` — moved from `~/Documents/` to bypass macOS Sequoia TCC restrictions on launchd
 - **tsx watch**: Bridge and x402 use `tsx watch` for auto-reload on file changes
 - **Source**: Plist copies in `scripts/launchd/`, wrapper scripts in `scripts/launchd-*.sh`
+
+### Sentinel Monitoring Engine
+
+Autonomous monitoring system embedded in the Bridge Daemon (v1.5.0). Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
+
+- **EventMonitor**: Checks 6 services (bridge, dashboard, x402, ollama, gateway, tailscale) via launchctl + HTTP probes. Adaptive polling interval (5s–120s) based on failure rate. Supabase Realtime subscriptions on `agent_sessions` and `sentinel_incidents`.
+- **AlertManager**: Anti-fatigue alerting with escalation levels (1st fail → immediate, 3rd → warning/5min cooldown, 5th → critical/15min cooldown). Alert history with resolution tracking.
+- **SelfHealer**: Registered remediation actions for each service (restart via `launchctl kickstart`), plus system-level actions (clean stale `.jsonl.lock` files, rotate large logs). 2-minute cooldown per issue.
+- **PredictiveHealth**: Collects macOS resources (CPU via `top`, memory via `vm_stat`, disk via `df`, load via `sysctl`). Linear regression trend prediction. Z-score anomaly detection (threshold: 3).
+- **DistributedTracer**: Span-based request tracking. Calculates P95 latency, throughput (req/min), and error rate. Persists spans to `sentinel_traces` table.
+- **Orchestrator**: Singleton lifecycle wired to bridge start/stop. Auto-heals on `service:down` events. Triggers SITREP on critical alerts. Persists incidents to `sentinel_incidents`.
+- **Endpoints**: `GET /sentinel` on bridge health server, `GET /api/sentinel` on dashboard (authenticated)
+- **DB Tables**: `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`
+- **Location**: `dashboard/bridge/lib/sentinel/`, `dashboard/scripts/setup-db-sentinel.sql`
 
 ### ERC-8004 Agent Identity
 
