@@ -123,7 +123,7 @@ process.on("SIGINT", async () => {
   const now = new Date().toISOString();
   const offlineRows = [
     "bridge", "main", "soul", "oracle", "sentinel", "briefing",
-    "alchemist", "web3dev", "akua", "basedintern", "midas",
+    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox",
   ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
 
   await supabase
@@ -146,7 +146,7 @@ process.on("SIGTERM", async () => {
   const now = new Date().toISOString();
   const offlineRows = [
     "bridge", "main", "soul", "oracle", "sentinel", "briefing",
-    "alchemist", "web3dev", "akua", "basedintern", "midas",
+    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox",
   ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
 
   await supabase
