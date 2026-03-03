@@ -8,9 +8,19 @@
  */
 
 export { buildSoulContext, processNewMemory, buildContextPacket } from "./context.js";
-export { retrieveRelevantMemories, extractKeywords } from "./retrieval.js";
+export { retrieveRelevantMemories, extractKeywords, scoreMemoryRecency } from "./retrieval.js";
 export { buildAssociations, reinforceAssociation } from "./associations.js";
 export { maybeStartDream, getRelevantInsights, triggerManualDream } from "./dream.js";
+
+// Session Buffer — in-memory caching + invalidation
+export {
+  notifyMemoryWrite,
+  getSessionBufferStats,
+  invalidateAgent,
+  contextCache,
+  retrievalCache,
+} from "./session-buffer.js";
+export type { ScoredMemory } from "./session-buffer.js";
 export {
   getActiveProposals,
   approveManifest,

@@ -19,15 +19,23 @@ import { buildAssociations } from "./associations.js";
 import { getLatestAnchor, isAnchoringEnabled } from "../memory-anchor.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import type { ContextPacket } from "./types.js";
+import { contextCache } from "./session-buffer.js";
 
 /**
  * Build an intelligent context preamble for dispatch.
  * This replaces the old buildMemoryContext() with Soul-powered retrieval.
+ *
+ * Fast path: returns cached context if the same agent is dispatched
+ * within the 30s TTL window (invalidated on memory writes).
  */
 export async function buildSoulContext(
   agentId: string,
   taskMessage: string
 ): Promise<string> {
+  // Fast path: return cached context (invalidated on memory writes)
+  const cached = contextCache.get(agentId);
+  if (cached !== undefined) return cached;
+
   const keywords = extractKeywords(taskMessage);
 
   // Fetch relevant memories (scored by keyword match + associations)
@@ -111,7 +119,12 @@ export async function buildSoulContext(
     memories.map((m) => m.relevance)
   ).catch(() => {});
 
-  return lines.join("\n");
+  const result = lines.join("\n");
+
+  // Cache the built context (auto-invalidated on memory writes)
+  contextCache.set(agentId, result);
+
+  return result;
 }
 
 /**

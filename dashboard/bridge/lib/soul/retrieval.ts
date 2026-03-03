@@ -11,6 +11,13 @@ import { supabase } from "../supabase.js";
 import type { MemoryEntry } from "../agent-memory.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import type { SoulConfig } from "./types.js";
+import {
+  retrievalCache,
+  keywordsKey,
+  getRecentWrites,
+  mergeRecentWrites,
+  type ScoredMemory,
+} from "./session-buffer.js";
 
 const config: SoulConfig = DEFAULT_CONFIG;
 
@@ -45,6 +52,11 @@ export function extractKeywords(text: string): string[] {
 /**
  * Score a memory entry against a set of task keywords.
  * Returns 0.0–1.0 relevance score.
+ *
+ * Combines:
+ *   - Keyword match ratio (0-1)
+ *   - Exponential time-decay (half-life = 48h)
+ *   - Kind importance weighting
  */
 function scoreMemory(entry: MemoryEntry, keywords: string[]): number {
   if (keywords.length === 0) return 0;
@@ -58,39 +70,61 @@ function scoreMemory(entry: MemoryEntry, keywords: string[]): number {
 
   const keywordScore = hits / keywords.length;
 
-  // Recency bonus: memories from last 24h get a boost
+  // Exponential time-decay: half-life of 48 hours
+  // importance = e^(-λt) where λ = ln(2)/halfLife
   const ageMs = Date.now() - new Date(entry.created_at || 0).getTime();
   const ageHours = ageMs / (1000 * 60 * 60);
-  const recencyBonus = ageHours < 24 ? 0.15 : ageHours < 72 ? 0.05 : 0;
+  const halfLifeHours = 48;
+  const lambda = Math.LN2 / halfLifeHours;
+  const timeFactor = Math.exp(-lambda * ageHours); // 1.0 at t=0, 0.5 at 48h, 0.25 at 96h
 
-  // Kind weighting: outcomes and facts are more relevant than observations
+  // Kind weighting: outcomes and errors are most actionable
   const kindWeight: Record<string, number> = {
     outcome: 1.0,
     fact: 1.0,
-    error: 0.9,
-    goal: 0.8,
+    error: 0.95,
+    goal: 0.85,
     observation: 0.6,
     note: 0.5,
   };
   const kw2 = kindWeight[entry.kind] ?? 0.5;
 
-  return Math.min(1.0, keywordScore * kw2 + recencyBonus);
+  // Combine: keyword relevance * kind weight + time decay bonus
+  // Keywords drive primary score, time decay modulates it
+  const score = keywordScore * kw2 * 0.7 + timeFactor * 0.3;
+
+  return Math.min(1.0, score);
+}
+
+/**
+ * Standalone scorer for use by session buffer merge.
+ * Scores without keywords (recency + kind only).
+ */
+export function scoreMemoryRecency(entry: MemoryEntry): number {
+  return scoreMemory(entry, []);
 }
 
 /**
  * Retrieve the most relevant memories for a task.
  *
- * 1. Fetch recent memories for the agent (+ shared)
- * 2. Score each against extracted task keywords
- * 3. Boost by association strength (if soul tables exist)
- * 4. Return top N sorted by relevance
+ * 1. Check session buffer cache (fast path)
+ * 2. Fetch recent memories for the agent (+ shared)
+ * 3. Score each against extracted task keywords
+ * 4. Merge in-memory session writes (fresher than DB)
+ * 5. Boost by association strength (if soul tables exist)
+ * 6. Cache result and return top N sorted by relevance
  */
 export async function retrieveRelevantMemories(
   agentId: string,
   taskMessage: string,
   maxResults = config.maxRetrievalCount
-): Promise<Array<MemoryEntry & { relevance: number }>> {
+): Promise<ScoredMemory[]> {
   const keywords = extractKeywords(taskMessage);
+  const cacheKey = keywordsKey(agentId, keywords);
+
+  // Fast path: return cached results if fresh
+  const cached = retrievalCache.get(cacheKey);
+  if (cached) return cached;
 
   // Fetch a wider window than the old RECENT_LIMIT to score from
   // Exclude TTL-expired memories: created_at + ttl_hours > now
@@ -114,10 +148,16 @@ export async function retrieveRelevantMemories(
   });
 
   // Score each memory
-  const scored = entries.map((entry) => ({
+  let scored: ScoredMemory[] = entries.map((entry) => ({
     ...entry,
     relevance: scoreMemory(entry, keywords),
   }));
+
+  // Merge recent in-memory writes (may not be in DB query result yet)
+  const recent = getRecentWrites(agentId);
+  if (recent.length > 0) {
+    scored = mergeRecentWrites(scored, recent, (e) => scoreMemory(e, keywords));
+  }
 
   // Try to boost by associations (non-fatal if table doesn't exist)
   await boostByAssociations(scored);
@@ -130,6 +170,9 @@ export async function retrieveRelevantMemories(
   const result = relevant.length > 0
     ? relevant.slice(0, maxResults)
     : scored.slice(0, Math.min(5, maxResults)); // fallback: latest 5
+
+  // Cache the result
+  retrievalCache.set(cacheKey, result);
 
   return result;
 }

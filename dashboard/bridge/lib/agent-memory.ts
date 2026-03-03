@@ -3,6 +3,7 @@ import { anchorMemory, isAnchoringEnabled, MemoryCategory } from "./memory-ancho
 import type { MemoryCategoryType } from "./memory-anchor.js";
 import { processNewMemory } from "./soul/index.js";
 import { createCrystal } from "./memory-crystal.js";
+import { notifyMemoryWrite } from "./soul/session-buffer.js";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -117,6 +118,13 @@ export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
     console.error(`[memory] Failed to write memory for ${entry.agent_id}:`, error.message);
     return null;
   }
+
+  // Notify session buffer so caches auto-invalidate
+  notifyMemoryWrite(entry.agent_id, {
+    ...entry,
+    id: data?.id,
+    created_at: new Date().toISOString(),
+  });
 
   return data?.id ?? null;
 }
