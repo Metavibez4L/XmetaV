@@ -13,14 +13,14 @@ Before planning, here's what's **already done** vs what's **not**:
 
 | Optimization | Status | Notes |
 |-------------|--------|-------|
-| Ollama hot-keep (24h, 3 models, 4 parallel) | ✅ Done | launchd plist `com.ollama.env` |
+| Ollama hot-keep (keep_alive=-1, 3 models, 4 parallel) | ✅ Done | launchd plist `com.ollama.env` + `just warm` |
 | Watchdog (Tailscale/SSH/VNC checks) | ✅ Done | launchd plist `com.xmetav.watchdog` |
 | DB indexes (7 CONCURRENTLY indexes) | ✅ Done | `setup-db-indexes.sql` |
 | Circuit breaker (bridge) | ✅ Done | `bridge/lib/circuit-breaker.ts` |
 | TTL cache (bridge) | ✅ Done | `bridge/lib/ttl-cache.ts` |
 | RLS on soul/swaps tables (4 tables, 5 policies) | ✅ Done | `setup-db-soul.sql`, `setup-db-swaps-log.sql` |
 | Power management (never sleep, auto-restart) | ✅ Done | `pmset` configured |
-| `justfile` (18 commands) | ✅ Done | `just status`, `just all`, etc. |
+| `justfile` (24 recipes, launchd-native) | ✅ Done | `just status`, `just restart`, `just cold-check`, `just warm`, etc. |
 | LaunchAgent auto-restart (all 3 services) | ✅ Done | `com.xmetav.{dashboard,bridge,x402}.plist` — KeepAlive + RunAtLoad |
 | RLS on x402_payments, agent_memory, agent_commands | ❌ Not done | Critical tables unprotected |
 | SSE/WebSocket streaming | ❌ Not done | Still using Supabase polling |

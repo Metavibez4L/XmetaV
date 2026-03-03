@@ -70,15 +70,18 @@ openclaw --version
 All services auto-restart on crash and survive reboots via LaunchAgent plists.
 
 Start all: `just all`  
-Stop all: `just killall`  
+Stop all: `just stop` (bootout — won't respawn until `just start`)  
+Restart all: `just restart`  
+Restart one: `just restart-one bridge`  
 Status: `just status`  
-Restart one: `launchctl kickstart -k gui/$(id -u)/com.xmetav.<service>`
+Cold-start check: `just cold-check`  
+Pin models: `just warm`
 
 ## Ollama Configuration
 
 | Setting | Value |
 |---------|-------|
-| OLLAMA_KEEP_ALIVE | 24h (models stay hot) |
+| OLLAMA_KEEP_ALIVE | -1 (never unload — models permanently resident) |
 | OLLAMA_MAX_LOADED_MODELS | 3 (concurrent models in memory) |
 | OLLAMA_NUM_PARALLEL | 4 (parallel request handling) |
 
