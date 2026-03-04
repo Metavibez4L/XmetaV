@@ -19,7 +19,7 @@
         "maxConcurrent": 4
       },
       "model": {
-        "primary": "ollama/qwen2.5:32b-instruct"
+        "primary": "ollama/kimi-k2.5:cloud"
       }
     },
     "list": [
@@ -28,7 +28,7 @@
         "default": true,
         "workspace": "/home/manifest/.openclaw/workspace",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "full",
@@ -52,7 +52,7 @@
         "id": "basedintern",
         "workspace": "/home/manifest/basedintern",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -75,7 +75,7 @@
         "id": "basedintern_web",
         "workspace": "/home/manifest/basedintern",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "full",
@@ -96,7 +96,7 @@
         "id": "akua",
         "workspace": "/home/manifest/akua",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -119,7 +119,7 @@
         "id": "akua_web",
         "workspace": "/home/manifest/akua",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "full",
@@ -140,7 +140,7 @@
         "id": "midas",
         "workspace": "/home/manifest/midas",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "skills": [
           "gas",
@@ -169,7 +169,7 @@
         "id": "sentinel",
         "workspace": "/home/manifest/sentinel",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -192,7 +192,7 @@
         "id": "briefing",
         "workspace": "/home/manifest/briefing",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -215,7 +215,7 @@
         "id": "oracle",
         "workspace": "/home/manifest/oracle",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "skills": [
           "gas",
@@ -242,7 +242,7 @@
         "id": "alchemist",
         "workspace": "/home/manifest/alchemist",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "skills": [
           "gas",
@@ -269,7 +269,7 @@
         "id": "web3dev",
         "workspace": "/home/manifest/web3dev",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "skills": [
           "tools",
@@ -304,7 +304,7 @@
         "id": "soul",
         "workspace": "/home/manifest/soul",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -327,7 +327,7 @@
         "id": "vox",
         "workspace": "/home/manifest/.openclaw/agents/vox",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
@@ -350,7 +350,7 @@
         "id": "scholar",
         "workspace": "/home/manifest/.openclaw/agents/scholar",
         "model": {
-          "primary": "ollama/qwen2.5:32b-instruct"
+          "primary": "ollama/kimi-k2.5:cloud"
         },
         "tools": {
           "profile": "coding",
