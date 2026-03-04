@@ -272,6 +272,8 @@ export async function GET(request: NextRequest) {
       x402: x402Stats,
       soul: soulStats,
       crystals: crystalStats,
+    }, {
+      headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to read on-chain identity";

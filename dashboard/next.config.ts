@@ -6,7 +6,17 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["pg"],
   experimental: {
-    optimizePackageImports: ["lucide-react", "@supabase/supabase-js", "viem"],
+    optimizePackageImports: [
+      "lucide-react",
+      "@supabase/supabase-js",
+      "viem",
+      "openai",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-select",
+      "@radix-ui/react-slot",
+    ],
   },
 };
 

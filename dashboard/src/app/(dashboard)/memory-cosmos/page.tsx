@@ -1,17 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useCallback } from "react";
 import { useMemoryCrystals } from "@/hooks/useMemoryCrystals";
 import {
   CrystalInventory,
-  FusionChamber,
-  SummonOverlay,
   LimitBreakBanner,
-  MemoryCosmos,
   QuestTracker,
+  SummonOverlay,
 } from "@/components/crystals";
 import type { MemoryCrystal } from "@/lib/types";
 import { Gem, RefreshCw, Loader2 } from "lucide-react";
+
+// Lazy-load heavy canvas components
+const MemoryCosmos = dynamic(() => import("@/components/crystals").then(m => m.MemoryCosmos), { ssr: false });
+const FusionChamber = dynamic(() => import("@/components/crystals").then(m => m.FusionChamber), { ssr: false });
 
 export default function MemoryCosmosPage() {
   const {

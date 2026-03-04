@@ -30,7 +30,7 @@ let lineCounter = 0;
 
 // ── Component ──
 
-export function AgentTerminal({ open, onClose }: AgentTerminalProps) {
+export const AgentTerminal = React.memo(function AgentTerminal({ open, onClose }: AgentTerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([
     {
       id: lineCounter++,
@@ -322,4 +322,4 @@ export function AgentTerminal({ open, onClose }: AgentTerminalProps) {
       </div>
     </div>
   );
-}
+});

@@ -85,7 +85,7 @@ function truncate(text: string, len: number): string {
 
 // ── Component ──
 
-export function ChatHistory({
+export const ChatHistory = React.memo(function ChatHistory({
   agentId,
   open,
   onClose,
@@ -340,4 +340,4 @@ export function ChatHistory({
       )}
     </>
   );
-}
+});

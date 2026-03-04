@@ -54,36 +54,38 @@ export async function GET(request: NextRequest) {
 
     /* ── Manifestation Stats ───────────────────── */
     case "stats": {
-      const { data, error } = await admin
+      // Use parallel count queries instead of fetching thousands of rows
+      const statuses = ["proposed", "executed", "auto_executed", "rejected", "expired"] as const;
+      const [totalRes, ...statusResults] = await Promise.all([
+        admin.from("soul_dream_manifestations").select("*", { count: "exact", head: true }),
+        ...statuses.map(s =>
+          admin.from("soul_dream_manifestations").select("*", { count: "exact", head: true }).eq("status", s)
+        ),
+      ]);
+
+      if (totalRes.error) {
+        return NextResponse.json({ error: totalRes.error.message }, { status: 500 });
+      }
+
+      const stats: Record<string, number | Record<string, number>> = {
+        total: totalRes.count ?? 0,
+      };
+      for (let i = 0; i < statuses.length; i++) {
+        stats[statuses[i]] = statusResults[i].count ?? 0;
+      }
+
+      // Bounded category breakdown (last 2000 only)
+      const { data: catRows } = await admin
         .from("soul_dream_manifestations")
-        .select("status, category")
+        .select("category")
         .order("created_at", { ascending: false })
         .limit(2000);
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      const by_category: Record<string, number> = {};
+      for (const row of catRows ?? []) {
+        by_category[row.category] = (by_category[row.category] ?? 0) + 1;
       }
-
-      const rows = data ?? [];
-      const stats = {
-        total: rows.length,
-        proposed: 0,
-        executed: 0,
-        auto_executed: 0,
-        rejected: 0,
-        expired: 0,
-        by_category: {} as Record<string, number>,
-      };
-
-      for (const row of rows) {
-        const s = row.status;
-        if (s === "proposed") stats.proposed++;
-        else if (s === "executed") stats.executed++;
-        else if (s === "auto_executed") stats.auto_executed++;
-        else if (s === "rejected") stats.rejected++;
-        else if (s === "expired") stats.expired++;
-        stats.by_category[row.category] = (stats.by_category[row.category] ?? 0) + 1;
-      }
+      stats.by_category = by_category;
 
       return NextResponse.json({ stats });
     }

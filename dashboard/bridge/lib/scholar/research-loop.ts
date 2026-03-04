@@ -217,6 +217,7 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
     if (score >= config.minShareScore) {
       await writeSharedMemory(
         `[scholar/${domain.label}] ${chunk}`,
+        "fact",
         `scholar/${domain.id}`
       );
       totalShared++;
@@ -232,11 +233,10 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
       try {
         const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
         const result = await anchorMemory(agentTokenId, MemoryCategory.MILESTONE, {
-          content: chunk,
-          domain: domain.id,
-          relevanceScore: score,
-          scoring: finding.scoring,
+          content: `[${domain.id}] (score: ${score.toFixed(2)}) ${chunk}`,
+          kind: "milestone",
           source: "scholar",
+          task: `scholar/${domain.id}`,
           timestamp: finding.discoveredAt,
         });
 
