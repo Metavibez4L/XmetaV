@@ -102,6 +102,7 @@ flowchart TB
                 A_BI["basedintern"]
                 A_BI_W["basedintern_web"]
                 A_VOX["vox"]
+                A_SCHOLAR["scholar"]
                 A_DYN["dynamic"]
             end
         end
@@ -375,6 +376,7 @@ Static agents are defined in `openclaw.json`. Dynamic agents can be created at r
 | `akua_web` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/akua` | full | Same repo — browser/web automation only |
 | `soul` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dream consolidation, associations |
 | `vox` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/vox` | coding | **Brand & Campaigns** — content strategy, voice calibration, competitor analysis |
+| `scholar` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/scholar` | coding | **Deep Research** — 24/7 research daemon, relevance scoring, memory anchoring (ERC-8004, x402, L2, stablecoins, SMB adoption) |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(per-agent)_ | Created on-demand by Agent Factory |
 
 ### Agent Factory (Orchestrator Layer)

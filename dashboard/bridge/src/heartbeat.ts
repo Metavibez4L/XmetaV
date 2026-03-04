@@ -14,7 +14,7 @@ let timer: ReturnType<typeof setInterval> | null = null;
 /** All fleet agents whose sessions the bridge keeps alive */
 const FLEET_AGENTS = [
   "main", "soul", "oracle", "sentinel", "briefing",
-  "alchemist", "web3dev", "akua", "basedintern", "midas", "vox",
+  "alchemist", "web3dev", "akua", "basedintern", "midas", "vox", "scholar",
 ];
 
 /** Path to the briefing skill (pure bash — no LLM tokens) */

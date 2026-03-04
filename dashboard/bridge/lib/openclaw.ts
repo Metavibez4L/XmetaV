@@ -18,6 +18,7 @@ const ALLOWED_AGENTS = new Set([
   "basedintern",
   "basedintern_web",
   "vox",
+  "scholar",
 ]);
 
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */

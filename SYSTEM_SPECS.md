@@ -46,7 +46,7 @@
 
 ---
 
-## Agent Fleet (11 Active)
+## Agent Fleet (12 Active)
 
 | Agent | Role | Status |
 |-------|------|--------|
@@ -61,6 +61,7 @@
 | basedintern | TypeScript | ✅ |
 | midas | Revenue | ✅ |
 | vox | Brand & Campaigns | ✅ |
+| scholar | Deep Research | ✅ |
 
 ---
 
@@ -140,7 +141,7 @@
 
 - **Latest Anchor:** 2026-03-02T19:10 (Category 2)
 - **Total Anchored:** 62 memories
-- **Fleet Updated:** All 10 agents
+- **Fleet Updated:** All 12 agents
 
 ---
 

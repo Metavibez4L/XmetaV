@@ -1,7 +1,7 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 11 specialized agents across intel, development, operations, branding, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), brand voice & campaigns (vox), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, branding, research, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), brand voice & campaigns (vox), 24/7 deep research with relevance scoring (scholar), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), autonomous research with memory anchoring, and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
@@ -108,7 +108,12 @@
     "content-strategy",
     "campaign-generation",
     "voice-calibration",
-    "competitor-analysis"
+    "competitor-analysis",
+    "deep-research",
+    "relevance-scoring",
+    "knowledge-anchoring",
+    "research-domain-scheduling",
+    "automated-memory-dedup"
   ],
   "fleet": {
     "agents": [
@@ -122,11 +127,12 @@
       { "id": "basedintern", "role": "TypeScript/Node.js repo agent", "room": "devFloor" },
       { "id": "akua", "role": "Solidity/Hardhat repo agent", "room": "devFloor" },
       { "id": "soul", "role": "Memory orchestrator — context curation, association building, dream consolidation", "room": "soul" },
-      { "id": "vox", "role": "Brand voice & campaign specialist — content strategy, voice calibration, competitor analysis", "room": "opsOutreach", "skills": ["content-strategy", "voice-calibration", "competitor-analysis"] }
+      { "id": "vox", "role": "Brand voice & campaign specialist — content strategy, voice calibration, competitor analysis", "room": "opsOutreach", "skills": ["content-strategy", "voice-calibration", "competitor-analysis"] },
+      { "id": "scholar", "role": "24/7 deep research daemon — ERC-8004, x402, L2, stablecoins, SMB adoption with relevance scoring & memory anchoring", "room": "research", "skills": ["deep-research", "relevance-scoring", "knowledge-anchoring"] }
     ],
     "model": "ollama/kimi-k2.5:cloud",
     "meetingCapacity": 8,
-    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul", "opsOutreach"]
+    "rooms": ["command", "meeting", "intel", "web3Lab", "devFloor", "soul", "opsOutreach", "research"]
   },
   "contracts": {
     "token": {

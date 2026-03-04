@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-03-03  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v25 (Sentinel Engine + Bridge v1.5.0)  
+**XmetaV Version:** v26 (Scholar Research Daemon + Bridge v1.6.0)  
 **Platform:** macOS 26.3 (Sequoia)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -91,7 +91,7 @@ Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across
 
 | Model | Size | Context | Purpose | Hot-Keep |
 |-------|------|---------|---------|----------|
-| `kimi-k2.5:cloud` | Cloud (remote) | 262K | Primary agent model — all 12 fleet agents | N/A (cloud-proxied, no local VRAM) |
+| `kimi-k2.5:cloud` | Cloud (remote) | 262K | Primary agent model — all 14 fleet agents | N/A (cloud-proxied, no local VRAM) |
 | `qwen2.5:7b-instruct` | 4.7 GB (19.7GB VRAM) | 32K | Local fallback | ✅ Pinned (`keep_alive:-1`, expires ~2318) |
 
 Use `just cold-check` to verify models. Use `just warm` to re-pin after Ollama restart.

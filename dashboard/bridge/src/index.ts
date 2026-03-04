@@ -6,6 +6,7 @@ import { executeCommand } from "./executor.js";
 import { subscribeToSwarms } from "./swarm-executor.js";
 import { startIntentTracker } from "./intent-tracker.js";
 import { Sentinel } from "../lib/sentinel/index.js";
+import { startScholar, stopScholar, getScholarStats } from "../lib/scholar/index.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -13,9 +14,10 @@ const HEALTH_PORT = Number(process.env.BRIDGE_PORT || 3001);
 const PID_FILE = path.resolve(import.meta.dirname, "../.bridge.pid");
 
 console.log("╔══════════════════════════════════════╗");
-console.log("║    XmetaV Bridge Daemon v1.5.0       ║");
+console.log("║    XmetaV Bridge Daemon v1.6.0       ║");
 console.log("║    + Soul Agent (Memory Orchestrator) ║");
 console.log("║    + Sentinel Monitoring Engine       ║");
+console.log("║    + Scholar Research Daemon          ║");
 console.log("╚══════════════════════════════════════╝");
 console.log("");
 
@@ -47,6 +49,15 @@ const healthServer = createServer(async (req, res) => {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(err) }));
     }
+  } else if (req.url === "/scholar" || req.url === "/scholar/stats") {
+    try {
+      const stats = getScholarStats();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(stats));
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(err) }));
+    }
   } else {
     res.writeHead(404);
     res.end();
@@ -58,6 +69,9 @@ healthServer.listen(HEALTH_PORT, () => {
 
 // Start heartbeat
 startHeartbeat();
+
+// Start Scholar research daemon (24/7 continuous research)
+startScholar();
 
 // Subscribe to new pending commands via Realtime
 const channel = supabase
@@ -105,13 +119,14 @@ const swarmChannel = subscribeToSwarms();
 // Start intent session tracker
 const intentChannel = startIntentTracker();
 
-console.log("[bridge] Listening for commands, swarm runs & intent sessions...");
+console.log("[bridge] Listening for commands, swarm runs, intent sessions & scholar research...");
 console.log("[bridge] Press Ctrl+C to stop");
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("\n[bridge] Shutting down...");
   sentinel.stop();
+  stopScholar();
   stopHeartbeat();
   healthServer.close();
   try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
@@ -123,7 +138,7 @@ process.on("SIGINT", async () => {
   const now = new Date().toISOString();
   const offlineRows = [
     "bridge", "main", "soul", "oracle", "sentinel", "briefing",
-    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox",
+    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox", "scholar",
   ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
 
   await supabase
@@ -136,6 +151,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   console.log("\n[bridge] SIGTERM received, shutting down...");
   sentinel.stop();
+  stopScholar();
   stopHeartbeat();
   healthServer.close();
   try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
@@ -146,12 +162,7 @@ process.on("SIGTERM", async () => {
   const now = new Date().toISOString();
   const offlineRows = [
     "bridge", "main", "soul", "oracle", "sentinel", "briefing",
-    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox",
-  ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
-
-  await supabase
-    .from("agent_sessions")
-    .upsert(offlineRows, { onConflict: "agent_id" });
+    "alchemist", "web3dev", "akua", "basedintern", "midas", "vox", "scholar",
 
   process.exit(0);
 });

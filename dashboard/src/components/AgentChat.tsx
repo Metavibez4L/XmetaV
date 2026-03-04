@@ -451,7 +451,7 @@ export function AgentChat() {
         const lowerMsg = trimmed.toLowerCase();
         const isMeetingCmd = /meeting/i.test(lowerMsg);
         if (isMeetingCmd) {
-          const AGENT_IDS = ["main","operator","sentinel","soul","briefing","oracle","alchemist","web3dev","akua","akua_web","basedintern","basedintern_web","vox"];
+          const AGENT_IDS = ["main","operator","sentinel","soul","briefing","oracle","alchemist","web3dev","akua","akua_web","basedintern","basedintern_web","vox","scholar"];
           const mentioned = AGENT_IDS.filter((id) => lowerMsg.includes(id.replace(/_/g, " ")) || lowerMsg.includes(id));
           const meetingSet = new Set([agentId, "main", ...mentioned]);
           if (mentioned.length === 0) { meetingSet.add("briefing"); meetingSet.add("oracle"); }

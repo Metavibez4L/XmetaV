@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v25
+Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v26
 
 ```
  ___   ___                    __           ___   ___
@@ -14,7 +14,7 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v25
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  13 (+ dynamic)                     |
+ |   agents:  14 (+ dynamic)                     |
  |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
@@ -54,7 +54,7 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v25
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
 - **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle), gas/standards/addresses/concepts (midas). Skills displayed as badges in Fleet table and Identity page
-- Multi-agent management (12 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web
+- Multi-agent management (14 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web, vox, scholar
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -863,6 +863,12 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-03-03 (v26) — Scholar Research Daemon + Bridge v1.6.0
+- **Scholar Research Daemon** — New 24/7 autonomous research agent (`scholar`). Cycles through 5 domains (ERC-8004, x402, Layer 2, stablecoins, SMB adoption) on scheduled intervals (15–60 min). Relevance scoring: novelty (0.35) + impact (0.30) + actionability (0.20) + recency (0.15). Auto-anchors significant findings (≥0.7) on-chain, shares high-value intel (≥0.6) to fleet memory, deduplicates against last 50 memories (70% keyword overlap). Room: Research. Color: Emerald (`#10b981`). Skills: `deep-research`, `relevance-scoring`, `knowledge-anchoring`. Arena desk at col 5, row 7. Meeting seat 75°. Connections: main, soul, oracle, midas, briefing. Runner: `scripts/scholar-agent.sh`. Runbook: `docs/agents/scholar.md`
+- **Bridge Daemon v1.6.0** — Upgraded from v1.5.0 with Scholar Research Loop integration, new `/scholar` health endpoint, graceful Scholar shutdown on SIGTERM/SIGINT
+- **Research Engine Modules** — `bridge/lib/scholar/`: types (domain configs), scorer (4-dimension relevance scoring), research-loop (continuous daemon with round-robin domain scheduling), index (public exports)
+- **Full Stack Integration** — Scholar added to: Arena (research room, desk, meeting seat, connections), office workstations, KNOWN_AGENTS, AgentChat, AgentIdentity (emerald color, 📚 room icon), ERC-8004 metadata+registration (fleet of 12, 5 new capabilities), Supabase (agent_controls + memory seeds), FLEET_AGENTS heartbeat, ALLOWED_AGENTS openclaw, both shutdown offline arrays
 
 ### 2026-03-03 (v25) — Sentinel Monitoring Engine + Vox Branding Agent + Bridge v1.5.0
 - **Vox Branding Agent** — New brand voice & campaign specialist (`vox`). Content strategy, voice calibration, competitor monitoring. Room: OPS Outreach. Color: Cyan (`#06b6d4`). Skills: `content-strategy`, `voice-calibration`, `competitor-analysis`. Arena desk at col 1, row 5.5. Meeting seat 105°. Connections: main, midas, oracle, briefing, soul. Runner: `scripts/vox-agent.sh`. x402 pricing: campaign $0.15, voice audit $0.25, competitor $0.20, calendar $0.30, crisis $0.50
