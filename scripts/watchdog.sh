@@ -4,6 +4,8 @@
 # Detects crash loops, checks bridge/dashboard/x402 health
 # Runs every 5 minutes via launchd
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin"
+
 LOG="/tmp/xmetav-watchdog.log"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 CRASH_LOG="/tmp/xmetav-crash-tracker.json"
