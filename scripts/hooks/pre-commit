@@ -1,0 +1,39 @@
+#!/bin/zsh
+# XmetaV pre-commit hook — validates bridge compiles before allowing commits
+# Prevents broken bridge/src/index.ts from reaching the repo.
+#
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+REPO="$(git rev-parse --show-toplevel)"
+BRIDGE_DIR="${REPO}/dashboard/bridge"
+ESBUILD="${BRIDGE_DIR}/node_modules/.bin/esbuild"
+
+# Only run if bridge files are staged
+BRIDGE_STAGED=$(git diff --cached --name-only -- 'dashboard/bridge/')
+if [[ -z "$BRIDGE_STAGED" ]]; then
+  exit 0
+fi
+
+echo "[pre-commit] Bridge files staged — running syntax check..."
+
+if [[ ! -x "$ESBUILD" ]]; then
+  echo "[pre-commit] WARNING: esbuild not found, skipping check"
+  exit 0
+fi
+
+CHECK_OUT=$("$ESBUILD" "${BRIDGE_DIR}/src/index.ts" --bundle --platform=node --outfile=/dev/null 2>&1)
+if [[ $? -ne 0 ]]; then
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════╗"
+  echo "║  COMMIT BLOCKED — Bridge syntax check failed         ║"
+  echo "╚═══════════════════════════════════════════════════════╝"
+  echo ""
+  echo "$CHECK_OUT"
+  echo ""
+  echo "Fix the error above before committing."
+  echo "To bypass (emergency only): git commit --no-verify"
+  exit 1
+fi
+
+echo "[pre-commit] Bridge syntax check passed ✓"
+exit 0
