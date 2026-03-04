@@ -35,7 +35,7 @@ const healthServer = createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       status: "ok",
-      version: "1.5.0",
+      version: "1.6.0",
       pid: process.pid,
       uptime: process.uptime(),
       startedAt,
@@ -163,6 +163,11 @@ process.on("SIGTERM", async () => {
   const offlineRows = [
     "bridge", "main", "soul", "oracle", "sentinel", "briefing",
     "alchemist", "web3dev", "akua", "basedintern", "midas", "vox", "scholar",
+  ].map((id) => ({ agent_id: id, status: "offline", last_heartbeat: now }));
+
+  await supabase
+    .from("agent_sessions")
+    .upsert(offlineRows, { onConflict: "agent_id" });
 
   process.exit(0);
 });
