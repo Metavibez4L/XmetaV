@@ -16,6 +16,7 @@ import {
   keywordsKey,
   getRecentWrites,
   mergeRecentWrites,
+  adaptiveTTL,
   type ScoredMemory,
 } from "./session-buffer.js";
 
@@ -171,8 +172,9 @@ export async function retrieveRelevantMemories(
     ? relevant.slice(0, maxResults)
     : scored.slice(0, Math.min(5, maxResults)); // fallback: latest 5
 
-  // Cache the result
-  retrievalCache.set(cacheKey, result);
+  // Cache the result with adaptive TTL
+  const ttl = adaptiveTTL(keywords);
+  retrievalCache.set(cacheKey, result, ttl);
 
   return result;
 }

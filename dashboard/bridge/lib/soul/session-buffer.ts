@@ -27,6 +27,31 @@ export const contextCache = new TTLCache<string>(30_000);
 /** Scored retrieval results, keyed by "agentId:keywordsHash" */
 export const retrievalCache = new TTLCache<ScoredMemory[]>(15_000);
 
+// ---- Adaptive TTL ----
+
+/** Payment-related keywords trigger shorter cache TTLs (fresher data needed) */
+const VOLATILE_KEYWORDS = new Set([
+  "payment", "revenue", "spend", "usdc", "trade", "swap",
+  "balance", "price", "fee", "billing", "transaction",
+]);
+
+/**
+ * Determine the retrieval cache TTL based on query keywords.
+ *   - Payment / trade queries → 5s (high-volatility)
+ *   - Default queries → 15s (normal)
+ *   - Status / identity queries → 30s (low-volatility)
+ */
+export function adaptiveTTL(keywords: string[]): number {
+  const hasVolatile = keywords.some((kw) => VOLATILE_KEYWORDS.has(kw));
+  if (hasVolatile) return 5_000;   // 5s — financial data changes rapidly
+
+  const statusKeywords = ["status", "identity", "config", "health", "version"];
+  const isStable = keywords.some((kw) => statusKeywords.includes(kw));
+  if (isStable) return 30_000;     // 30s — stable data
+
+  return 15_000;                   // 15s default
+}
+
 // ---- Session Ring Buffer ----
 
 const MAX_RECENT_PER_AGENT = 20;
@@ -78,6 +103,18 @@ export function invalidateAgent(agentId: string): void {
   if (agentId === "_shared") {
     contextCache.clear();
   }
+}
+
+/**
+ * Invalidate caches on payment events.
+ * Called from the payment pipeline so agents see fresh financial data.
+ */
+export function invalidateOnPayment(): void {
+  // Clear all retrieval caches — payment events change revenue context
+  retrievalCache.clear();
+  // Clear context for midas + alchemist (revenue-sensitive agents)
+  contextCache.invalidate("midas");
+  contextCache.invalidate("alchemist");
 }
 
 /**

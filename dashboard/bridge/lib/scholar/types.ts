@@ -34,7 +34,7 @@ export const RESEARCH_DOMAINS: DomainConfig[] = [
       "agent wallet", "reputation", "agent nft",
     ],
     weight: 1.2,
-    intervalMinutes: 15,
+    intervalMinutes: 30,
   },
   {
     id: "x402",
@@ -45,7 +45,7 @@ export const RESEARCH_DOMAINS: DomainConfig[] = [
       "machine-to-machine payment", "autonomous payment",
     ],
     weight: 1.2,
-    intervalMinutes: 20,
+    intervalMinutes: 40,
   },
   {
     id: "layer2",
@@ -56,7 +56,7 @@ export const RESEARCH_DOMAINS: DomainConfig[] = [
       "base mainnet", "l2 fees", "throughput",
     ],
     weight: 1.0,
-    intervalMinutes: 30,
+    intervalMinutes: 60,
   },
   {
     id: "stablecoins",
@@ -67,7 +67,7 @@ export const RESEARCH_DOMAINS: DomainConfig[] = [
       "stablecoin adoption", "pyusd",
     ],
     weight: 0.9,
-    intervalMinutes: 45,
+    intervalMinutes: 90,
   },
   {
     id: "smb-adoption",
@@ -78,7 +78,7 @@ export const RESEARCH_DOMAINS: DomainConfig[] = [
       "payment gateway", "smb crypto", "retail crypto",
     ],
     weight: 1.1,
-    intervalMinutes: 60,
+    intervalMinutes: 120,
   },
 ];
 
@@ -127,8 +127,31 @@ export interface ScholarConfig {
 export const DEFAULT_SCHOLAR_CONFIG: ScholarConfig = {
   minMemoryScore: 0.3,
   minShareScore: 0.6,
-  minAnchorScore: 0.7,
+  minAnchorScore: 0.75,
   maxConcurrent: 2,
   deduplicationWindowHours: 12,
   maxFindingsPerCycle: 5,
 };
+
+// ---- Adaptive Interval Logic ----
+
+/**
+ * Compute the effective interval for a domain based on its last avg score.
+ * High-scoring domains get checked sooner; low-scoring domains back off.
+ *
+ *   avgScore ≥ 0.7  → 0.6× base  (more frequent — domain is hot)
+ *   avgScore ≥ 0.5  → 1.0× base  (normal cadence)
+ *   avgScore ≥ 0.3  → 1.5× base  (slow down — low signal)
+ *   avgScore < 0.3   → 2.0× base  (back off — mostly noise)
+ */
+export function adaptiveInterval(
+  baseMinutes: number,
+  lastAvgScore: number | null
+): number {
+  if (lastAvgScore === null) return baseMinutes; // first run — use base
+
+  if (lastAvgScore >= 0.7) return Math.round(baseMinutes * 0.6);
+  if (lastAvgScore >= 0.5) return baseMinutes;
+  if (lastAvgScore >= 0.3) return Math.round(baseMinutes * 1.5);
+  return Math.round(baseMinutes * 2.0);
+}

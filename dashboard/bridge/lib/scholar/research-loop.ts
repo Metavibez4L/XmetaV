@@ -14,13 +14,15 @@
 
 import { supabase } from "../supabase.js";
 import { writeMemory, writeSharedMemory } from "../agent-memory.js";
-import { anchorMemory, isAnchoringEnabled } from "../memory-anchor.js";
+import { anchorMemory, isAnchoringEnabled, queueAnchor } from "../memory-anchor.js";
 import { MemoryCategory } from "../memory-anchor.js";
 import { processNewMemory } from "../soul/index.js";
 import { scoreRelevance, isDuplicate } from "./scorer.js";
+import { queueVoxContent } from "../vox/content-automation.js";
 import {
   RESEARCH_DOMAINS,
   DEFAULT_SCHOLAR_CONFIG,
+  adaptiveInterval,
   type DomainConfig,
   type ResearchFinding,
   type ScholarConfig,
@@ -30,6 +32,9 @@ const config: ScholarConfig = DEFAULT_SCHOLAR_CONFIG;
 
 /** Track last research time per domain */
 const lastResearchTime = new Map<string, number>();
+
+/** Track last average score per domain for adaptive scheduling */
+const lastDomainAvgScore = new Map<string, number>();
 
 /** Track total findings for stats */
 let totalFindings = 0;
@@ -52,7 +57,11 @@ function pickNextDomain(): DomainConfig | null {
   for (const domain of RESEARCH_DOMAINS) {
     const lastTime = lastResearchTime.get(domain.id) || 0;
     const elapsedMs = now - lastTime;
-    const intervalMs = domain.intervalMinutes * 60 * 1000;
+    const effectiveMinutes = adaptiveInterval(
+      domain.intervalMinutes,
+      lastDomainAvgScore.get(domain.id) ?? null
+    );
+    const intervalMs = effectiveMinutes * 60 * 1000;
 
     if (elapsedMs >= intervalMs) {
       return domain;
@@ -221,6 +230,9 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
         `scholar/${domain.id}`
       );
       totalShared++;
+
+      // ---- Queue for Vox marketing (auto-thread) ----
+      queueVoxContent(finding).catch(() => {});
     }
 
     // ---- Build associations via Soul ----
@@ -228,11 +240,11 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
       processNewMemory(memoryId, "scholar", chunk).catch(() => {});
     }
 
-    // ---- Anchor on-chain if significant ----
-    if (score >= config.minAnchorScore && isAnchoringEnabled()) {
+    // ---- Anchor on-chain if significant (score ≥ threshold AND novelty ≥ 0.8) ----
+    if (score >= config.minAnchorScore && novelty >= 0.8 && isAnchoringEnabled()) {
       try {
         const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
-        const result = await anchorMemory(agentTokenId, MemoryCategory.MILESTONE, {
+        const result = await queueAnchor(agentTokenId, MemoryCategory.MILESTONE, {
           content: `[${domain.id}] (score: ${score.toFixed(2)}) ${chunk}`,
           kind: "milestone",
           source: "scholar",
@@ -272,6 +284,13 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
     );
 
   lastResearchTime.set(domain.id, Date.now());
+
+  // Track average score for adaptive scheduling
+  if (findings.length > 0) {
+    const avgScore =
+      findings.reduce((sum, f) => sum + f.relevanceScore, 0) / findings.length;
+    lastDomainAvgScore.set(domain.id, avgScore);
+  }
 
   console.log(
     `[scholar] ${domain.label}: ${findings.length} findings ` +
@@ -361,7 +380,12 @@ export function getScholarStats() {
     domains: RESEARCH_DOMAINS.map((d) => ({
       id: d.id,
       label: d.label,
-      intervalMinutes: d.intervalMinutes,
+      baseIntervalMinutes: d.intervalMinutes,
+      effectiveIntervalMinutes: adaptiveInterval(
+        d.intervalMinutes,
+        lastDomainAvgScore.get(d.id) ?? null
+      ),
+      lastAvgScore: lastDomainAvgScore.get(d.id) ?? null,
       lastResearched: lastResearchTime.get(d.id)
         ? new Date(lastResearchTime.get(d.id)!).toISOString()
         : null,

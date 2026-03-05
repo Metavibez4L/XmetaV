@@ -18,6 +18,14 @@ import {
 } from "./payment-memory.js";
 import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
 import { createAlphaFeedsRouter, ALPHA_FEE_SCHEDULES } from "./alpha-feeds.js";
+import {
+  recordDemand,
+  getDynamicPriceString,
+  getPricingSnapshot,
+  syncPricingToSupabase,
+  BUNDLES,
+  getBundlePrice,
+} from "./dynamic-pricing.js";
 
 // ── TTL Cache for expensive lookups ──────────────────────────
 interface CacheEntry<T> { value: T; expiresAt: number; }
@@ -164,6 +172,9 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
     // ---- Midas endpoint_analytics tracking ----
     trackEndpointAnalytics(endpoint, amount, callerAddress);
+
+    // ---- Dynamic pricing demand tracking ----
+    recordDemand(endpoint);
 
     // ---- A/B pricing experiment tracking ----
     const numAmt = parseFloat(amount.replace("$", ""));
@@ -1074,6 +1085,21 @@ app.get("/token-info", async (_req, res) => {
   });
 });
 
+// ---- Dynamic Pricing API (free) ----
+app.get("/pricing", (_req, res) => {
+  const snapshot = getPricingSnapshot();
+  res.json({
+    ...snapshot,
+    bundles: BUNDLES.map((b) => ({
+      name: b.name,
+      description: b.description,
+      endpoints: b.endpoints,
+      bundlePrice: `$${getBundlePrice(b).toFixed(2)}`,
+      discount: `${(b.discount * 100).toFixed(0)}%`,
+    })),
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -1117,6 +1143,7 @@ app.get("/health", (_req, res) => {
       },
       free: {
         "GET /health": "this endpoint",
+        "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
         "POST /digest": "trigger payment→memory digest (writes to agent memories)",
@@ -1268,6 +1295,12 @@ const server = app.listen(port, () => {
 
   // Start payment→memory digest scheduler (hourly)
   startDigestScheduler();
+
+  // Start dynamic pricing sync to Supabase (every 5 min)
+  if (supabase) {
+    setInterval(() => syncPricingToSupabase(supabase), 5 * 60 * 1000);
+    console.log(`  Pricing:   dynamic (syncs to Supabase every 5min)`);
+  }
 });
 
 // ── Graceful Shutdown: write session summary to memory ──

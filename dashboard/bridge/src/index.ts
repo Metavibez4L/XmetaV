@@ -7,6 +7,8 @@ import { subscribeToSwarms } from "./swarm-executor.js";
 import { startIntentTracker } from "./intent-tracker.js";
 import { Sentinel } from "../lib/sentinel/index.js";
 import { startScholar, stopScholar, getScholarStats } from "../lib/scholar/index.js";
+import { flushPendingAnchors } from "../lib/memory-anchor.js";
+import { invalidateOnPayment } from "../lib/soul/session-buffer.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -116,6 +118,22 @@ processPendingCommands();
 // Subscribe to swarm runs
 const swarmChannel = subscribeToSwarms();
 
+// Subscribe to x402 payments — invalidate soul caches on revenue events
+const paymentChannel = supabase
+  .channel("bridge-payments")
+  .on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "x402_payments",
+    },
+    () => {
+      invalidateOnPayment();
+    }
+  )
+  .subscribe();
+
 // Start intent session tracker
 const intentChannel = startIntentTracker();
 
@@ -129,9 +147,11 @@ process.on("SIGINT", async () => {
   stopScholar();
   stopHeartbeat();
   healthServer.close();
+  await flushPendingAnchors();
   try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
   supabase.removeChannel(channel);
   supabase.removeChannel(swarmChannel);
+  supabase.removeChannel(paymentChannel);
   supabase.removeChannel(intentChannel);
 
   // Mark bridge + all fleet agents as offline
@@ -154,9 +174,11 @@ process.on("SIGTERM", async () => {
   stopScholar();
   stopHeartbeat();
   healthServer.close();
+  await flushPendingAnchors();
   try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
   supabase.removeChannel(channel);
   supabase.removeChannel(swarmChannel);
+  supabase.removeChannel(paymentChannel);
   supabase.removeChannel(intentChannel);
 
   const now = new Date().toISOString();

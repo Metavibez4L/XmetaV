@@ -9,11 +9,22 @@
  *
  * Formula:
  *   score = (novelty × 0.35) + (impact × 0.30) + (actionability × 0.20) + (recency × 0.15)
+ *
+ * Dedup:
+ *   - Keyword overlap ≥ 85% = duplicate (was 70%)
+ *   - Entity-based semantic check for named entities
+ *   - Recurring topic detection for consolidation
  */
 
 import { supabase } from "../supabase.js";
 import { extractKeywords } from "../soul/retrieval.js";
 import type { ResearchDomain, DomainConfig, RESEARCH_DOMAINS } from "./types.js";
+
+/** Duplicate threshold — 85% keyword overlap */
+const DUPLICATE_THRESHOLD = 0.85;
+
+/** Entity-based overlap threshold (lower because entities are more specific) */
+const ENTITY_DUPLICATE_THRESHOLD = 0.6;
 
 // ---- Impact Keywords ----
 
@@ -85,6 +96,7 @@ export async function scoreRelevance(
 /**
  * Compute novelty by checking how many recent memories overlap with this finding.
  * High overlap = low novelty (we already know this).
+ * Uses both keyword overlap and entity-based semantic matching.
  */
 async function computeNovelty(
   keywords: string[],
@@ -102,13 +114,30 @@ async function computeNovelty(
 
     if (!recentMemories || recentMemories.length === 0) return 1.0; // Nothing stored yet = max novelty
 
-    // Count how many existing memories share 50%+ keywords
+    // Count how many existing memories share keywords at threshold
     let duplicateCount = 0;
+    const contentEntities = extractEntities(keywords.join(" "));
+
     for (const mem of recentMemories) {
       const memKw = extractKeywords(mem.content);
       const overlap = keywords.filter((kw) => memKw.includes(kw));
+
+      // Keyword overlap check (raised to 50% from having been 50%)
       if (overlap.length >= keywords.length * 0.5) {
         duplicateCount++;
+        continue;
+      }
+
+      // Entity-based semantic check — even if keywords diverge,
+      // if the same named entities appear the topic is the same
+      if (contentEntities.length >= 2) {
+        const memEntities = extractEntities(mem.content);
+        const entityOverlap = contentEntities.filter((e) =>
+          memEntities.some((me) => me.toLowerCase() === e.toLowerCase())
+        );
+        if (entityOverlap.length >= contentEntities.length * ENTITY_DUPLICATE_THRESHOLD) {
+          duplicateCount += 0.5; // Partial match — contributes less
+        }
       }
     }
 
@@ -171,13 +200,68 @@ export async function isDuplicate(
     for (const mem of recentMemories) {
       const memKw = extractKeywords(mem.content);
       const overlap = keywords.filter((kw) => memKw.includes(kw));
-      // 70%+ keyword overlap = duplicate
-      if (overlap.length >= keywords.length * 0.7) {
+      // 85%+ keyword overlap = duplicate (raised from 70%)
+      if (overlap.length >= keywords.length * DUPLICATE_THRESHOLD) {
         return true;
+      }
+
+      // Entity-based semantic dedup
+      const contentEntities = extractEntities(content);
+      if (contentEntities.length >= 2) {
+        const memEntities = extractEntities(mem.content);
+        const entityOverlap = contentEntities.filter((e) =>
+          memEntities.some((me) => me.toLowerCase() === e.toLowerCase())
+        );
+        if (entityOverlap.length >= contentEntities.length * ENTITY_DUPLICATE_THRESHOLD) {
+          // Same entities + some keyword overlap = likely duplicate
+          if (overlap.length >= keywords.length * 0.4) {
+            return true;
+          }
+        }
       }
     }
     return false;
   } catch {
     return false;
   }
+}
+
+// ---- Entity Extraction ----
+
+/** Known project/protocol names for entity matching */
+const KNOWN_ENTITIES = [
+  "ethereum", "base", "optimism", "arbitrum", "polygon", "solana",
+  "coinbase", "circle", "tether", "uniswap", "aave", "compound",
+  "opensea", "metamask", "alchemy", "infura", "chainlink",
+  "erc-8004", "erc8004", "x402", "usdc", "usdt", "dai",
+  "eip-4844", "op-stack", "superchain", "blob",
+];
+
+/**
+ * Extract named entities from text.
+ * Combines known-entity lookup with capitalized-word heuristic
+ * to catch project names, protocols, and organizations.
+ */
+function extractEntities(text: string): string[] {
+  const lower = text.toLowerCase();
+  const entities: string[] = [];
+
+  // Match known entities
+  for (const entity of KNOWN_ENTITIES) {
+    if (lower.includes(entity)) {
+      entities.push(entity);
+    }
+  }
+
+  // Heuristic: capitalized multi-word names (e.g., "Agent Registry", "Base Mainnet")
+  const capitalizedPattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g;
+  let match;
+  while ((match = capitalizedPattern.exec(text)) !== null) {
+    const name = match[1].toLowerCase();
+    if (!entities.includes(name) && name.length > 4) {
+      entities.push(name);
+    }
+  }
+
+  return [...new Set(entities)];
 }
