@@ -212,7 +212,7 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 - **Indexes**: `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` composite
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
-### Bridge Daemon (Node.js — v1.5.0)
+### Bridge Daemon (Node.js — v1.6.0)
 
 A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
 
@@ -222,7 +222,9 @@ A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
 - **Sentinel Engine**: Autonomous monitoring system with event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing (see below)
-- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, stops Sentinel engine, sets session offline
+- **Anchor Batch Queue**: `queueAnchor()` + `flushPendingAnchors()` — batches memory anchoring (IPFS + on-chain) in groups of 3, auto-flushes every 5 min (v1.6.0)
+- **Payment Cache Invalidation**: Subscribes to `x402_payments` Realtime channel, triggers `invalidateOnPayment()` for session buffer TTL (v1.6.0)
+- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, stops Sentinel engine, flushes pending anchors, sets session offline
 - **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next
 - **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
 - **Dashboard Integration**: `bridge-manager.ts` uses `launchctl` to start/stop/status the bridge service (no more spawned child processes)
@@ -234,6 +236,7 @@ A standalone Express server that gates XmetaV API endpoints with USDC micro-paym
 
 - **Port**: 4021
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
+- **Dynamic Pricing Engine**: Demand-based multiplier (0.8×–1.5×), time-of-day adjustment, endpoint bundles (Research Pack, Swarm Suite, Memory Explorer). `GET /pricing` free endpoint for live snapshot. Syncs pricing to Supabase every 5 min (v1.6.0)
 - **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+)
 - **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
 - **Discovery**: `GET /agent/:agentId/payment-info` — public ERC-8004 lookup with x402 detection
@@ -262,7 +265,7 @@ All three core services are managed by macOS `launchd` via LaunchAgent plists wi
 
 ### Sentinel Monitoring Engine
 
-Autonomous monitoring system embedded in the Bridge Daemon (v1.5.0). Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
+Autonomous monitoring system embedded in the Bridge Daemon (v1.6.0). Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
 
 - **EventMonitor**: Checks 6 services (bridge, dashboard, x402, ollama, gateway, tailscale) via launchctl + HTTP probes. Adaptive polling interval (5s–120s) based on failure rate. Supabase Realtime subscriptions on `agent_sessions` and `sentinel_incidents`.
 - **AlertManager**: Anti-fatigue alerting with escalation levels (1st fail → immediate, 3rd → warning/5min cooldown, 5th → critical/15min cooldown). Alert history with resolution tracking.
@@ -313,6 +316,28 @@ A dedicated agent that sits between task dispatch and agent execution, curating 
 - **API Route**: `GET/POST /api/soul` — proposals listing, stats, sessions, approve/reject, manual dream trigger
 - **ERC-8004**: Listed in `fleet.agents` with 6 soul-specific capabilities
 - **Location**: `dashboard/bridge/lib/soul/`, `dashboard/scripts/setup-db-soul.sql`, `dashboard/supabase/migrations/20260215220000_lucid_dreaming.sql`
+
+### Scholar Research Daemon
+
+A 24/7 autonomous research agent that continuously monitors 5 domains (ERC-8004, x402 protocol, L2 scaling, stablecoin infrastructure, SMB adoption), scores findings for relevance, deduplicates, and anchors high-quality research to memory.
+
+- **Research Loop**: `pickNextDomain()` with adaptive intervals (30/40/60/90/120 min base, scaled by finding quality)
+- **Relevance Scoring**: Multi-factor scoring (keyword match, recency, source authority) with 0.85 duplicate threshold + entity-based semantic dedup
+- **Memory Anchoring**: High-novelty findings (≥ 0.8) queued via `queueAnchor()` for batch IPFS + on-chain anchoring
+- **Vox Feed**: Findings scoring ≥ 0.8 automatically queued to Vox content automation pipeline
+- **Adaptive Intervals**: `adaptiveInterval()` dynamically adjusts polling frequency based on recent avg relevance scores
+- **Entity Dedup**: Extracts ERC numbers, protocol names, token tickers for semantic similarity comparison
+- **Location**: `dashboard/bridge/lib/scholar/` (types, scorer, research-loop)
+
+### Vox Content Automation
+
+Automated marketing content pipeline that transforms high-quality scholar research into social-ready threads.
+
+- **Queue**: `queueVoxContent()` receives high-scoring findings from Scholar
+- **Generation**: `generateThread()` formats research into engaging social threads
+- **Content Calendar**: Max 3 posts/day, minimum 4-hour spacing between posts
+- **Persistence**: `vox_content_queue` Supabase table for queue management
+- **Location**: `dashboard/bridge/lib/vox/content-automation.ts`
 
 ### Memory Crystal System (Cyber-Neural Memory Evolution)
 

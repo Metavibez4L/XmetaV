@@ -1,13 +1,91 @@
-# Changes Summary — March 3, 2026
+# Changes Summary — March 5, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v25 (Sentinel Engine + Bridge v1.5.0)
+**XmetaV Version:** v27 (Comprehensive Optimization + Bridge v1.6.0)
 
 ---
 
-## Major Changes (March 3, 2026)
+## Major Changes (March 5, 2026)
 
-### 1. Sentinel Monitoring Engine (NEW)
+### 1. Comprehensive 9-Point Optimization (commit `195a4b0`)
+
+Full-stack optimization pass spanning Bridge, Scholar, x402, Dashboard, and Vox.
+
+### 2. Scholar Adaptive Intervals
+
+Doubled all base research intervals to reduce redundant API calls. Added `adaptiveInterval()` that scales polling dynamically based on recent finding quality.
+
+| Domain | Old (min) | New Base (min) |
+|--------|-----------|---------------|
+| erc8004 | 15 | 30 |
+| x402 | 20 | 40 |
+| layer2_scaling | 30 | 60 |
+| stablecoin_infra | 45 | 90 |
+| smb_adoption | 60 | 120 |
+
+### 3. Anchor Batch Queue
+
+Replaced individual `anchorMemory()` calls with batch queue system:
+- `queueAnchor()` buffers entries; `flushPendingAnchors()` processes in batch
+- Batch size: 3, auto-flush timer: 5 minutes
+- ~60% reduction in IPFS/on-chain calls
+- Flush on graceful shutdown (SIGINT/SIGTERM)
+
+### 4. Scholar Dedup Enhancement
+
+- Duplicate threshold raised to **0.85** (stricter filtering)
+- Entity-based semantic dedup: extracts ERC numbers, protocol names, token tickers
+- `KNOWN_ENTITIES` list for domain-specific entity recognition
+- Capitalized-name heuristic for protocol detection
+
+### 5. Dynamic Pricing Engine (NEW)
+
+New demand-based pricing module for x402 server:
+- **Demand multiplier**: 0.8×–1.5× based on calls/hour per endpoint
+- **Time-of-day multiplier**: UTC peak hours adjustment
+- **Endpoint bundles**: Research Pack, Swarm Suite, Memory Explorer
+- **Free endpoint**: `GET /pricing` returns live pricing snapshot
+- **Sync**: Pricing snapshot synced to Supabase every 5 minutes
+- `recordDemand()` called in payment callback for real-time tracking
+
+### 6. Session Buffer TTL Tuning
+
+- `adaptiveTTL()`: 5s for volatile queries, 15s for standard, 30s for static
+- `invalidateOnPayment()`: Supabase Realtime subscription on `x402_payments` triggers cache invalidation
+- `VOLATILE_KEYWORDS` set for automatic query classification
+- Integrated into `retrieval.ts` for per-query TTL selection
+
+### 7. Vox Content Automation (NEW)
+
+Auto-generates marketing threads from scholar findings:
+- `queueVoxContent()`: queues high-scoring findings (≥ 0.8 relevance)
+- `generateThread()`: formats research into social-ready threads
+- Content calendar: max 3 posts/day, 4hr minimum spacing
+- Persists to `vox_content_queue` Supabase table
+
+### 8. SSE Streaming (NEW)
+
+Dashboard server-sent events for real-time updates:
+- **Endpoint**: `/api/events` — streams sessions, memory, payments, commands
+- **Client hook**: `useRealtime` — EventSource with auto-reconnect, channel filtering, event counting
+- **Heartbeat**: 30-second keepalive
+- **Source**: Supabase Realtime → SSE bridge → EventSource client
+
+### 9. Bridge v1.6.0 Integration
+
+- `x402_payments` Realtime channel subscription for payment cache invalidation
+- `flushPendingAnchors()` cleanup on SIGINT/SIGTERM
+- `paymentChannel` unsubscribe on graceful shutdown
+
+### 10. OpenClaw Updated to 2026.3.2
+
+### 11. Model: kimi-k2.5:cloud (all 14 agents)
+
+---
+
+## Previous Changes (March 3, 2026)
+
+### Sentinel Monitoring Engine
 
 Full autonomous monitoring system integrated into the Bridge Daemon (v1.5.0). Six interconnected modules provide event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing.
 
@@ -22,103 +100,74 @@ Full autonomous monitoring system integrated into the Bridge Daemon (v1.5.0). Si
 | **DistributedTracer** | `bridge/lib/sentinel/distributed-tracer.ts` | End-to-end request tracing with P95 latency, throughput, error rate |
 | **Sentinel (orchestrator)** | `bridge/lib/sentinel/index.ts` | Wires all sub-systems, singleton lifecycle |
 
-**Features:**
-- Monitors 6 services: bridge, dashboard, x402, ollama, gateway, tailscale
-- Supabase Realtime subscriptions on `agent_sessions` and `sentinel_incidents`
-- Self-healing actions: restart downed services via `launchctl`, clean stale locks, rotate large logs
-- Predictive: CPU/memory/disk/load trend analysis with linear regression + anomaly detection (z-score threshold: 3)
-- Distributed tracing: span-based request tracking with P95 latency metrics
-- Alert escalation: 1st fail → immediate, 3rd → warning (5min cooldown), 5th → critical (15min cooldown)
-- Auto-triggers SITREP on critical alerts
-- HTTP endpoint: `GET /sentinel` on Bridge health server (:3001)
+### Bridge Daemon v1.5.0 → v1.6.0
 
-### 2. Bridge Daemon v1.5.0
+- v1.5.0: Sentinel integration, `/sentinel` endpoint, graceful shutdown
+- v1.6.0: Anchor batch queue, payment cache invalidation, Vox feed pipeline
 
-Upgraded from v1.4.0 to v1.5.0 with Sentinel integration:
-- Sentinel starts with bridge, stops on SIGTERM/SIGINT
-- New `/sentinel` HTTP endpoint returns full health report
-- Graceful shutdown includes sentinel cleanup
+### Dashboard CWD Fix
 
-### 3. Sentinel Database Schema (4 New Tables)
-
-| Table | Purpose | RLS |
-|-------|---------|-----|
-| `sentinel_incidents` | Alert/incident tracking with severity and resolution | Authenticated: SELECT + Service role: ALL |
-| `sentinel_healing_log` | Self-healing action audit trail | Authenticated: SELECT + Service role: ALL |
-| `sentinel_traces` | Distributed trace spans with timing data | Authenticated: SELECT + Service role: ALL |
-| `sentinel_resource_snapshots` | System resource snapshots (CPU, memory, disk, load) | Authenticated: SELECT + Service role: ALL |
-
-All tables have Realtime enabled, indexes on `created_at`, and RLS policies.
-
-**Migration:** `dashboard/scripts/setup-db-sentinel.sql`
-
-### 4. Dashboard API Route
-
-- **`GET /api/sentinel`** — Authenticated endpoint returning sentinel health data (health, incidents, healing log, resources, traces)
-
-### 5. Watchdog LaunchAgent
-
-- **Plist:** `scripts/launchd/com.xmetav.watchdog.plist`
-- **Interval:** Every 5 minutes (StartInterval: 300)
-- **Script:** `scripts/watchdog.sh`
-
-### 6. Dashboard CWD Fix
-
-- **File:** `scripts/launchd-dashboard.sh`
-- **Fix:** Changed working directory from `cd /tmp` to `cd "${REPO}/dashboard"` — resolves Tailwind CSS / PostCSS build errors under launchd
-
-### 7. Service Status
-
-All services verified running with auto-restart:
-
-| Service | Port | Status |
-|---------|------|--------|
-| Dashboard | 3000 | ✅ Running (LaunchAgent) |
-| Bridge | 3001 | ✅ Running (v1.5.0 + Sentinel) |
-| x402 | 4021 | ✅ Running (LaunchAgent) |
-| Ollama | 11434 | ✅ System service |
+- `scripts/launchd-dashboard.sh`: Changed cwd from `/tmp` to `${REPO}/dashboard`
 
 ---
 
-## Files Added/Modified
+## Files Added/Modified (v27)
 
 **New Files:**
 ```
-dashboard/bridge/lib/sentinel/alert-manager.ts
-dashboard/bridge/lib/sentinel/event-monitor.ts
-dashboard/bridge/lib/sentinel/self-healer.ts
-dashboard/bridge/lib/sentinel/predictive-health.ts
-dashboard/bridge/lib/sentinel/distributed-tracer.ts
-dashboard/bridge/lib/sentinel/index.ts
-dashboard/src/app/api/sentinel/route.ts
-dashboard/scripts/setup-db-sentinel.sql
-scripts/launchd/com.xmetav.watchdog.plist
+dashboard/x402-server/dynamic-pricing.ts
+dashboard/bridge/lib/vox/content-automation.ts
+dashboard/src/app/api/events/route.ts
+dashboard/src/hooks/useRealtime.ts
 ```
 
 **Modified Files:**
 ```
-dashboard/bridge/src/index.ts (v1.4.0 → v1.5.0, Sentinel integration)
-scripts/launchd-dashboard.sh (cwd fix: /tmp → ${REPO}/dashboard)
+dashboard/bridge/lib/scholar/types.ts (adaptive intervals)
+dashboard/bridge/lib/scholar/scorer.ts (85% dedup + entity dedup)
+dashboard/bridge/lib/scholar/research-loop.ts (adaptiveInterval, queueAnchor, Vox feed)
+dashboard/bridge/lib/memory-anchor.ts (batch queue system)
+dashboard/bridge/lib/soul/session-buffer.ts (adaptiveTTL, invalidateOnPayment)
+dashboard/bridge/lib/soul/retrieval.ts (per-query adaptive TTL)
+dashboard/bridge/src/index.ts (v1.6.0 — payment channel, anchor flush)
+dashboard/x402-server/index.ts (dynamic pricing, /pricing endpoint)
 ```
+
+---
+
+## Service Status (v27)
+
+| Service | Port | Status |
+|---------|------|--------|
+| Dashboard | 3000 | ✅ Running (LaunchAgent) |
+| Bridge | 3001 | ✅ Running (v1.6.0 + Sentinel) |
+| x402 | 4021 | ✅ Running (+ Dynamic Pricing) |
+| Ollama | 11434 | ✅ System service |
 
 ---
 
 ## Verification
 
 ```bash
-# Sentinel health endpoint
+# Bridge health
+curl -s http://localhost:3001/health | jq .
+
+# Sentinel health report
 curl -s http://localhost:3001/sentinel | jq .
+
+# Dynamic pricing snapshot
+curl -s http://localhost:4021/pricing | jq .
+
+# SSE stream test
+curl -N http://localhost:3000/api/events
 
 # Check all services
 launchctl list | grep com.xmetav
 
-# View sentinel logs
-tail -f /tmp/xmetav-bridge.log | grep -i sentinel
-
-# Verify DB tables
-# sentinel_incidents, sentinel_healing_log, sentinel_traces, sentinel_resource_snapshots
+# Scholar stats (from bridge logs)
+tail -f /tmp/xmetav-bridge.log | grep -i scholar
 ```
 
 ---
 
-*Generated: 2026-03-03*
+*Generated: 2026-03-05*

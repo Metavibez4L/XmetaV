@@ -2,7 +2,8 @@
 
 > **Status:** Active
 > **Created:** 2026-03-02
-> **Platform:** Mac Studio M3 Ultra · macOS 26.3 · OpenClaw 2026.3.1
+> **Updated:** 2026-03-05
+> **Platform:** Mac Studio M3 Ultra · macOS 26.3 · OpenClaw 2026.3.2
 > **Branch:** dev
 
 ---
@@ -23,7 +24,7 @@ Before planning, here's what's **already done** vs what's **not**:
 | `justfile` (24 recipes, launchd-native) | ✅ Done | `just status`, `just restart`, `just cold-check`, `just warm`, etc. |
 | LaunchAgent auto-restart (all 3 services) | ✅ Done | `com.xmetav.{dashboard,bridge,x402}.plist` — KeepAlive + RunAtLoad |
 | RLS on x402_payments, agent_memory, agent_commands | ❌ Not done | Critical tables unprotected |
-| SSE/WebSocket streaming | ❌ Not done | Still using Supabase polling |
+| SSE/WebSocket streaming | ✅ Done | `/api/events` SSE endpoint + `useRealtime` hook (2026-03-05) |
 | Middleware `getSession()` optimization | ✅ Done | Replaced `getUser()` — saves ~130ms per request |
 | `useBridgeControl` visibility-aware polling | ✅ Done | 5s→15s interval, pauses on hidden tabs |
 | CSS animation GPU optimization | ✅ Done | `will-change`, hover-only spin, `prefers-reduced-motion` |
@@ -34,6 +35,12 @@ Before planning, here's what's **already done** vs what's **not**:
 | Redis/caching layer | ❌ Not done | No in-memory cache beyond TTL |
 | Alerting (Discord/email) | ❌ Not done | Silent failures |
 | Docker | ❌ Not done | Bare metal only |
+| Scholar adaptive intervals | ✅ Done | Doubled base intervals (30/40/60/90/120), `adaptiveInterval()` (2026-03-05) |
+| Anchor batch queue | ✅ Done | `queueAnchor()` + `flushPendingAnchors()`, batch size 3, 5-min flush (2026-03-05) |
+| Scholar dedup enhancement | ✅ Done | 85% threshold + entity-based semantic dedup (2026-03-05) |
+| Dynamic pricing engine | ✅ Done | Demand-based multiplier (0.8×–1.5×), time-of-day, endpoint bundles (2026-03-05) |
+| Session buffer TTL tuning | ✅ Done | `adaptiveTTL()` (5s/15s/30s by query type), `invalidateOnPayment()` (2026-03-05) |
+| Vox content automation | ✅ Done | Auto-generate marketing threads from scholar findings (2026-03-05) |
 
 ---
 
@@ -45,7 +52,7 @@ Before planning, here's what's **already done** vs what's **not**:
 | 2 | RLS on critical tables | High | Low | **P0** | 30 min |
 | 3 | Structured logging (Pino) | Medium | Low | **P1** | 2 hr |
 | 4 | Secrets consolidation (.env → single source) | Medium | Low | **P1** | 1 hr |
-| 5 | SSE streaming (replace polling) | High | Medium | **P1** | 4 hr |
+| 5 | ~~SSE streaming (replace polling)~~ | High | Medium | **P1 ✅** | Done |
 | 6 | Alerting (Discord webhook) | Medium | Low | **P1** | 1 hr |
 | 7 | Supabase selective Realtime | Medium | Low | **P2** | 30 min |
 | 8 | Redis caching layer | Medium | Medium | **P2** | 3 hr |
@@ -175,24 +182,14 @@ Start with A:
   3. Remove duplicated secrets
 ```
 
-### 5. SSE Streaming (Replace Polling)
+### 5. ✅ SSE Streaming — COMPLETE
 
-**Problem:** Bridge streams via Supabase INSERT → dashboard polls every ~1s. Adds latency and unnecessary DB writes.
+**Implemented:** 2026-03-05 (commit `195a4b0`)
 
-**Plan:**
-```
-Phase 1: Add SSE endpoint to bridge (/api/stream)
-Phase 2: Dashboard subscribes via EventSource
-Phase 3: Keep Supabase as persistence but remove real-time polling
-Phase 4: Measure latency improvement (target: <50ms)
-```
-
-**Architecture:**
-```
-Agent → Bridge → SSE → Dashboard
-                  ↓
-              Supabase (persist only)
-```
+- **SSE Endpoint**: `dashboard/src/app/api/events/route.ts` — streams sessions, memory, payments, commands via Supabase Realtime → SSE
+- **Client Hook**: `dashboard/src/hooks/useRealtime.ts` — auto-reconnect, channel filtering, event counting
+- **Heartbeat**: 30-second keepalive, abort cleanup on disconnect
+- **Architecture**: Supabase Realtime → SSE bridge → EventSource client
 
 ### 6. Alerting (Discord Webhook)
 
@@ -314,3 +311,5 @@ just rls-check                 # RLS policy audit (TODO: add to justfile)
 | 2026-03-02 | Ollama KEEP_ALIVE → -1. Justfile rewritten (24 recipes, launchd-native). |
 | 2026-03-02 | Default agent model → kimi-k2.5:cloud. All 12 agents verified. |
 | 2026-03-02 | x402 live USDC test: 4/4 endpoints passed, $0.11 spent on Base Mainnet. |
+| 2026-03-05 | P1 #5 done: SSE streaming (`/api/events` + `useRealtime` hook). |
+| 2026-03-05 | New optimizations: Scholar adaptive intervals, anchor batch queue, dedup 85%, dynamic pricing, TTL tuning, Vox automation. |

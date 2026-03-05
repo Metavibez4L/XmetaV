@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-03  
+**Last verified:** 2026-03-05  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v26 (Scholar Research Daemon + Bridge v1.6.0)  
+**XmetaV Version:** v27 (Comprehensive Optimization + Bridge v1.6.0)  
 **Platform:** macOS 26.3 (Sequoia)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -55,14 +55,14 @@ openclaw --version
 | **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
-| **OpenClaw** | 2026.3.1 | npm global |
+| **OpenClaw** | 2026.3.2 | npm global |
 
 ## Active Services
 
 | Service | Port | Status | Start Command | Auto-Restart |
 |---------|------|--------|---------------|-------------|
 | **Dashboard** (Next.js) | 3000 | Active | `just dashboard` | ✅ LaunchAgent (KeepAlive) |
-| **Bridge Daemon** (v1.5.0 + Sentinel) | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
+| **Bridge Daemon** (v1.6.0 + Sentinel) | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
 | **x402 Server** | 4021 | Active | `just x402` | ✅ LaunchAgent (KeepAlive) |
 | **OpenClaw Gateway** | 18789 | Active | `just gateway` | ✅ launchd (native) |
 | **Ollama** | 11434 | Active | macOS app (auto-start) | ✅ launchd (native) |
@@ -206,6 +206,86 @@ Automated health monitor checking every 5 minutes:
 ```bash
 just logs-watchdog
 ```
+
+## v27 Comprehensive Optimization (2026-03-05)
+
+Nine-point optimization pass across Bridge, Scholar, x402, Dashboard, and Vox. Commit `195a4b0`.
+
+### Scholar Adaptive Intervals
+
+Base research intervals doubled to reduce redundant API calls. `adaptiveInterval()` dynamically adjusts based on recent finding quality (avg relevance score).
+
+| Domain | Old Interval (min) | New Base (min) | Adaptive Range |
+|--------|-------------------|---------------|----------------|
+| erc8004 | 15 | 30 | 20–45 |
+| x402 | 20 | 40 | 25–60 |
+| layer2_scaling | 30 | 60 | 40–90 |
+| stablecoin_infra | 45 | 90 | 60–135 |
+| smb_adoption | 60 | 120 | 80–180 |
+
+**File:** `bridge/lib/scholar/types.ts`
+
+### Anchor Batch Queue
+
+Replaced direct `anchorMemory()` calls with a batch queue (`queueAnchor()` + `flushPendingAnchors()`). Batches up to 3 entries per flush, auto-flushes every 5 minutes. Reduces IPFS/on-chain calls by ~60%.
+
+**File:** `bridge/lib/memory-anchor.ts`
+
+### Scholar Dedup Enhancement
+
+- Duplicate threshold raised from default to **0.85** (stricter)
+- Added entity-based semantic dedup: extracts ERC numbers, protocol names, token tickers from findings
+- Capitalized-name heuristic for protocol detection
+
+**File:** `bridge/lib/scholar/scorer.ts`
+
+### Dynamic Pricing Engine (NEW)
+
+Demand-based pricing for x402 endpoints:
+- **Demand multiplier**: 0.8×–1.5× based on calls/hour per endpoint
+- **Time-of-day multiplier**: UTC peak hours pricing
+- **Endpoint bundles**: Research Pack, Swarm Suite, Memory Explorer
+- **Free endpoint**: `GET /pricing` returns live snapshot
+- **Sync**: Pricing snapshot synced to Supabase every 5 minutes
+
+**File:** `x402-server/dynamic-pricing.ts`
+
+### Session Buffer TTL Tuning
+
+- `adaptiveTTL()`: 5s for volatile queries, 15s for standard, 30s for static
+- `invalidateOnPayment()`: Supabase Realtime subscription on `x402_payments` triggers cache invalidation
+- `VOLATILE_KEYWORDS` set for query classification
+
+**Files:** `bridge/lib/soul/session-buffer.ts`, `bridge/lib/soul/retrieval.ts`
+
+### Vox Content Automation (NEW)
+
+Auto-generates marketing threads from high-scoring scholar findings:
+- `queueVoxContent()`: called when scholar score ≥ 0.8
+- `generateThread()`: formats research into social-ready threads
+- Content calendar: max 3 posts/day, 4hr minimum spacing
+- Persists to `vox_content_queue` Supabase table
+
+**File:** `bridge/lib/vox/content-automation.ts`
+
+### SSE Streaming (NEW)
+
+- **Endpoint**: `/api/events` — streams sessions, memory, payments, commands via Supabase Realtime → SSE
+- **Client hook**: `useRealtime` — EventSource with auto-reconnect, channel filtering, event counting
+- **Heartbeat**: 30-second keepalive
+- **Cleanup**: Abort controller on disconnect
+
+**Files:** `src/app/api/events/route.ts`, `src/hooks/useRealtime.ts`
+
+### Bridge Integration
+
+- `x402_payments` Realtime subscription for `invalidateOnPayment()`
+- `flushPendingAnchors()` cleanup on SIGINT/SIGTERM
+- `paymentChannel` unsubscribe on graceful shutdown
+
+**File:** `bridge/src/index.ts`
+
+---
 
 ## Sentinel Monitoring Engine (v1.5.0)
 
