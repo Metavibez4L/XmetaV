@@ -10,10 +10,16 @@ export async function GET() {
 
   const sb = createAdminClient();
 
+  // Schema:
+  //   agent_sessions: id, agent_id, status, hostname, started_at, last_heartbeat
+  //   agent_commands: id, agent_id, message, status, created_by, created_at, updated_at
+  //   agent_memory:   id, agent_id, kind, content, source, ttl_hours, created_at
+  //   x402_payments:  id, agent_id, amount ("$0.10"), currency, status, created_at, ...
+
   const [
     { data: sessions },
     { data: recentCommands },
-    { data: memoryStats },
+    { data: memoryRaw },
     { data: payments },
   ] = await Promise.all([
     sb
@@ -27,20 +33,19 @@ export async function GET() {
       .limit(200),
     sb
       .from("agent_memory")
-      .select("source")
-      .then(({ data }) => {
-        const counts: Record<string, number> = {};
-        data?.forEach((m: { source: string }) => {
-          counts[m.source] = (counts[m.source] || 0) + 1;
-        });
-        return { data: counts };
-      }),
+      .select("agent_id"),
     sb
       .from("x402_payments")
       .select("amount, created_at"),
   ]);
 
-  // Agent activity stats
+  // Memory counts by agent_id
+  const memoryCounts: Record<string, number> = {};
+  memoryRaw?.forEach((m: { agent_id: string }) => {
+    memoryCounts[m.agent_id] = (memoryCounts[m.agent_id] || 0) + 1;
+  });
+
+  // Agent activity stats from commands
   const agentStats: Record<string, { commands: number; completed: number; failed: number; lastActivity: string }> = {};
   recentCommands?.forEach((cmd: { agent_id: string; status: string; created_at: string }) => {
     if (!agentStats[cmd.agent_id]) {
@@ -60,19 +65,20 @@ export async function GET() {
       id: s.agent_id,
       status: s.status,
       lastHeartbeat: s.last_heartbeat,
-      memoryCount: (memoryStats as Record<string, number>)?.[s.agent_id] || 0,
+      memoryCount: memoryCounts[s.agent_id] || 0,
       commands: stats.commands,
       successRate: stats.commands > 0 ? Math.round((stats.completed / stats.commands) * 100) : 0,
       lastActivity: stats.lastActivity || s.last_heartbeat,
     };
   });
 
-  // Revenue by day
+  // Revenue by day — amount is a money string like "$0.10"
   const revenueByDay: Record<string, number> = {};
   let totalRevenue = 0;
-  payments?.forEach((p: { amount: number | string | null; created_at: string }) => {
+  payments?.forEach((p: { amount: string | null; created_at: string }) => {
     const day = p.created_at.split("T")[0];
-    const amt = typeof p.amount === "number" ? p.amount : parseFloat(String(p.amount || "0"));
+    const amtStr = String(p.amount || "0").replace(/[^0-9.\-]/g, "");
+    const amt = parseFloat(amtStr) || 0;
     revenueByDay[day] = (revenueByDay[day] || 0) + amt;
     totalRevenue += amt;
   });
