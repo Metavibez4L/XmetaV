@@ -24,6 +24,12 @@ const ALLOWED_AGENTS = new Set([
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
 const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "180", 10);
 
+/** Idle timeout (seconds) — kill if no output for this long (tool hangs, etc.) */
+const IDLE_TIMEOUT_S = parseInt(process.env.AGENT_IDLE_TIMEOUT || "30", 10);
+
+/** Retry timeout (seconds) — shorter than first attempt since we already waited */
+const RETRY_TIMEOUT_S = parseInt(process.env.AGENT_RETRY_TIMEOUT || "90", 10);
+
 export interface OpenClawOptions {
   agentId: string;
   message: string;
@@ -103,48 +109,84 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
 
   let resolved = false;
   let timedOut = false;
+  let idleTimedOut = false;
   let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastOutputAt = Date.now();
 
-  // Hard timeout: SIGTERM then SIGKILL
+  /** Kill the process with a reason label */
+  function killWithReason(reason: string, label: string) {
+    if (resolved) return;
+    timedOut = true;
+    console.log(`[openclaw] ${reason}, sending SIGTERM`);
+    onChunk(`\n[Bridge] ${label}\n`);
+    try { child.kill("SIGTERM"); } catch { /* ignore */ }
+
+    // Force-kill after 5s grace period
+    setTimeout(() => {
+      if (!resolved) {
+        console.log(`[openclaw] Force-killing process after grace period`);
+        try { child.kill("SIGKILL"); } catch { /* ignore */ }
+      }
+    }, 5000);
+  }
+
+  // Hard timeout: absolute wall-clock limit
   if (timeout > 0) {
     timeoutTimer = setTimeout(() => {
-      if (resolved) return;
-      timedOut = true;
-      console.log(`[openclaw] Process timed out after ${timeout}s, sending SIGTERM`);
-      onChunk(`\n[Bridge] Agent timed out after ${timeout}s\n`);
-      try { child.kill("SIGTERM"); } catch { /* ignore */ }
-
-      // Force-kill after 5s grace period
-      setTimeout(() => {
-        if (!resolved) {
-          console.log(`[openclaw] Force-killing process after grace period`);
-          try { child.kill("SIGKILL"); } catch { /* ignore */ }
-        }
-      }, 5000);
+      killWithReason(
+        `Process timed out after ${timeout}s`,
+        `Agent timed out after ${timeout}s`
+      );
     }, timeout * 1000);
   }
 
+  // Idle-output timeout: kill if no stdout/stderr for IDLE_TIMEOUT_S
+  // This catches hung tool calls (e.g. browser tools with no Chrome attached)
+  const idleTimeout = IDLE_TIMEOUT_S;
+  function resetIdleTimer() {
+    lastOutputAt = Date.now();
+    if (idleTimer) clearTimeout(idleTimer);
+    if (idleTimeout > 0 && !resolved) {
+      idleTimer = setTimeout(() => {
+        if (resolved) return;
+        idleTimedOut = true;
+        const silentSecs = Math.round((Date.now() - lastOutputAt) / 1000);
+        killWithReason(
+          `No output for ${silentSecs}s (idle timeout)`,
+          `Agent idle — no output for ${silentSecs}s (likely a hung tool call). Killing.`
+        );
+      }, idleTimeout * 1000);
+    }
+  }
+  resetIdleTimer();
+
   // Stream stdout
   child.stdout?.on("data", (data: Buffer) => {
+    resetIdleTimer();
     onChunk(data.toString("utf-8"));
   });
 
   // Stream stderr
   child.stderr?.on("data", (data: Buffer) => {
+    resetIdleTimer();
     onChunk(data.toString("utf-8"));
   });
 
   child.on("exit", (code) => {
     resolved = true;
     if (timeoutTimer) clearTimeout(timeoutTimer);
+    if (idleTimer) clearTimeout(idleTimer);
     const exitCode = timedOut ? 124 : code;
-    console.log(`[openclaw] Process exited with code ${exitCode}${timedOut ? " (timeout)" : ""}`);
+    const suffix = idleTimedOut ? " (idle timeout)" : timedOut ? " (timeout)" : "";
+    console.log(`[openclaw] Process exited with code ${exitCode}${suffix}`);
     onExit(exitCode);
   });
 
   child.on("error", (err) => {
     resolved = true;
     if (timeoutTimer) clearTimeout(timeoutTimer);
+    if (idleTimer) clearTimeout(idleTimer);
     console.error(`[openclaw] Spawn error:`, err.message);
     onChunk(`\n[Bridge Error] ${err.message}\n`);
     onExit(1);
@@ -175,7 +217,7 @@ export function runAgentWithFallback(options: OpenClawOptions): ChildProcess {
           agentId,
           message,
           isRetry: true,
-          timeoutSeconds: options.timeoutSeconds ?? DEFAULT_TIMEOUT_S,
+          timeoutSeconds: RETRY_TIMEOUT_S,
           onChunk,
           onExit: originalOnExit,
         });
