@@ -31,6 +31,10 @@ interface AvatarEntry {
   chromaB: Graphics;
   /** Outer neon pulse ring */
   neonAura: Graphics;
+  /** Rotating hex data ring (busy state) */
+  hexRing: Graphics;
+  /** Status indicator triangle */
+  statusIndicator: Graphics;
   state: NodeState;
   /** Home (desk) position in iso-space */
   homeX: number;
@@ -133,6 +137,20 @@ export function initAvatars(
     drawGhostSilhouette(silhouette, cfg.size, cfg.color);
     container.addChild(silhouette);
 
+    // ── Cyberpunk: Hex data ring (visible when busy) ──
+    const hexRing = new Graphics();
+    hexRing.visible = false;
+    container.addChild(hexRing);
+
+    // ── Cyberpunk: Status indicator (triangle below orb) ──
+    const statusIndicator = new Graphics();
+    statusIndicator.moveTo(0, cfg.size * 0.9);
+    statusIndicator.lineTo(-3, cfg.size * 0.9 + 5);
+    statusIndicator.lineTo(3, cfg.size * 0.9 + 5);
+    statusIndicator.closePath();
+    statusIndicator.fill({ color: cfg.color, alpha: 0.3 });
+    container.addChild(statusIndicator);
+
     // Busy ring (spinning, hidden by default)
     const ring = new Graphics();
     ring.circle(0, 0, cfg.size * 0.8).stroke({
@@ -154,6 +172,8 @@ export function initAvatars(
       chromaR,
       chromaB,
       neonAura,
+      hexRing,
+      statusIndicator,
       state: "idle",
       homeX: sx,
       homeY: sy,
@@ -200,6 +220,8 @@ export function initAvatars(
           // INCREASED: More visible silhouette
           entry.silhouette.alpha = entry.inMeeting ? 0.5 : 0.35;
           entry.ring.visible = false;
+          entry.hexRing.visible = false;
+          entry.statusIndicator.alpha = 0.2;
 
           // ── Cyberpunk: gentle neon pulse ──
           entry.neonAura.alpha = 0.15 + Math.sin(time * 0.8 + phase) * 0.08;
@@ -225,6 +247,28 @@ export function initAvatars(
           entry.silhouette.alpha = entry.inMeeting ? 0.65 : 0.5;
           entry.ring.visible = true;
           entry.ring.rotation = time * 2.5;
+          entry.statusIndicator.alpha = 0.6 + Math.sin(time * 4) * 0.2;
+
+          // ── Cyberpunk: Hex data ring (rotating segmented ring) ──
+          entry.hexRing.visible = true;
+          entry.hexRing.clear();
+          const ringRadius = entry.config.size * 1.1;
+          const segments = 8;
+          for (let seg = 0; seg < segments; seg++) {
+            const startAngle = (seg / segments) * Math.PI * 2 + time * 1.8 + phase;
+            const gapRatio = 0.3; // gap between segments
+            const endAngle = startAngle + ((1 - gapRatio) / segments) * Math.PI * 2;
+            const segAlpha = (seg % 2 === 0) ? 0.4 : 0.2;
+            // Draw arc segment as small lines
+            const steps = 6;
+            for (let st = 0; st < steps; st++) {
+              const a1 = startAngle + (st / steps) * (endAngle - startAngle);
+              const a2 = startAngle + ((st + 1) / steps) * (endAngle - startAngle);
+              entry.hexRing.moveTo(Math.cos(a1) * ringRadius, Math.sin(a1) * ringRadius);
+              entry.hexRing.lineTo(Math.cos(a2) * ringRadius, Math.sin(a2) * ringRadius);
+              entry.hexRing.stroke({ color: entry.config.color, width: 1.2, alpha: segAlpha });
+            }
+          }
 
           // ── Cyberpunk: intense neon pulse ──
           entry.neonAura.alpha = 0.35 + Math.sin(time * 3 + phase) * 0.2;
@@ -244,15 +288,24 @@ export function initAvatars(
         case "offline": {
           entry.container.scale.set(1);
           entry.glow.alpha = 0.05;
-          entry.core.alpha = 0.2 + (Math.random() > 0.96 ? 0.25 : 0);
-          entry.silhouette.alpha = 0.04;
+          // Voltage flicker — occasional sharp flash
+          const staticFlicker = Math.random();
+          entry.core.alpha = staticFlicker > 0.96 ? 0.5 : staticFlicker > 0.92 ? 0.3 : 0.15;
+          entry.silhouette.alpha = staticFlicker > 0.95 ? 0.08 : 0.03;
           entry.ring.visible = false;
+          entry.hexRing.visible = false;
+          entry.statusIndicator.alpha = 0.05;
 
-          // ── Cyberpunk: static flicker ──
+          // ── Cyberpunk: static flicker with scan line ──
           entry.neonAura.alpha = Math.random() > 0.95 ? 0.12 : 0.02;
           entry.neonAura.scale.set(1);
-          entry.chromaR.alpha = 0;
-          entry.chromaB.alpha = 0;
+          entry.chromaR.alpha = staticFlicker > 0.97 ? 0.08 : 0;
+          entry.chromaB.alpha = staticFlicker > 0.97 ? 0.08 : 0;
+          // Random position jitter (TV static)
+          if (staticFlicker > 0.98) {
+            entry.chromaR.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3);
+            entry.chromaB.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3);
+          }
           break;
         }
       }

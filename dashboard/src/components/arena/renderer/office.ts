@@ -322,11 +322,40 @@ export function initOffice(
   // ── Animation ticker ──────────────────────────────────────────
   let time = 0;
   let meetingMode = false;
+
+  // Holographic data particles above busy screens
+  interface HoloParticle { x: number; y: number; vy: number; life: number; maxLife: number; color: number; char: string }
+  const holoParticles: HoloParticle[] = [];
+  const holoChars = "0123456789ABCDEF{}<>[]=/+*&#@$%";
+
+  // Server rack blinkenlights (decorative, bottom of Intel room)
+  const blinkLayer = new Graphics();
+  layer.addChild(blinkLayer);
+  interface Blinker { x: number; y: number; rate: number; color: number; phase: number }
+  const blinkers: Blinker[] = [];
+  const rackPos = toScreen(0.5, 9);
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 8; col++) {
+      blinkers.push({
+        x: rackPos.x - 16 + col * 4.5,
+        y: rackPos.y - 20 + row * 6,
+        rate: 0.5 + Math.random() * 4,
+        color: [0x39ff14, 0x00f0ff, 0xf59e0b, 0xff2d5e][Math.floor(Math.random() * 4)],
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  // Holographic layer for data particles
+  const holoLayer = new Graphics();
+  layer.addChild(holoLayer);
+
   const tick = (ticker: { deltaMS: number }) => {
-    time += ticker.deltaMS / 1000;
+    const dt = ticker.deltaMS / 1000;
+    time += dt;
 
     // Animate screens
-    for (const [, screen] of screens) {
+    for (const [agentId, screen] of screens) {
       if (screen.state === "busy") {
         for (let i = 0; i < screen.lines.length; i++) {
           screen.lines[i].visible = true;
@@ -337,6 +366,21 @@ export function initOffice(
         }
         screen.bg.tint = 0x112233;
         screen.border.tint = 0xffffff;
+
+        // Spawn holographic data particles above busy screens (skip soul_mon_*)
+        if (!agentId.startsWith("soul_mon_") && Math.random() < 0.15 && holoParticles.length < 60) {
+          const sx = screen.container.position.x + screen.w / 2;
+          const sy = screen.container.position.y;
+          holoParticles.push({
+            x: sx + (Math.random() - 0.5) * screen.w * 1.2,
+            y: sy - 2,
+            vy: -8 - Math.random() * 15,
+            life: 0,
+            maxLife: 0.6 + Math.random() * 0.8,
+            color: screen.color,
+            char: holoChars[Math.floor(Math.random() * holoChars.length)],
+          });
+        }
       } else if (screen.state === "fail") {
         for (const line of screen.lines) line.visible = false;
         screen.bg.tint = Math.random() > 0.7 ? 0x331111 : 0x220808;
@@ -349,6 +393,34 @@ export function initOffice(
         for (const line of screen.lines) line.visible = false;
         screen.bg.tint = 0xffffff;
         screen.border.tint = 0xffffff;
+      }
+    }
+
+    // Animate holographic particles
+    holoLayer.clear();
+    for (let i = holoParticles.length - 1; i >= 0; i--) {
+      const hp = holoParticles[i];
+      hp.life += dt;
+      if (hp.life >= hp.maxLife) {
+        holoParticles.splice(i, 1);
+        continue;
+      }
+      hp.y += hp.vy * dt;
+      hp.x += (Math.random() - 0.5) * 2;
+      const fade = 1 - hp.life / hp.maxLife;
+      // Tiny rect to represent the character
+      holoLayer.rect(hp.x, hp.y, 3, 4).fill({ color: hp.color, alpha: fade * 0.35 });
+    }
+
+    // Server rack blinkenlights
+    blinkLayer.clear();
+    for (const bk of blinkers) {
+      const on = Math.sin(time * bk.rate + bk.phase) > 0.3;
+      if (on) {
+        blinkLayer.circle(bk.x, bk.y, 1.2).fill({ color: bk.color, alpha: 0.5 + Math.random() * 0.2 });
+        blinkLayer.circle(bk.x, bk.y, 3).fill({ color: bk.color, alpha: 0.08 });
+      } else {
+        blinkLayer.circle(bk.x, bk.y, 1).fill({ color: 0x1a2a3a, alpha: 0.3 });
       }
     }
 

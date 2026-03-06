@@ -126,6 +126,74 @@ export function initBackground(
   neonGrid.alpha = 0.6;
   app.stage.addChildAt(neonGrid, 1);
 
+  // -- Rain overlay (cyberpunk) ----------------------------------------
+  const rainLayer = new Graphics();
+  interface RainDrop { x: number; y: number; len: number; speed: number; alpha: number }
+  const rainDrops: RainDrop[] = [];
+  for (let i = 0; i < 120; i++) {
+    rainDrops.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      len: 8 + Math.random() * 20,
+      speed: 200 + Math.random() * 350,
+      alpha: 0.02 + Math.random() * 0.06,
+    });
+  }
+  rainLayer.alpha = 0.7;
+  app.stage.addChildAt(rainLayer, 2);
+
+  // -- Shooting stars / satellite trails (rare, dramatic) ---------------
+  interface ShootingStar { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: number }
+  const shootingStars: ShootingStar[] = [];
+  let starTimer = 0;
+
+  // -- Neon billboard signs in skyline ---------------------------------
+  const billboardLayer = new Graphics();
+  interface Billboard { x: number; y: number; w: number; h: number; color: number; text: string; phase: number }
+  const billboards: Billboard[] = [
+    { x: w * 0.10, y: skylineY * 0.42, w: 28, h: 10, color: 0xff006e, text: "XMETA", phase: 0 },
+    { x: w * 0.30, y: skylineY * 0.28, w: 22, h: 8, color: 0x00f0ff, text: "AI", phase: 1.2 },
+    { x: w * 0.56, y: skylineY * 0.22, w: 32, h: 10, color: 0x39ff14, text: "AGENTS", phase: 2.4 },
+    { x: w * 0.78, y: skylineY * 0.38, w: 24, h: 8, color: 0xf59e0b, text: "WEB3", phase: 3.6 },
+    { x: w * 0.92, y: skylineY * 0.30, w: 20, h: 8, color: 0xa855f7, text: "SOUL", phase: 4.8 },
+  ];
+  // Static billboard backgrounds
+  for (const bb of billboards) {
+    billboardLayer.rect(bb.x - bb.w / 2, bb.y - bb.h / 2, bb.w, bb.h).fill({
+      color: 0x080c18,
+      alpha: 0.85,
+    });
+    billboardLayer.rect(bb.x - bb.w / 2, bb.y - bb.h / 2, bb.w, bb.h).stroke({
+      color: bb.color,
+      width: 0.5,
+      alpha: 0.3,
+    });
+  }
+  billboardLayer.alpha = 0.8;
+  app.stage.addChildAt(billboardLayer, 1);
+
+  // Dynamic billboard glow (redrawn each frame)
+  const billboardGlow = new Graphics();
+  app.stage.addChildAt(billboardGlow, 2);
+
+  // -- Data highway lines (pulsing along neon grid) --------------------
+  interface DataHighway { startX: number; y: number; speed: number; len: number; color: number; x: number }
+  const dataHighways: DataHighway[] = [];
+  for (let i = 0; i < 6; i++) {
+    const gy = skylineY + (i + 2) * (i + 2) * 1.8;
+    if (gy > h) break;
+    dataHighways.push({
+      startX: -60,
+      y: gy,
+      speed: 80 + Math.random() * 160,
+      len: 30 + Math.random() * 60,
+      color: [0x00f0ff, 0xff006e, 0x39ff14, 0xf59e0b][i % 4],
+      x: Math.random() * w,
+    });
+  }
+  const dataHighwayGraphics = new Graphics();
+  app.stage.addChildAt(dataHighwayGraphics, 2);
+
   // -- Floor tiles ----------------------------------------------------
   const floor = new Graphics();
 
@@ -345,7 +413,8 @@ export function initBackground(
   // -- Ticker ---------------------------------------------------------
   let time = 0;
   const tick = (ticker: { deltaMS: number }) => {
-    time += ticker.deltaMS / 1000;
+    const dt = ticker.deltaMS / 1000;
+    time += dt;
 
     // Scanline sweep (viewport coords)
     scanline.position.y = ((time * 30) % (h + 20)) - 10;
@@ -355,6 +424,85 @@ export function initBackground(
 
     // City skyline subtle parallax (very slow drift)
     cityLayer.position.x = Math.sin(time * 0.05) * 1.5;
+
+    // ── Rain animation ──
+    rainLayer.clear();
+    for (const drop of rainDrops) {
+      drop.y += drop.speed * dt;
+      drop.x -= drop.speed * 0.08 * dt; // slight wind
+      if (drop.y > h) {
+        drop.y = -drop.len;
+        drop.x = Math.random() * w * 1.3;
+      }
+      if (drop.x < -20) drop.x = w + 10;
+      rainLayer.moveTo(drop.x, drop.y);
+      rainLayer.lineTo(drop.x - drop.len * 0.08, drop.y + drop.len);
+      rainLayer.stroke({ color: 0x6090c0, width: 0.5, alpha: drop.alpha });
+    }
+
+    // ── Shooting stars (spawn every ~4-8s) ──
+    starTimer += dt;
+    if (starTimer > 4 + Math.random() * 4) {
+      starTimer = 0;
+      const fromLeft = Math.random() > 0.5;
+      const colors = [0x00f0ff, 0xff006e, 0x39ff14, 0xf59e0b, 0xffffff];
+      shootingStars.push({
+        x: fromLeft ? -10 : w + 10,
+        y: Math.random() * skylineY * 0.6,
+        vx: (fromLeft ? 1 : -1) * (300 + Math.random() * 400),
+        vy: 60 + Math.random() * 120,
+        life: 0,
+        maxLife: 0.8 + Math.random() * 0.6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }
+    for (let i = shootingStars.length - 1; i >= 0; i--) {
+      const s = shootingStars[i];
+      s.life += dt;
+      if (s.life >= s.maxLife) {
+        shootingStars.splice(i, 1);
+        continue;
+      }
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const fade = 1 - s.life / s.maxLife;
+      const tailLen = 40 + fade * 30;
+      const tailX = s.x - (s.vx / Math.abs(s.vx)) * tailLen;
+      const tailY = s.y - (s.vy / Math.abs(s.vy)) * tailLen * 0.3;
+      // Draw on rain layer (reuses same redraw)
+      rainLayer.moveTo(tailX, tailY);
+      rainLayer.lineTo(s.x, s.y);
+      rainLayer.stroke({ color: s.color, width: 1.5, alpha: fade * 0.5 });
+      rainLayer.circle(s.x, s.y, 2).fill({ color: s.color, alpha: fade * 0.8 });
+    }
+
+    // ── Billboard glow pulse ──
+    billboardGlow.clear();
+    for (const bb of billboards) {
+      const pulse = 0.3 + Math.sin(time * 1.5 + bb.phase) * 0.2;
+      const flicker = Math.random() > 0.97 ? 0.1 : 0;
+      billboardGlow.rect(bb.x - bb.w / 2, bb.y - bb.h / 2, bb.w, bb.h).fill({
+        color: bb.color,
+        alpha: (pulse + flicker) * 0.15,
+      });
+      // Vertical light spill below billboard
+      billboardGlow.rect(bb.x - bb.w / 4, bb.y + bb.h / 2, bb.w / 2, 12 + pulse * 8).fill({
+        color: bb.color,
+        alpha: pulse * 0.04,
+      });
+    }
+
+    // ── Data highways (horizontal pulses along grid) ──
+    dataHighwayGraphics.clear();
+    for (const dh of dataHighways) {
+      dh.x += dh.speed * dt;
+      if (dh.x > w + dh.len) dh.x = -dh.len;
+      dataHighwayGraphics.moveTo(dh.x, dh.y);
+      dataHighwayGraphics.lineTo(dh.x + dh.len, dh.y);
+      dataHighwayGraphics.stroke({ color: dh.color, width: 1.5, alpha: 0.12 });
+      // Leading bright dot
+      dataHighwayGraphics.circle(dh.x + dh.len, dh.y, 2).fill({ color: dh.color, alpha: 0.3 });
+    }
 
     // Particle drift
     for (const p of particles) {
@@ -375,5 +523,9 @@ export function initBackground(
     scanline.destroy();
     cityLayer.destroy();
     neonGrid.destroy();
+    rainLayer.destroy();
+    billboardLayer.destroy();
+    billboardGlow.destroy();
+    dataHighwayGraphics.destroy();
   };
 }
