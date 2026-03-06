@@ -6,6 +6,7 @@ import { useArenaEvents, type ArenaHandlers } from "./useArenaEvents";
 import type { NodesApi } from "./renderer/avatars";
 import type { EffectsApi } from "./renderer/effects";
 import type { OfficeApi } from "./renderer/office";
+import "./arena.css";
 
 interface HudStats {
   online: number;
@@ -14,6 +15,13 @@ interface HudStats {
   meetingActive: boolean;
   meetingAgents: string[];
   meetingType: "auto" | "manual" | null;
+}
+
+interface EventLogEntry {
+  id: number;
+  text: string;
+  time: string;
+  type: "info" | "command" | "success" | "fail" | "meeting" | "swarm";
 }
 
 export default function ArenaCanvas() {
@@ -38,6 +46,33 @@ export default function ArenaCanvas() {
   const [meetingPanelOpen, setMeetingPanelOpen] = useState(false);
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set(["main"]));
   const manualMeetingRef = useRef(false);
+
+  // Event log (rolling 8 entries)
+  const eventIdRef = useRef(0);
+  const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
+
+  const pushEvent = useCallback((text: string, type: EventLogEntry["type"] = "info") => {
+    const id = ++eventIdRef.current;
+    const time = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setEventLog((prev) => [{ id, text, time, type }, ...prev].slice(0, 8));
+  }, []);
+
+  // Live clock
+  const [clock, setClock] = useState("");
+  useEffect(() => {
+    const tick = () =>
+      setClock(
+        new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      );
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   const [labelPositions, setLabelPositions] = useState<
     { id: string; label: string; colorHex: string; x: number; y: number }[]
@@ -78,6 +113,7 @@ export default function ArenaCanvas() {
         meetingType: "auto",
         lastEvent: `MEETING: ${meetingIds.length} agents at table`,
       }));
+      pushEvent(`MEETING: ${meetingIds.length} agents at table`, "meeting");
     } else if (busyCount >= 2 && meetingActiveRef.current) {
       const meetingIds = withSoul(busyIds);
       meetingAgentsRef.current = new Set(meetingIds);
@@ -107,8 +143,9 @@ export default function ArenaCanvas() {
         meetingType: null,
         lastEvent: "Meeting ended",
       }));
+      pushEvent("Meeting ended", "meeting");
     }
-  }, []);
+  }, [pushEvent]);
 
   // -- Call a specific meeting with chosen agents ----------------------
   const callMeeting = useCallback((agentIds: string[]) => {
@@ -135,8 +172,9 @@ export default function ArenaCanvas() {
       meetingType: "manual",
       lastEvent: `MEETING CALLED: ${meetingIds.join(", ")}`,
     }));
+    pushEvent(`MEETING CALLED: ${meetingIds.join(", ")}`, "meeting");
     setMeetingPanelOpen(false);
-  }, []);
+  }, [pushEvent]);
 
   // -- Dismiss current meeting -----------------------------------------
   const dismissMeeting = useCallback(() => {
@@ -154,7 +192,8 @@ export default function ArenaCanvas() {
       meetingType: null,
       lastEvent: "Meeting dismissed",
     }));
-  }, []);
+    pushEvent("Meeting dismissed", "meeting");
+  }, [pushEvent]);
 
   // Keep refs current for use in async callbacks & cross-tab listeners
   checkMeetingRef.current = checkMeeting;
@@ -240,6 +279,7 @@ export default function ArenaCanvas() {
           online,
           lastEvent: `${agentId} ${status}`,
         }));
+        pushEvent(`${agentId} → ${status}`, status === "busy" ? "command" : "info");
       }
 
       // Don't let session sync noise end meetings prematurely
@@ -260,6 +300,7 @@ export default function ArenaCanvas() {
         activeCommands: activeCommandsRef.current.size,
         lastEvent: `CMD > ${agentId}: ${message.slice(0, 40)}`,
       }));
+      pushEvent(`CMD > ${agentId}: ${message.slice(0, 40)}`, "command");
 
       // Detect meeting commands from voice/chat and trigger arena meeting
       const lower = message.toLowerCase();
@@ -308,6 +349,10 @@ export default function ArenaCanvas() {
         activeCommands: activeCommandsRef.current.size,
         lastEvent: `${status === "completed" ? "OK" : "FAIL"} ${agentId}`,
       }));
+      pushEvent(
+        `${status === "completed" ? "✓" : "✗"} ${agentId} ${status}`,
+        status === "completed" ? "success" : "fail",
+      );
       checkMeeting();
     },
     onControl(agentId, enabled) {
@@ -319,6 +364,7 @@ export default function ArenaCanvas() {
         ...s,
         lastEvent: `${agentId} ${enabled ? "enabled" : "disabled"}`,
       }));
+      pushEvent(`${agentId} ${enabled ? "enabled" : "disabled"}`, "info");
     },
     onSwarmStart(runId, agentIds, mode) {
       console.log("[arena] swarmStart:", runId.slice(0, 8), agentIds, mode);
@@ -327,6 +373,7 @@ export default function ArenaCanvas() {
         ...s,
         lastEvent: `SWARM ${mode.toUpperCase()}: ${agentIds.length} agents`,
       }));
+      pushEvent(`SWARM ${mode.toUpperCase()}: ${agentIds.length} agents`, "swarm");
     },
     onSwarmTaskUpdate(runId, agentId, status) {
       effectsApiRef.current?.swarmTaskUpdate(runId, agentId, status);
@@ -338,6 +385,7 @@ export default function ArenaCanvas() {
         ...s,
         lastEvent: "Swarm completed",
       }));
+      pushEvent("Swarm completed", "success");
     },
   };
 
@@ -471,6 +519,16 @@ export default function ArenaCanvas() {
     };
   }, []);
 
+  /* Event log color map */
+  const eventColor: Record<EventLogEntry["type"], string> = {
+    info: "#00f0ff",
+    command: "#f59e0b",
+    success: "#39ff14",
+    fail: "#ff2d5e",
+    meeting: "#a855f7",
+    swarm: "#ff006e",
+  };
+
   return (
     <div
       className="relative w-full h-full overflow-hidden"
@@ -479,50 +537,59 @@ export default function ArenaCanvas() {
       {/* PixiJS canvas mount point */}
       <div ref={containerRef} className="absolute inset-0" />
 
+      {/* -- Atmospheric overlays ------------------------------------ */}
+      <div className="arena-scanline-overlay" />
+      <div className="arena-vignette" />
+      <div className="arena-corner arena-corner--tl" />
+      <div className="arena-corner arena-corner--tr" />
+      <div className="arena-corner arena-corner--bl" />
+      <div className="arena-corner arena-corner--br" />
+
       {/* -- HUD: Title (top-left) ----------------------------------- */}
       <div className="absolute top-4 left-6 z-10 pointer-events-none select-none">
-        <h1
-          className="text-xl font-mono font-bold tracking-[0.25em]"
-          style={{ color: "#00f0ff", textShadow: "0 0 20px #00f0ff44" }}
-        >
-          XMETAV HQ
-        </h1>
+        <div className="flex items-end gap-3">
+          <h1
+            className="arena-title-glitch text-xl font-mono font-bold tracking-[0.25em]"
+            data-text="XMETAV HQ"
+            style={{ color: "#00f0ff" }}
+          >
+            XMETAV HQ
+          </h1>
+          <span
+            className="text-[10px] font-mono mb-[3px] tracking-widest"
+            style={{ color: "#39ff14", textShadow: "0 0 8px #39ff1466" }}
+          >
+            {clock}
+          </span>
+        </div>
+        <div className="arena-title-line mt-1" />
         <p
-          className="text-[10px] font-mono mt-1 tracking-wider"
-          style={{ color: "#00f0ff33" }}
+          className="text-[9px] font-mono mt-1.5 tracking-[0.3em] uppercase"
+          style={{ color: "#00f0ff44" }}
         >
-          COMMAND CENTER LIVE VIEW
+          COMMAND CENTER &middot; LIVE
         </p>
       </div>
 
       {/* -- HUD: Meeting indicator (top-center) ---------------------- */}
       {hudStats.meetingActive && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 select-none">
-          <div
-            className="px-4 py-2 rounded font-mono text-xs tracking-widest text-center animate-pulse"
-            style={{
-              color: "#00f0ff",
-              border: "1px solid #00f0ff33",
-              background: "#05080fdd",
-              backdropFilter: "blur(8px)",
-              textShadow: "0 0 12px #00f0ffaa",
-            }}
-          >
-            <div className="text-[10px] mb-0.5" style={{ color: "#00f0ff88" }}>
-              MEETING IN SESSION
+          <div className="arena-meeting-glow px-5 py-2.5 rounded font-mono text-xs tracking-widest text-center">
+            <div className="text-[10px] mb-0.5" style={{ color: "#a855f7" }}>
+              &#9670; MEETING IN SESSION &#9670;
               {hudStats.meetingType === "manual" && (
-                <span style={{ color: "#f59e0b88" }}> (CALLED)</span>
+                <span style={{ color: "#f59e0b" }}> [CALLED]</span>
               )}
             </div>
-            <div className="text-[8px]" style={{ color: "#00f0ff55" }}>
+            <div className="text-[8px] mt-1" style={{ color: "#a855f788" }}>
               {hudStats.meetingAgents.join(" / ")}
             </div>
             <button
               onClick={dismissMeeting}
-              className="mt-1.5 px-2 py-0.5 rounded text-[9px] font-mono transition-all hover:border-[#ff444488]"
+              className="mt-2 px-3 py-0.5 rounded text-[9px] font-mono transition-all hover:border-[#ff2d5e88] hover:text-[#ff2d5e]"
               style={{
-                color: "#ff444488",
-                border: "1px solid #ff444422",
+                color: "#ff2d5e88",
+                border: "1px solid #ff2d5e33",
                 background: "#05080fcc",
               }}
             >
@@ -536,23 +603,18 @@ export default function ArenaCanvas() {
       <div className="absolute top-4 right-6 z-10 flex gap-2">
         <button
           onClick={() => setMeetingPanelOpen(!meetingPanelOpen)}
-          className="px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#f59e0b55]"
+          className="arena-hud-panel px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#f59e0b55]"
           style={{
             color: meetingPanelOpen ? "#f59e0b" : "#f59e0b88",
-            border: `1px solid ${meetingPanelOpen ? "#f59e0b55" : "#f59e0b22"}`,
-            background: "#05080fcc",
+            borderColor: meetingPanelOpen ? "#f59e0b55" : "#f59e0b22",
           }}
         >
-          CALL MEETING
+          &#9670; CALL MEETING
         </button>
         <a
           href="/agent"
-          className="px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#00f0ff55]"
-          style={{
-            color: "#00f0ff88",
-            border: "1px solid #00f0ff22",
-            background: "#05080fcc",
-          }}
+          className="arena-hud-panel px-3 py-1.5 rounded text-xs font-mono transition-all hover:border-[#00f0ff55]"
+          style={{ color: "#00f0ff88", borderColor: "#00f0ff22" }}
         >
           &larr; DASHBOARD
         </a>
@@ -593,7 +655,6 @@ export default function ArenaCanvas() {
                       setSelectedAgents((prev) => {
                         const next = new Set(prev);
                         if (next.has(a.id)) {
-                          // Don't let them remove "main" — main always attends
                           if (a.id === "main") return next;
                           next.delete(a.id);
                         } else {
@@ -678,72 +739,113 @@ export default function ArenaCanvas() {
         </div>
       )}
 
-      {/* -- HUD: Stats (bottom-left) -------------------------------- */}
-      <div
-        className="absolute bottom-4 left-6 z-10 p-3 rounded pointer-events-none select-none"
-        style={{
-          background: "#05080fdd",
-          border: "1px solid #00f0ff15",
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        <div
-          className="text-[9px] font-mono uppercase tracking-wider mb-2"
-          style={{ color: "#00f0ff44" }}
-        >
-          SYSTEM STATUS
-        </div>
-        <div className="flex gap-4 text-xs font-mono">
-          <div>
-            <span style={{ color: "#39ff14" }}>{hudStats.online}</span>
-            <span style={{ color: "#4a6a8a" }}> online</span>
+      {/* -- HUD: Stats + Event Log (bottom-left) -------------------- */}
+      <div className="absolute bottom-4 left-6 z-10 pointer-events-none select-none" style={{ maxWidth: 320 }}>
+        {/* System Status */}
+        <div className="arena-hud-panel p-3 rounded mb-2 relative overflow-hidden">
+          <div className="arena-radar" />
+          <div
+            className="text-[9px] font-mono uppercase tracking-[0.3em] mb-2 flex items-center gap-2"
+            style={{ color: "#00f0ff66" }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" style={{ flexShrink: 0 }}>
+              <rect x="1" y="1" width="3" height="3" fill="#00f0ff" opacity="0.6" />
+              <rect x="6" y="1" width="3" height="3" fill="#00f0ff" opacity="0.3" />
+              <rect x="1" y="6" width="3" height="3" fill="#00f0ff" opacity="0.3" />
+              <rect x="6" y="6" width="3" height="3" fill="#00f0ff" opacity="0.6" />
+            </svg>
+            SYSTEM STATUS
           </div>
-          <div>
-            <span style={{ color: "#f59e0b" }}>
-              {hudStats.activeCommands}
-            </span>
-            <span style={{ color: "#4a6a8a" }}> active</span>
+          <div className="flex gap-5 text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="arena-pulse-dot" style={{ background: "#39ff14", boxShadow: "0 0 6px #39ff14" }} />
+              <span style={{ color: "#39ff14", fontSize: 16, fontWeight: 700 }}>{hudStats.online}</span>
+              <span style={{ color: "#4a6a8a", fontSize: 10 }}>ONLINE</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="arena-pulse-dot" style={{ background: "#f59e0b", boxShadow: "0 0 6px #f59e0b", animationDelay: "0.5s" }} />
+              <span style={{ color: "#f59e0b", fontSize: 16, fontWeight: 700 }}>{hudStats.activeCommands}</span>
+              <span style={{ color: "#4a6a8a", fontSize: 10 }}>ACTIVE</span>
+            </div>
+            {hudStats.meetingActive && (
+              <div className="flex items-center gap-1.5">
+                <span className="arena-pulse-dot" style={{ background: "#a855f7", boxShadow: "0 0 6px #a855f7", animationDelay: "1s" }} />
+                <span style={{ color: "#a855f7", fontSize: 16, fontWeight: 700 }}>{hudStats.meetingAgents.length}</span>
+                <span style={{ color: "#4a6a8a", fontSize: 10 }}>MTG</span>
+              </div>
+            )}
           </div>
         </div>
-        <div
-          className="text-[10px] font-mono mt-1.5 max-w-[200px] truncate"
-          style={{ color: "#00f0ff55" }}
-        >
-          {hudStats.lastEvent}
-        </div>
+
+        {/* Event Log */}
+        {eventLog.length > 0 && (
+          <div className="arena-hud-panel p-3 rounded">
+            <div
+              className="text-[9px] font-mono uppercase tracking-[0.3em] mb-2"
+              style={{ color: "#00f0ff44" }}
+            >
+              &#9656; EVENT LOG
+            </div>
+            <div className="space-y-[3px]">
+              {eventLog.map((e) => (
+                <div
+                  key={e.id}
+                  className="arena-event-entry flex items-start gap-2 text-[10px] font-mono"
+                >
+                  <span style={{ color: "#4a6a8a", flexShrink: 0, fontSize: 9 }}>{e.time}</span>
+                  <span style={{ color: eventColor[e.type], opacity: 0.9 }}>{e.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* -- HUD: Legend (bottom-right) ------------------------------ */}
-      <div
-        className="absolute bottom-4 right-6 z-10 p-3 rounded pointer-events-none select-none"
-        style={{
-          background: "#05080fdd",
-          border: "1px solid #00f0ff15",
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        <div
-          className="text-[9px] font-mono uppercase tracking-wider mb-2"
-          style={{ color: "#00f0ff44" }}
-        >
-          AGENTS
-        </div>
-        <div className="space-y-1">
-          {ARENA_AGENTS.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-2 text-[10px] font-mono"
-            >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  background: a.colorHex,
-                  boxShadow: `0 0 4px ${a.colorHex}`,
-                }}
-              />
-              <span style={{ color: a.colorHex }}>{a.label}</span>
-            </div>
-          ))}
+      <div className="absolute bottom-4 right-6 z-10 pointer-events-none select-none">
+        <div className="arena-hud-panel p-3 rounded">
+          <div
+            className="text-[9px] font-mono uppercase tracking-[0.3em] mb-2 flex items-center gap-2"
+            style={{ color: "#00f0ff44" }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" style={{ flexShrink: 0 }}>
+              <circle cx="5" cy="5" r="3" fill="none" stroke="#00f0ff" strokeWidth="0.8" opacity="0.5" />
+              <circle cx="5" cy="5" r="1.2" fill="#00f0ff" opacity="0.6" />
+            </svg>
+            AGENTS ({hudStats.online}/{ARENA_AGENTS.length})
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-[3px]">
+            {ARENA_AGENTS.map((a) => {
+              const isOnline = nodeStatesRef.current.get(a.id) !== "offline";
+              const isBusy = busyAgentsRef.current.has(a.id);
+              return (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-1.5 text-[10px] font-mono"
+                >
+                  <span
+                    className={isOnline ? "arena-pulse-dot" : ""}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      background: isOnline ? a.colorHex : "#1a2538",
+                      boxShadow: isOnline ? `0 0 5px ${a.colorHex}` : "none",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: isOnline ? a.colorHex : "#2a3a4a",
+                      fontWeight: isBusy ? 700 : 400,
+                    }}
+                  >
+                    {a.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
