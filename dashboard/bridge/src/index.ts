@@ -97,6 +97,32 @@ const channel = supabase
 
 // Also pick up any pending commands that were created while bridge was offline
 async function processPendingCommands() {
+  // ── Stale command reaper ─────────────────────────────────────
+  // Commands stuck in "running" from a previous bridge session are zombies —
+  // the process that was executing them is gone. Mark them as failed so the
+  // agent queue is unblocked and the dashboard shows the correct state.
+  const { data: stale, error: staleErr } = await supabase
+    .from("agent_commands")
+    .select("id, agent_id, created_at")
+    .eq("status", "running");
+
+  if (!staleErr && stale && stale.length > 0) {
+    console.log(`[bridge] Found ${stale.length} stale "running" command(s) from previous session — marking as failed`);
+    const staleIds = stale.map((c: { id: string }) => c.id);
+    await supabase
+      .from("agent_commands")
+      .update({ status: "failed" })
+      .in("id", staleIds);
+
+    // Reset any sessions stuck as "busy" from those agents
+    const staleAgents = [...new Set(stale.map((c: { agent_id: string }) => c.agent_id))];
+    await supabase
+      .from("agent_sessions")
+      .update({ status: "idle", last_heartbeat: new Date().toISOString() })
+      .in("agent_id", staleAgents)
+      .eq("status", "busy");
+  }
+
   const { data } = await supabase
     .from("agent_commands")
     .select("*")
