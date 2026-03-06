@@ -5,6 +5,7 @@ import { captureCommandOutcome } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
+import { isDiagramCommand, parseDiagramCommand, executeDiagramCommand } from "../lib/diagram-executor.js";
 import { refreshSitrep } from "./heartbeat.js";
 import { TTLCache } from "../lib/ttl-cache.js";
 import type { ChildProcess } from "child_process";
@@ -210,6 +211,85 @@ export async function executeCommand(command: {
     }
 
     // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
+
+  // ── Diagram generation interception ────────────────────────────
+  // If the message is a diagram command (e.g. "/diagram fleet architecture"),
+  // generate the diagram directly and return file paths.
+  if (isDiagramCommand(message)) {
+    console.log(`[executor] Diagram command detected for "${agent_id}"`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    streamer.write(`\n📐 **Generating diagram...**\n\n`);
+
+    try {
+      const result = await executeDiagramCommand(message);
+
+      if (result.success) {
+        streamer.write(`✅ **Diagram generated!**\n\n`);
+        streamer.write(`📊 **${result.title}** (${result.type})\n\n`);
+        streamer.write(`📁 **Files:**\n`);
+        streamer.write(`- Excalidraw: \`${result.excalidrawPath}\`\n`);
+        streamer.write(`- SVG: \`${result.svgPath}\`\n\n`);
+        if (result.opened) {
+          streamer.write(`🖥️ Opened in default app\n`);
+        }
+        streamer.write(`\n💡 Open SVG in browser or load .excalidraw in excalidraw.com to edit\n`);
+      } else {
+        streamer.write(`\n❌ **Diagram generation failed**\n\n`);
+        streamer.write(`${result.error}\n`);
+      }
+
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+
+      captureCommandOutcome(
+        agent_id,
+        message,
+        `Diagram: ${result.title || "unknown"} → ${result.svgPath || "failed"}`,
+        result.success ? 0 : 1
+      ).catch((err) =>
+        console.error(`[executor] Memory capture failed (non-fatal):`, err)
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      streamer.write(`\n❌ **Diagram error**\n\n${msg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
     await supabase
       .from("agent_sessions")
       .upsert(

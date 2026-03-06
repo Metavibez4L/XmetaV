@@ -1,0 +1,21 @@
+{
+  "name": "diagram-to-video",
+  "description": "Generate a diagram, open it in browser, arrange windows, and record the whole flow",
+  "steps": [
+    { "action": "notify", "title": "XmetaV", "message": "Diagram-to-video pipeline starting..." },
+    { "action": "start-recording" },
+    { "action": "wait", "seconds": 1 },
+    { "action": "switch-app", "app": "Terminal" },
+    { "action": "wait", "seconds": 1 },
+    { "action": "switch-app", "app": "Safari" },
+    { "action": "wait", "seconds": 1 },
+    { "action": "arrange-split" },
+    { "action": "wait", "seconds": 1 },
+    { "action": "open-svg", "path": "~/XmetaV/diagrams/latest.svg" },
+    { "action": "wait", "seconds": 4 },
+    { "action": "screenshot", "name": "diagram-video-frame" },
+    { "action": "wait", "seconds": 2 },
+    { "action": "stop-recording" },
+    { "action": "notify", "title": "XmetaV", "message": "Recording complete! Check Screen Studio for export." }
+  ]
+}

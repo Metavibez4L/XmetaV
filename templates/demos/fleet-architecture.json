@@ -1,0 +1,18 @@
+{
+  "name": "fleet-architecture-demo",
+  "description": "Generate fleet architecture diagram, display it, and capture a screenshot",
+  "steps": [
+    { "action": "notify", "title": "XmetaV Demo", "message": "Starting fleet architecture demo..." },
+    { "action": "wait", "seconds": 1 },
+    { "action": "start-recording" },
+    { "action": "wait", "seconds": 2 },
+    { "action": "open-svg", "path": "~/XmetaV/diagrams/latest.svg" },
+    { "action": "wait", "seconds": 3 },
+    { "action": "full-screen" },
+    { "action": "wait", "seconds": 2 },
+    { "action": "screenshot", "name": "fleet-architecture" },
+    { "action": "wait", "seconds": 2 },
+    { "action": "stop-recording" },
+    { "action": "notify", "title": "XmetaV Demo", "message": "Fleet architecture demo complete!" }
+  ]
+}
