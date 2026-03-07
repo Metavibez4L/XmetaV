@@ -257,3 +257,17 @@ server-status:
     @curl -sf http://localhost:80 >/dev/null 2>&1 && echo "  Caddy    :80    ✅ UP" || echo "  Caddy    :80    ❌ DOWN"
     @docker info >/dev/null 2>&1 && echo "  Docker          ✅ UP ($(docker ps -q | wc -l | tr -d ' ') containers)" || echo "  Docker          ❌ DOWN"
     @tmux has-session -t xmetav 2>/dev/null && echo "  tmux            ✅ UP ($(tmux list-windows -t xmetav | wc -l | tr -d ' ') windows)" || echo "  tmux            ❌ No session"
+
+# ── Remote Reboot ─────────────────────────────────────
+
+# Pre-flight check (verify safe to reboot remotely)
+reboot-check:
+    @bash {{root}}/scripts/safe-reboot.sh --check
+
+# Safe reboot (graceful shutdown + reboot)
+reboot:
+    @bash {{root}}/scripts/safe-reboot.sh
+
+# Install macOS update + reboot (downloads, installs, restarts)
+reboot-update:
+    @bash {{root}}/scripts/safe-reboot.sh --update
