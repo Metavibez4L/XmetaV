@@ -170,3 +170,90 @@ health:
     @echo ""
     @echo "── Memory ──"
     @vm_stat | awk '/Pages free/ {free=$3} /Pages active/ {active=$3} END {printf "  Free: %.1f GB  Active: %.1f GB\n", free*4096/1073741824, active*4096/1073741824}'
+
+# ── Headless Server ──────────────────────────────────
+
+# Launch tmux headless server session (7 windows: control, logs, htop, redis, docker, dev, agents)
+tmux-up:
+    @bash {{root}}/scripts/tmux-server.sh detach
+
+# Attach to tmux server session
+tmux-attach:
+    @bash {{root}}/scripts/tmux-server.sh
+
+# Kill tmux server session
+tmux-kill:
+    @bash {{root}}/scripts/tmux-server.sh kill
+
+# ── Redis ─────────────────────────────────────────────
+
+# Start Redis with XmetaV config
+redis-start:
+    @redis-server /opt/homebrew/etc/redis.conf --include {{root}}/configs/redis.conf --daemonize yes && echo "✅ Redis started" && redis-cli ping
+
+# Stop Redis
+redis-stop:
+    @redis-cli shutdown && echo "Redis stopped"
+
+# Redis status
+redis-status:
+    @redis-cli ping 2>/dev/null && echo "  Redis  :6379  ✅ UP ($(redis-cli INFO memory | grep used_memory_human | cut -d: -f2 | tr -d '\r') used)" || echo "  Redis  :6379  ❌ DOWN"
+
+# ── Docker ────────────────────────────────────────────
+
+# Docker status
+docker-status:
+    @docker ps --format "table {{{{.Names}}\t{{{{.Status}}\t{{{{.Ports}}" 2>/dev/null || echo "  Docker  ❌ Not running"
+
+# ── Caddy ─────────────────────────────────────────────
+
+# Start Caddy reverse proxy
+caddy-start:
+    @brew services start caddy && echo "✅ Caddy started"
+
+# Stop Caddy
+caddy-stop:
+    @brew services stop caddy && echo "Caddy stopped"
+
+# Reload Caddy config
+caddy-reload:
+    @caddy reload --config /opt/homebrew/etc/Caddyfile && echo "✅ Caddy reloaded"
+
+# ── System Update ─────────────────────────────────────
+
+# Run system update now (macOS, Homebrew, Ollama, npm, git)
+update:
+    @bash {{root}}/scripts/system-update.sh
+
+# Schedule system update in N minutes (default: 5)
+update-later min="5":
+    @nohup bash {{root}}/scripts/system-update.sh --delay {{min}} >/dev/null 2>&1 & echo "✅ Update scheduled in {{min}} min (PID $$!)"
+
+# Check system update log
+update-log:
+    @tail -30 /tmp/xmetav-system-update.log 2>/dev/null || echo "No update log yet"
+
+# ── Full Server Setup ─────────────────────────────────
+
+# Start everything: Redis, Caddy, Docker, tmux session, XmetaV services
+server-up:
+    @echo "═══ Starting XmetaV Headless Server ═══"
+    @redis-server /opt/homebrew/etc/redis.conf --include {{root}}/configs/redis.conf --daemonize yes 2>/dev/null && echo "  ✅ Redis" || echo "  ⚠️  Redis (already running?)"
+    @brew services start caddy 2>/dev/null && echo "  ✅ Caddy" || echo "  ⚠️  Caddy (already running?)"
+    @open -a Docker 2>/dev/null && echo "  ✅ Docker Desktop" || echo "  ⚠️  Docker"
+    @just all
+    @bash {{root}}/scripts/tmux-server.sh detach
+    @echo ""
+    @echo "═══ Server Ready ═══"
+    @just server-status
+
+# Full server status
+server-status:
+    @echo "── XmetaV Server Status ──"
+    @just status
+    @echo ""
+    @just redis-status
+    @echo ""
+    @curl -sf http://localhost:80 >/dev/null 2>&1 && echo "  Caddy    :80    ✅ UP" || echo "  Caddy    :80    ❌ DOWN"
+    @docker info >/dev/null 2>&1 && echo "  Docker          ✅ UP ($(docker ps -q | wc -l | tr -d ' ') containers)" || echo "  Docker          ❌ DOWN"
+    @tmux has-session -t xmetav 2>/dev/null && echo "  tmux            ✅ UP ($(tmux list-windows -t xmetav | wc -l | tr -d ' ') windows)" || echo "  tmux            ❌ No session"
