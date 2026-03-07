@@ -18,6 +18,7 @@ export function createStreamer(commandId: string) {
   let buffer = "";
   let timer: ReturnType<typeof setTimeout> | null = null;
   let started = false;
+  let ended = false;
   let flushing = false;
   let pendingFlush = false;
 
@@ -70,6 +71,13 @@ export function createStreamer(commandId: string) {
   }
 
   function write(text: string) {
+    // Ghost-response guard: drop writes that arrive after end() was called.
+    // This happens when a killed agent process has queued LLM chunks that
+    // arrive after the stream was finalised (is_final=true already sent).
+    if (ended) {
+      console.log(`[streamer] Dropping ghost chunk (${text.length} chars) for command ${commandId}`);
+      return;
+    }
     buffer += text;
     // If buffer is large enough, flush immediately
     if (buffer.length >= CHUNK_SIZE) {
@@ -79,6 +87,7 @@ export function createStreamer(commandId: string) {
 
   async function end(exitCode: number | null) {
     started = false;
+    ended = true;
     if (timer) {
       clearTimeout(timer);
       timer = null;

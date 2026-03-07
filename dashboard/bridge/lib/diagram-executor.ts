@@ -23,16 +23,31 @@ const MAC_AUTOMATE = path.resolve(
 
 // ── Command Detection ────────────────────────────────────────────
 
-const DIAGRAM_PATTERNS = [
+/** Patterns that MUST appear at the start of the message (slash-command style) */
+const PREFIX_PATTERNS = [
   /^\/diagram\b/i,
   /^diagram:/i,
-  /^generate\s+diagram\b/i,
-  /^draw\s+(architecture|flow|mindmap|timeline)\b/i,
 ];
+
+/**
+ * Natural-language patterns that match diagram/excalidraw requests anywhere
+ * in the message. We require at least one "action" word + one "artifact" word
+ * to avoid false positives on casual mentions.
+ */
+const NL_ACTION = /\b(?:generate|create|make|build|draw|produce|render|use)\b/i;
+const NL_ARTIFACT = /\b(?:diagram|excalidraw|flowchart|architecture\s*diagram|system\s*diagram|mindmap|timeline\s*diagram)\b/i;
 
 export function isDiagramCommand(message: string): boolean {
   const trimmed = message.trim();
-  return DIAGRAM_PATTERNS.some((p) => p.test(trimmed));
+
+  // 1. Exact prefix commands always match
+  if (PREFIX_PATTERNS.some((p) => p.test(trimmed))) return true;
+
+  // 2. Natural-language: must contain both an action verb AND a diagram artifact
+  const lower = trimmed.toLowerCase();
+  if (NL_ACTION.test(lower) && NL_ARTIFACT.test(lower)) return true;
+
+  return false;
 }
 
 // ── Command Parsing ──────────────────────────────────────────────
