@@ -13,6 +13,40 @@ import type { ChildProcess } from "child_process";
 /** Track running processes per agent (one at a time per agent) */
 export const running = new Map<string, ChildProcess>();
 
+/**
+ * Track the last diagram context per agent.
+ * When a diagram is generated, we store it here so follow-up messages
+ * like "update it", "improve it", "retry" can be intercepted instead
+ * of letting the LLM use browser tools and hang.
+ */
+interface DiagramContext {
+  message: string;
+  timestamp: number;
+}
+const lastDiagramContext = new Map<string, DiagramContext>();
+const DIAGRAM_CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
+
+/** Vague follow-up messages that should inherit the previous diagram context */
+const DIAGRAM_FOLLOWUP_PATTERNS = [
+  /^(update|improve|enhance|fix|refine|redo|retry|regenerate|redo)\b/i,
+  /^(update|improve|make|do)\s+(it|that|this|the diagram|the excalidraw)\b/i,
+  /^(make it|do it)\s+(better|nicer|bigger|more detailed|cleaner)/i,
+  /^(it|that|this)\s+(needs?|should|could)\b/i,
+  /^(keep going|continue|go ahead|do it)$/i,
+  /^retry$/i,
+];
+
+function isDiagramFollowUp(agentId: string, message: string): boolean {
+  const ctx = lastDiagramContext.get(agentId);
+  if (!ctx) return false;
+  if (Date.now() - ctx.timestamp > DIAGRAM_CONTEXT_TTL) {
+    lastDiagramContext.delete(agentId);
+    return false;
+  }
+  const trimmed = message.trim();
+  return DIAGRAM_FOLLOWUP_PATTERNS.some((p) => p.test(trimmed));
+}
+
 /** Cache agent enabled status for 30s — avoids DB query on every command */
 const agentEnabledCache = new TTLCache<boolean>(30_000);
 
@@ -226,8 +260,14 @@ export async function executeCommand(command: {
   // ── Diagram generation interception ────────────────────────────
   // If the message is a diagram command (e.g. "/diagram fleet architecture"),
   // generate the diagram directly and return file paths.
-  if (isDiagramCommand(message)) {
-    console.log(`[executor] Diagram command detected for "${agent_id}"`);
+  // Also catches follow-up messages ("update it", "improve it") within 5 min
+  // of the last diagram, preventing the LLM from using browser tools and hanging.
+  const diagramFollowUp = isDiagramFollowUp(agent_id, message);
+  if (isDiagramCommand(message) || diagramFollowUp) {
+    const effectiveMessage = diagramFollowUp
+      ? `${lastDiagramContext.get(agent_id)!.message} — ${message}`
+      : message;
+    console.log(`[executor] Diagram command detected for "${agent_id}"${diagramFollowUp ? " (follow-up)" : ""}`);
 
     await supabase
       .from("agent_commands")
@@ -245,9 +285,12 @@ export async function executeCommand(command: {
     streamer.start();
 
     streamer.write(`\n📐 **Generating diagram...**\n\n`);
+    if (diagramFollowUp) {
+      streamer.write(`🔄 *Follow-up on previous diagram — regenerating with updates*\n\n`);
+    }
 
     try {
-      const result = await executeDiagramCommand(message);
+      const result = await executeDiagramCommand(effectiveMessage);
 
       if (result.success) {
         streamer.write(`✅ **Diagram generated!**\n\n`);
@@ -259,6 +302,12 @@ export async function executeCommand(command: {
           streamer.write(`🖥️ Opened in default app\n`);
         }
         streamer.write(`\n💡 Open SVG in browser or load .excalidraw in excalidraw.com to edit\n`);
+
+        // Store diagram context so follow-up messages are intercepted
+        lastDiagramContext.set(agent_id, {
+          message: effectiveMessage,
+          timestamp: Date.now(),
+        });
       } else {
         streamer.write(`\n❌ **Diagram generation failed**\n\n`);
         streamer.write(`${result.error}\n`);
