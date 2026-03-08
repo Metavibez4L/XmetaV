@@ -24,11 +24,13 @@ const ALLOWED_AGENTS = new Set([
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
 const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "180", 10);
 
-/** Idle timeout (seconds) — kill if no output for this long (tool hangs, etc.) */
-const IDLE_TIMEOUT_S = parseInt(process.env.AGENT_IDLE_TIMEOUT || "30", 10);
+/** Idle timeout (seconds) — kill if no output for this long (tool hangs, etc.)
+ *  90s allows room for tool calls (URL fetching, deep thinking) while still
+ *  catching truly hung processes. */
+const IDLE_TIMEOUT_S = parseInt(process.env.AGENT_IDLE_TIMEOUT || "90", 10);
 
 /** Retry timeout (seconds) — shorter than first attempt since we already waited */
-const RETRY_TIMEOUT_S = parseInt(process.env.AGENT_RETRY_TIMEOUT || "90", 10);
+const RETRY_TIMEOUT_S = parseInt(process.env.AGENT_RETRY_TIMEOUT || "120", 10);
 
 export interface OpenClawOptions {
   agentId: string;
