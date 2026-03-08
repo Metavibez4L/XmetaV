@@ -1,7 +1,7 @@
 {
   "meta": {
-    "lastTouchedVersion": "2026.3.2",
-    "lastTouchedAt": "2026-02-18T00:00:00.000Z"
+    "lastTouchedVersion": "2026.3.7",
+    "lastTouchedAt": "2026-03-08T00:00:00.000Z"
   },
   "agents": {
     "defaults": {
@@ -11,8 +11,15 @@
         "ollama:qwen2.5:32b-instruct": {}
       },
       "workspace": "/home/manifest/.openclaw/workspace",
+      "contextTokens": 131072,
+      "memorySearch": {
+        "provider": "ollama",
+        "model": "nomic-embed-text"
+      },
       "compaction": {
-        "mode": "safeguard"
+        "mode": "safeguard",
+        "recentTurnsPreserve": 4,
+        "postCompactionSections": ["Session Startup", "Red Lines"]
       },
       "maxConcurrent": 2,
       "subagents": {
@@ -385,7 +392,8 @@
     "auth": {
       "mode": "token",
       "token": "REPLACE_ME"
-    }
+    },
+    "trustedProxies": ["127.0.0.1"]
   },
   "skills": {
     "install": {
@@ -395,9 +403,8 @@
   "models": {
     "providers": {
       "ollama": {
-        "baseUrl": "http://127.0.0.1:11434/v1",
-        "api": "openai-responses",
-        "apiKey": "local",
+        "baseUrl": "http://127.0.0.1:11434",
+        "api": "ollama",
         "models": [
           {
             "id": "qwen2.5:7b-instruct",

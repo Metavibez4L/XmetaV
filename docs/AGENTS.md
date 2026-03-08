@@ -1,6 +1,6 @@
 # Agents — Operating Guide
 
-> **Platform:** Mac Studio M3 Ultra · macOS 26.3 · Ollama 0.17.4 · OpenClaw 2026.2.17
+> **Platform:** Mac Studio M3 Ultra · macOS 26.3.1 · Ollama 0.17.4 · OpenClaw 2026.3.7
 > **Quick start:** `just all` (start services) · `just status` (health) · `just killall` (stop)
 
 This doc covers how to manage OpenClaw agents on this system.
