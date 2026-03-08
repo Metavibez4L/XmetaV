@@ -104,7 +104,12 @@ export async function getJupiterOrder(
     slippageBps: slippage.toString(),
   });
 
-  const res = await fetch(`${APIS.JUPITER_ORDER}?${params}`);
+  const headers: Record<string, string> = {};
+  if (process.env.JUPITER_API_KEY) {
+    headers["x-api-key"] = process.env.JUPITER_API_KEY;
+  }
+
+  const res = await fetch(`${APIS.JUPITER_ORDER}?${params}`, { headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Jupiter order failed (${res.status}): ${body}`);
@@ -144,9 +149,14 @@ export async function executeJupiterOrder(
   // Send signed transaction to Jupiter for execution
   const signedTxBase64 = Buffer.from(tx.serialize()).toString("base64");
 
+  const execHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.JUPITER_API_KEY) {
+    execHeaders["x-api-key"] = process.env.JUPITER_API_KEY;
+  }
+
   const res = await fetch(APIS.JUPITER_EXECUTE, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: execHeaders,
     body: JSON.stringify({
       signedTransaction: signedTxBase64,
       requestId: order.requestId,
