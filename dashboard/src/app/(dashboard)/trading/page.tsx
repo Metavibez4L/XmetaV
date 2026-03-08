@@ -2,7 +2,8 @@
 
 import { CrossChainPanel } from "@/components/CrossChainPanel";
 import { KaminoPanel } from "@/components/KaminoPanel";
-import { ArrowLeftRight, Globe, Vault, Zap } from "lucide-react";
+import { KaminoBorrowPanel } from "@/components/KaminoBorrowPanel";
+import { ArrowLeftRight, Globe, Landmark, Vault, Zap } from "lucide-react";
 
 export default function TradingPage() {
   return (
@@ -19,7 +20,7 @@ export default function TradingPage() {
             </span>
           </div>
           <p className="text-[11px] font-mono mt-1" style={{ color: "#4a6a8a" }}>
-            // cross-chain swaps · Jupiter Ultra · Kamino vaults · Base ↔ Solana
+            // cross-chain swaps · Jupiter Ultra · Kamino earn & borrow · Base ↔ Solana
           </p>
         </div>
       </div>
@@ -30,6 +31,7 @@ export default function TradingPage() {
           { icon: ArrowLeftRight, label: "Base ↔ Solana Bridge (CCTP)", color: "#a855f7" },
           { icon: Zap, label: "Jupiter Ultra Swaps", color: "#00f0ff" },
           { icon: Vault, label: "Kamino Yield Vaults", color: "#10b981" },
+          { icon: Landmark, label: "Kamino Borrow / Lend", color: "#a855f7" },
           { icon: Globe, label: "Multi-Chain", color: "#f59e0b" },
         ].map(({ icon: Icon, label, color }) => (
           <div
@@ -43,17 +45,11 @@ export default function TradingPage() {
         ))}
       </div>
 
-      {/* Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Cross-Chain */}
-        <div>
-          <CrossChainPanel />
-        </div>
-
-        {/* Right: Kamino Vaults */}
-        <div>
-          <KaminoPanel />
-        </div>
+      {/* Three-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div><CrossChainPanel /></div>
+        <div><KaminoPanel /></div>
+        <div><KaminoBorrowPanel /></div>
       </div>
 
       {/* Endpoint Reference */}
@@ -67,8 +63,16 @@ export default function TradingPage() {
             { method: "POST", path: "/cross-chain-swap/quote", price: "Free", desc: "Get swap estimate" },
             { method: "GET", path: "/bridge-status/:jobId", price: "$0.05", desc: "Check job progress" },
             { method: "POST", path: "/trigger-return/:jobId", price: "$0.25", desc: "Bridge back to Base" },
-            { method: "POST", path: "/kamino/deposit", price: "$0.15", desc: "Deposit to Kamino vault" },
+            { method: "POST", path: "/kamino/deposit", price: "$0.15", desc: "Deposit to vault" },
             { method: "POST", path: "/kamino/withdraw", price: "$0.15", desc: "Withdraw from vault" },
+            { method: "GET", path: "/kamino/vault-details", price: "Free", desc: "Live vault APY & data" },
+            { method: "GET", path: "/kamino/positions", price: "Free", desc: "User vault positions" },
+            { method: "GET", path: "/kamino/market", price: "Free", desc: "Lending market overview" },
+            { method: "GET", path: "/kamino/obligation", price: "$0.05", desc: "User lending position" },
+            { method: "POST", path: "/kamino/deposit-collateral", price: "$0.20", desc: "Supply collateral" },
+            { method: "POST", path: "/kamino/borrow", price: "$0.20", desc: "Borrow against collateral" },
+            { method: "POST", path: "/kamino/repay", price: "$0.15", desc: "Repay a loan" },
+            { method: "POST", path: "/kamino/withdraw-collateral", price: "$0.20", desc: "Remove collateral" },
             { method: "GET", path: "/cross-chain/queue", price: "Free", desc: "Batch queue stats" },
             { method: "GET", path: "/cross-chain/vaults", price: "Free", desc: "Available Kamino vaults" },
           ].map(({ method, path, price, desc }) => (

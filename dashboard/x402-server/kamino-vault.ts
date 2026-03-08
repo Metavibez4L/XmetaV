@@ -1,20 +1,25 @@
 /**
- * Kamino Earn Vault Module
+ * Kamino Earn Vault Module (SDK-based)
  *
- * Deposit and withdraw from Kamino vaults on Solana for yield.
- * Uses Kamino REST API for transaction building, we sign locally.
+ * Uses @kamino-finance/klend-sdk for vault data, APY, holdings, user positions.
+ * SDK-first for reads; API-first for deposit/withdraw transactions.
  *
- * Flow: POST /ktx/kvault/deposit → sign returned tx → submit
+ * Note: klend-sdk uses @solana/kit types internally. We cast @solana/web3.js
+ * Connection/PublicKey at SDK boundaries with `as any` for compatibility.
  */
 
 import {
   Connection,
   Keypair,
   VersionedTransaction,
+  TransactionMessage,
   sendAndConfirmTransaction,
   Transaction,
+  PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { KaminoVault } from "@kamino-finance/klend-sdk";
+import Decimal from "decimal.js";
 import { APIS, SOLANA_CONTRACTS } from "./cross-chain-types.js";
 
 // ── Connection Setup ────────────────────────────────────────────
@@ -64,7 +69,25 @@ export const KAMINO_VAULTS: Record<string, {
   },
 };
 
-// ── Vault Listing ───────────────────────────────────────────────
+// ── SDK Vault Cache ─────────────────────────────────────────────
+
+const vaultCache = new Map<string, { vault: KaminoVault; loadedAt: number }>();
+const CACHE_TTL = 60_000; // 1 minute
+
+async function getKaminoVault(vaultAddress: string): Promise<KaminoVault> {
+  const cached = vaultCache.get(vaultAddress);
+  if (cached && Date.now() - cached.loadedAt < CACHE_TTL) {
+    return cached.vault;
+  }
+  const conn = getConnection();
+  // klend-sdk expects @solana/kit Rpc, but works at runtime with web3.js Connection
+  const vault = new KaminoVault(conn as any, new PublicKey(vaultAddress) as any);
+  await vault.getState();
+  vaultCache.set(vaultAddress, { vault, loadedAt: Date.now() });
+  return vault;
+}
+
+// ── Vault Data (SDK) ────────────────────────────────────────────
 
 export interface VaultInfo {
   address: string;
@@ -76,8 +99,53 @@ export interface VaultInfo {
   sharesMint: string;
 }
 
+export interface VaultDetails {
+  address: string;
+  holdings: any;
+  allocations: any;
+  apy: any;
+  exchangeRate: any;
+  hasFarm: boolean;
+}
+
 /**
- * Fetch available Kamino vaults from the API.
+ * Get live vault details via SDK: holdings, allocations, APY, exchange rate.
+ */
+export async function getVaultDetails(vaultAddress: string): Promise<VaultDetails> {
+  const vault = await getKaminoVault(vaultAddress);
+  const [holdings, allocations, apy, exchangeRate] = await Promise.all([
+    vault.getVaultHoldings(),
+    vault.getVaultAllocations(),
+    vault.getAPYs(),
+    vault.getExchangeRate(),
+  ]);
+
+  return {
+    address: vaultAddress,
+    holdings,
+    allocations,
+    apy,
+    exchangeRate,
+    hasFarm: await vault.hasFarm(),
+  };
+}
+
+/**
+ * Get user's share balance in a vault via SDK.
+ */
+export async function getUserVaultShares(
+  vaultAddress: string,
+  walletAddress?: string
+): Promise<any> {
+  const vault = await getKaminoVault(vaultAddress);
+  const wallet = walletAddress
+    ? new PublicKey(walletAddress)
+    : getKeypair().publicKey;
+  return vault.getUserShares(wallet as any);
+}
+
+/**
+ * Fetch available Kamino vaults from the API (list endpoint).
  */
 export async function listVaults(): Promise<VaultInfo[]> {
   const res = await fetch(APIS.KAMINO_VAULTS);
@@ -88,25 +156,39 @@ export async function listVaults(): Promise<VaultInfo[]> {
   return data;
 }
 
-// ── Deposit into Vault ──────────────────────────────────────────
+/**
+ * Get user positions across all known vaults.
+ * Queries each vault in KAMINO_VAULTS for user shares.
+ */
+export async function getUserPositions(walletAddress?: string): Promise<any> {
+  const wallet = walletAddress
+    ? new PublicKey(walletAddress)
+    : getKeypair().publicKey;
+  const results: Record<string, any> = {};
+  for (const [key, info] of Object.entries(KAMINO_VAULTS)) {
+    try {
+      const vault = await getKaminoVault(info.address);
+      results[key] = await vault.getUserShares(wallet as any);
+    } catch {
+      results[key] = null;
+    }
+  }
+  return { wallet: wallet.toBase58(), positions: results };
+}
+
+// ── Deposit into Vault (SDK-first, API fallback) ────────────────
 
 export interface DepositResult {
   txSignature: string;
   vaultAddress: string;
   depositAmount: number;
   sharesReceived: number | null;
+  method: "sdk" | "api";
 }
 
 /**
- * Deposit tokens into a Kamino vault.
- *
- * 1. POST to Kamino API to build the deposit transaction
- * 2. Deserialize and sign the transaction
- * 3. Submit to Solana
- *
- * @param vaultAddress - Kamino vault address
- * @param amount - Token amount in smallest units (lamports / raw)
- * @param tokenMint - The token being deposited
+ * Deposit tokens into a Kamino vault using SDK instruction building.
+ * Falls back to REST API if SDK method fails.
  */
 export async function depositToVault(
   vaultAddress: string,
@@ -116,7 +198,45 @@ export async function depositToVault(
   const kp = getKeypair();
   const conn = getConnection();
 
-  // 1. Request deposit transaction from Kamino API
+  // Try SDK-based deposit first
+  try {
+    const vault = await getKaminoVault(vaultAddress);
+    const depositAmount = new Decimal(amount);
+    const ixResult: any = await vault.depositIxs(kp.publicKey as any, depositAmount);
+
+    // DepositIxs may be an object with instruction arrays or a flat array
+    const ixs: any[] = Array.isArray(ixResult)
+      ? ixResult
+      : [...(ixResult.setupIxs || []), ...(ixResult.depositIxs || []), ...(ixResult.cleanupIxs || [])];
+
+    const { blockhash } = await conn.getLatestBlockhash("finalized");
+    const messageV0 = new TransactionMessage({
+      payerKey: kp.publicKey,
+      recentBlockhash: blockhash,
+      instructions: ixs,
+    }).compileToV0Message();
+
+    const vtx = new VersionedTransaction(messageV0);
+    vtx.sign([kp]);
+
+    const signature = await conn.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+    await conn.confirmTransaction(signature, "confirmed");
+
+    return {
+      txSignature: signature,
+      vaultAddress,
+      depositAmount: parseFloat(amount),
+      sharesReceived: null,
+      method: "sdk",
+    };
+  } catch (sdkErr: any) {
+    console.warn("[kamino] SDK deposit failed, falling back to API:", sdkErr.message);
+  }
+
+  // Fallback: REST API deposit
   const res = await fetch(APIS.KAMINO_DEPOSIT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -134,23 +254,18 @@ export async function depositToVault(
 
   const data = await res.json();
   const txBase64: string = data.transaction;
-
-  // 2. Deserialize and sign
   const txBytes = Buffer.from(txBase64, "base64");
   let signature: string;
 
   try {
-    // Try VersionedTransaction first (Kamino usually returns v0)
     const vtx = VersionedTransaction.deserialize(txBytes);
     vtx.sign([kp]);
-    const rawTx = vtx.serialize();
-    signature = await conn.sendRawTransaction(rawTx, {
+    signature = await conn.sendRawTransaction(vtx.serialize(), {
       skipPreflight: false,
       preflightCommitment: "confirmed",
     });
     await conn.confirmTransaction(signature, "confirmed");
   } catch {
-    // Fall back to legacy Transaction
     const tx = Transaction.from(txBytes);
     tx.sign(kp);
     signature = await sendAndConfirmTransaction(conn, tx, [kp]);
@@ -160,24 +275,24 @@ export async function depositToVault(
     txSignature: signature,
     vaultAddress,
     depositAmount: parseFloat(amount),
-    sharesReceived: null, // would need to parse tx events to get kToken amount
+    sharesReceived: null,
+    method: "api",
   };
 }
 
-// ── Withdraw from Vault ─────────────────────────────────────────
+// ── Withdraw from Vault (SDK-first, API fallback) ───────────────
 
 export interface WithdrawResult {
   txSignature: string;
   vaultAddress: string;
   sharesRedeemed: number;
   tokensReceived: number | null;
+  method: "sdk" | "api";
 }
 
 /**
- * Withdraw tokens from a Kamino vault.
- *
- * @param vaultAddress - Kamino vault address
- * @param shares - kToken shares to redeem (in smallest units)
+ * Withdraw tokens from a Kamino vault using SDK instruction building.
+ * Falls back to REST API if SDK method fails.
  */
 export async function withdrawFromVault(
   vaultAddress: string,
@@ -186,7 +301,45 @@ export async function withdrawFromVault(
   const kp = getKeypair();
   const conn = getConnection();
 
-  // 1. Request withdraw transaction from Kamino API
+  // Try SDK-based withdraw first
+  try {
+    const vault = await getKaminoVault(vaultAddress);
+    const shareAmount = new Decimal(shares);
+    const ixResult: any = await vault.withdrawIxs(kp.publicKey as any, shareAmount);
+
+    // WithdrawIxs may be an object with instruction arrays or a flat array
+    const ixs: any[] = Array.isArray(ixResult)
+      ? ixResult
+      : [...(ixResult.setupIxs || []), ...(ixResult.withdrawIxs || []), ...(ixResult.cleanupIxs || [])];
+
+    const { blockhash } = await conn.getLatestBlockhash("finalized");
+    const messageV0 = new TransactionMessage({
+      payerKey: kp.publicKey,
+      recentBlockhash: blockhash,
+      instructions: ixs,
+    }).compileToV0Message();
+
+    const vtx = new VersionedTransaction(messageV0);
+    vtx.sign([kp]);
+
+    const signature = await conn.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    });
+    await conn.confirmTransaction(signature, "confirmed");
+
+    return {
+      txSignature: signature,
+      vaultAddress,
+      sharesRedeemed: parseFloat(shares),
+      tokensReceived: null,
+      method: "sdk",
+    };
+  } catch (sdkErr: any) {
+    console.warn("[kamino] SDK withdraw failed, falling back to API:", sdkErr.message);
+  }
+
+  // Fallback: REST API withdraw
   const res = await fetch(APIS.KAMINO_WITHDRAW, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -204,16 +357,13 @@ export async function withdrawFromVault(
 
   const data = await res.json();
   const txBase64: string = data.transaction;
-
-  // 2. Deserialize and sign
   const txBytes = Buffer.from(txBase64, "base64");
   let signature: string;
 
   try {
     const vtx = VersionedTransaction.deserialize(txBytes);
     vtx.sign([kp]);
-    const rawTx = vtx.serialize();
-    signature = await conn.sendRawTransaction(rawTx, {
+    signature = await conn.sendRawTransaction(vtx.serialize(), {
       skipPreflight: false,
       preflightCommitment: "confirmed",
     });
@@ -229,33 +379,19 @@ export async function withdrawFromVault(
     vaultAddress,
     sharesRedeemed: parseFloat(shares),
     tokensReceived: null,
+    method: "api",
   };
 }
 
-// ── High-Level: Deposit USDC into best USDC vault ──────────────
+// ── High-Level Helpers ──────────────────────────────────────────
 
-/**
- * Deposit USDC into the default Kamino USDC vault.
- *
- * @param amountUsdc - Human-readable USDC amount (e.g. 10.5)
- */
-export async function depositUsdcToKamino(
-  amountUsdc: number
-): Promise<DepositResult> {
+export async function depositUsdcToKamino(amountUsdc: number): Promise<DepositResult> {
   const vault = KAMINO_VAULTS.USDC_MAIN;
   const amountRaw = Math.floor(amountUsdc * 1e6).toString();
-
   return depositToVault(vault.address, amountRaw, vault.tokenMint);
 }
 
-/**
- * Withdraw all USDC from the default Kamino USDC vault.
- *
- * @param shares - kToken shares to redeem (raw)
- */
-export async function withdrawUsdcFromKamino(
-  shares: string
-): Promise<WithdrawResult> {
+export async function withdrawUsdcFromKamino(shares: string): Promise<WithdrawResult> {
   const vault = KAMINO_VAULTS.USDC_MAIN;
   return withdrawFromVault(vault.address, shares);
 }

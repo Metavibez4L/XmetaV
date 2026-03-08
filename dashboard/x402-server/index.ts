@@ -1149,11 +1149,20 @@ app.get("/health", (_req, res) => {
         // Kamino Vault Direct
         "POST /kamino/deposit": "$0.15 — deposit tokens into Kamino vault",
         "POST /kamino/withdraw": "$0.15 — withdraw tokens from Kamino vault",
+        // Kamino Borrow / Lending
+        "GET /kamino/obligation": "$0.05 — user lending obligation (LTV, deposits, borrows)",
+        "POST /kamino/deposit-collateral": "$0.20 — deposit collateral into lending market",
+        "POST /kamino/borrow": "$0.20 — borrow assets against collateral",
+        "POST /kamino/repay": "$0.15 — repay a loan",
+        "POST /kamino/withdraw-collateral": "$0.20 — withdraw collateral from lending market",
       },
       free: {
         "GET /health": "this endpoint",
         "GET /cross-chain/queue": "batch queue stats",
         "GET /cross-chain/vaults": "available Kamino vaults",
+        "GET /kamino/vault-details": "live vault data (APY, holdings, exchange rate via SDK)",
+        "GET /kamino/positions": "user vault positions across all vaults",
+        "GET /kamino/market": "lending market overview (TVL, reserves, APYs)",
         "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",

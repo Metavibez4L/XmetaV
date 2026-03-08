@@ -32,9 +32,21 @@ import {
   depositToVault,
   withdrawFromVault,
   listVaults,
+  getVaultDetails,
+  getUserVaultShares,
+  getUserPositions,
   type DepositResult,
   type WithdrawResult,
 } from "./kamino-vault.js";
+import {
+  getMarketOverview,
+  getUserObligation,
+  depositCollateral,
+  borrowAsset,
+  repayLoan,
+  withdrawCollateral,
+  MAIN_MARKET,
+} from "./kamino-borrow.js";
 import { checkBridgeArrival } from "./bridge-solana.js";
 
 // ── Fee Schedules ───────────────────────────────────────────────
@@ -48,6 +60,14 @@ export const CROSS_CHAIN_FEE_SCHEDULES = {
   "/cross-chain/vaults": "free — available Kamino vaults",
   "/kamino/deposit": "$0.15 — deposit tokens into a Kamino vault",
   "/kamino/withdraw": "$0.15 — withdraw tokens from a Kamino vault",
+  "/kamino/vault-details": "free — live vault data (APY, holdings, exchange rate)",
+  "/kamino/positions": "free — user vault positions across all vaults",
+  "/kamino/market": "free — lending market overview (TVL, reserves, APYs)",
+  "/kamino/obligation": "$0.05 — user lending obligation (LTV, deposits, borrows)",
+  "/kamino/deposit-collateral": "$0.20 — deposit collateral into lending market",
+  "/kamino/borrow": "$0.20 — borrow assets against collateral",
+  "/kamino/repay": "$0.15 — repay a loan",
+  "/kamino/withdraw-collateral": "$0.20 — withdraw collateral from lending market",
 };
 
 // ── Router Factory ──────────────────────────────────────────────
@@ -493,6 +513,197 @@ export function createCrossChainRouter(
       });
     } catch (err: any) {
       console.error("[kamino] /kamino/withdraw error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * GET /kamino/vault-details?vault=USDC_MAIN
+   *
+   * Live vault data from SDK: holdings, allocations, APY, exchange rate.
+   * ──────────────────────────────────────────────────────── */
+  router.get("/kamino/vault-details", async (req: Request, res: Response) => {
+    try {
+      const vaultKey = (req.query.vault as string) || "USDC_MAIN";
+      const knownVault = KAMINO_VAULTS[vaultKey as keyof typeof KAMINO_VAULTS];
+      const vaultAddress = knownVault ? knownVault.address : vaultKey;
+
+      const details = await getVaultDetails(vaultAddress);
+      res.json({ vault: knownVault?.name ?? vaultAddress, ...details });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/vault-details error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * GET /kamino/positions?wallet=<optional>
+   *
+   * User vault positions across all Kamino vaults.
+   * ──────────────────────────────────────────────────────── */
+  router.get("/kamino/positions", async (req: Request, res: Response) => {
+    try {
+      const wallet = req.query.wallet as string | undefined;
+      const positions = await getUserPositions(wallet);
+      res.json({ positions });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/positions error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * GET /kamino/market
+   *
+   * Lending market overview: TVL, reserves with APY/utilization.
+   * ──────────────────────────────────────────────────────── */
+  router.get("/kamino/market", async (_req: Request, res: Response) => {
+    try {
+      const overview = await getMarketOverview();
+      res.json(overview);
+    } catch (err: any) {
+      console.error("[kamino] /kamino/market error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * GET /kamino/obligation?wallet=<optional>
+   *
+   * User lending obligation: LTV, deposits, borrows, health.
+   * ──────────────────────────────────────────────────────── */
+  router.get("/kamino/obligation", async (req: Request, res: Response) => {
+    try {
+      const wallet = req.query.wallet as string | undefined;
+      logPaymentFn("/kamino/obligation", "$0.05", req);
+      const obligation = await getUserObligation(wallet);
+      res.json({ obligation, market: MAIN_MARKET });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/obligation error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/deposit-collateral
+   *
+   * Body: { token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", amount: "100" }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/deposit-collateral", async (req: Request, res: Response) => {
+    try {
+      const { token, amount } = req.body;
+      if (!token || !amount) {
+        res.status(400).json({ error: "token (mint) and amount are required" });
+        return;
+      }
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" });
+        return;
+      }
+
+      logPaymentFn("/kamino/deposit-collateral", "$0.20", req);
+      const result = await depositCollateral(token, amount);
+      res.json({
+        success: true,
+        ...result,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/deposit-collateral error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/borrow
+   *
+   * Body: { token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", amount: "50" }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/borrow", async (req: Request, res: Response) => {
+    try {
+      const { token, amount } = req.body;
+      if (!token || !amount) {
+        res.status(400).json({ error: "token (mint) and amount are required" });
+        return;
+      }
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" });
+        return;
+      }
+
+      logPaymentFn("/kamino/borrow", "$0.20", req);
+      const result = await borrowAsset(token, amount);
+      res.json({
+        success: true,
+        ...result,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/borrow error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/repay
+   *
+   * Body: { token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", amount: "50" }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/repay", async (req: Request, res: Response) => {
+    try {
+      const { token, amount } = req.body;
+      if (!token || !amount) {
+        res.status(400).json({ error: "token (mint) and amount are required" });
+        return;
+      }
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" });
+        return;
+      }
+
+      logPaymentFn("/kamino/repay", "$0.15", req);
+      const result = await repayLoan(token, amount);
+      res.json({
+        success: true,
+        ...result,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/repay error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/withdraw-collateral
+   *
+   * Body: { token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", amount: "50" }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/withdraw-collateral", async (req: Request, res: Response) => {
+    try {
+      const { token, amount } = req.body;
+      if (!token || !amount) {
+        res.status(400).json({ error: "token (mint) and amount are required" });
+        return;
+      }
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" });
+        return;
+      }
+
+      logPaymentFn("/kamino/withdraw-collateral", "$0.20", req);
+      const result = await withdrawCollateral(token, amount);
+      res.json({
+        success: true,
+        ...result,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/withdraw-collateral error:", err);
       res.status(500).json({ error: err.message });
     }
   });
