@@ -1146,6 +1146,9 @@ app.get("/health", (_req, res) => {
         "POST /cross-chain-swap/quote": "free — estimate output and fees",
         "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
         "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
+        // Kamino Vault Direct
+        "POST /kamino/deposit": "$0.15 — deposit tokens into Kamino vault",
+        "POST /kamino/withdraw": "$0.15 — withdraw tokens from Kamino vault",
       },
       free: {
         "GET /health": "this endpoint",

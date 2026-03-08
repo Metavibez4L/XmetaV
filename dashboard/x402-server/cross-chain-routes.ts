@@ -27,7 +27,14 @@ import {
   loadJobsFromDb,
 } from "./cross-chain-queue.js";
 import { getSwapQuote } from "./jupiter-swap.js";
-import { KAMINO_VAULTS } from "./kamino-vault.js";
+import {
+  KAMINO_VAULTS,
+  depositToVault,
+  withdrawFromVault,
+  listVaults,
+  type DepositResult,
+  type WithdrawResult,
+} from "./kamino-vault.js";
 import { checkBridgeArrival } from "./bridge-solana.js";
 
 // ── Fee Schedules ───────────────────────────────────────────────
@@ -39,6 +46,8 @@ export const CROSS_CHAIN_FEE_SCHEDULES = {
   "/trigger-return/:jobId": "$0.25 — trigger return bridge (Solana→Base)",
   "/cross-chain/queue": "free — batch queue stats",
   "/cross-chain/vaults": "free — available Kamino vaults",
+  "/kamino/deposit": "$0.15 — deposit tokens into a Kamino vault",
+  "/kamino/withdraw": "$0.15 — withdraw tokens from a Kamino vault",
 };
 
 // ── Router Factory ──────────────────────────────────────────────
@@ -375,10 +384,117 @@ export function createCrossChainRouter(
    * List available Kamino vaults. Free endpoint.
    * ──────────────────────────────────────────────────────── */
   router.get("/cross-chain/vaults", async (_req: Request, res: Response) => {
-    res.json({
-      vaults: KAMINO_VAULTS,
-      note: "APY estimates are approximate and subject to change",
-    });
+    try {
+      let liveVaults;
+      try {
+        liveVaults = await listVaults();
+      } catch {
+        liveVaults = null;
+      }
+      res.json({
+        vaults: KAMINO_VAULTS,
+        live: liveVaults,
+        note: "APY estimates are approximate and subject to change",
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/deposit
+   *
+   * Deposit tokens directly into a Kamino vault.
+   *
+   * Body: {
+   *   vault: "USDC_MAIN" | "SOL_MAIN" | string,  // vault key or raw address
+   *   amount: "10.00",                            // human-readable token amount
+   * }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/deposit", async (req: Request, res: Response) => {
+    try {
+      const { vault, amount } = req.body;
+
+      if (!vault || !amount) {
+        res.status(400).json({ error: "vault and amount are required" });
+        return;
+      }
+
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        res.status(400).json({ error: "amount must be a positive number" });
+        return;
+      }
+
+      // Resolve vault: either a known key or a raw address
+      const knownVault = KAMINO_VAULTS[vault as keyof typeof KAMINO_VAULTS];
+      const vaultAddress = knownVault ? knownVault.address : vault;
+      const tokenMint = knownVault ? knownVault.tokenMint : undefined;
+      const decimals = knownVault?.token === "SOL" ? 1e9 : 1e6;
+      const amountRaw = Math.floor(amountNum * decimals).toString();
+
+      logPaymentFn("/kamino/deposit", "$0.15", req);
+
+      const result: DepositResult = await depositToVault(vaultAddress, amountRaw, tokenMint);
+
+      res.json({
+        success: true,
+        vault: knownVault?.name ?? vaultAddress,
+        depositAmount: amountNum,
+        txSignature: result.txSignature,
+        sharesReceived: result.sharesReceived,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/deposit error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────
+   * POST /kamino/withdraw
+   *
+   * Withdraw tokens from a Kamino vault by redeeming shares.
+   *
+   * Body: {
+   *   vault: "USDC_MAIN" | "SOL_MAIN" | string,  // vault key or raw address
+   *   shares: "1000000",                          // kToken shares (raw units)
+   * }
+   * ──────────────────────────────────────────────────────── */
+  router.post("/kamino/withdraw", async (req: Request, res: Response) => {
+    try {
+      const { vault, shares } = req.body;
+
+      if (!vault || !shares) {
+        res.status(400).json({ error: "vault and shares are required" });
+        return;
+      }
+
+      const sharesNum = parseFloat(shares);
+      if (isNaN(sharesNum) || sharesNum <= 0) {
+        res.status(400).json({ error: "shares must be a positive number" });
+        return;
+      }
+
+      const knownVault = KAMINO_VAULTS[vault as keyof typeof KAMINO_VAULTS];
+      const vaultAddress = knownVault ? knownVault.address : vault;
+
+      logPaymentFn("/kamino/withdraw", "$0.15", req);
+
+      const result: WithdrawResult = await withdrawFromVault(vaultAddress, shares);
+
+      res.json({
+        success: true,
+        vault: knownVault?.name ?? vaultAddress,
+        sharesRedeemed: result.sharesRedeemed,
+        tokensReceived: result.tokensReceived,
+        txSignature: result.txSignature,
+        explorerUrl: `https://solscan.io/tx/${result.txSignature}`,
+      });
+    } catch (err: any) {
+      console.error("[kamino] /kamino/withdraw error:", err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;
