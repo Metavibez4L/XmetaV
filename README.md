@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28.1
+Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28.2
 
 ```
  ___   ___                    __           ___   ___
@@ -53,9 +53,10 @@ Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28.1
 - **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
 - **Cross-Chain Swaps (Base↔Solana)** — Full multi-chain pipeline: USDC bridge (Base→Solana via CCTP), Jupiter Ultra swaps (SOL/BONK/JUP), Kamino vault deposits for yield, return bridge (Solana→Base). Batch queue for sub-threshold amounts, job lifecycle tracking in Supabase, x402 payment gating ($0.65/swap)
 - **Jupiter Ultra Integration** — RPC-less token swaps on Solana via Jupiter Ultra API with multi-route aggregation (PancakeSwap, Whirlpool, Meteora DLMM, TesseraV), automatic slippage protection, price impact safety checks
-- **Kamino Yield Vaults** — Deposit bridged USDC/SOL into Kamino Earn vaults (8.5% APY USDC, 7.2% APY SOL) with withdraw-and-return-bridge flow
+- **Kamino Yield Vaults** — SDK-first via `@kamino-finance/klend-sdk`: vault data (APY, holdings, exchange rate), user positions, deposit/withdraw with @solana/kit compat. REST API fallback
+- **Kamino Borrow/Lend** — Full lending market integration via klend-sdk: KaminoMarket overview, user obligations with LTV tracking, deposit-collateral/borrow/repay/withdraw-collateral via KaminoAction. 5 gated + 3 free endpoints
 - **Standalone Kamino Endpoints** — Direct `POST /kamino/deposit` ($0.15) and `POST /kamino/withdraw` ($0.15) for vault operations without a full cross-chain swap
-- **Trading/DeFi Dashboard** — Dedicated `/trading` page with CrossChainPanel (queue stats, swap quotes) and KaminoPanel (vault overview, deposit/withdraw UI with Solscan links)
+- **Trading/DeFi Dashboard** — Dedicated `/trading` page with 3-column layout: CrossChainPanel (queue stats, swap quotes), KaminoPanel (vault overview, deposit/withdraw), KaminoBorrowPanel (market TVL, reserves, obligations, 4-action form)
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
@@ -870,6 +871,17 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-03-08 (v28.2) — Kamino SDK Integration (Borrow/Lend + klend-sdk)
+- **Kamino SDK Integration** — Full `@kamino-finance/klend-sdk` integration: SDK-first vault operations (replaced REST API), complete borrow/lending module (`kamino-borrow.ts`), 8 new x402 endpoints (3 free data + 5 gated lending), KaminoBorrowPanel dashboard component, OpenClaw skill files at `~/.openclaw/workspace/skills/kamino/`. New deps: `@kamino-finance/klend-sdk@^7.3.20`, `@solana/kit@^6.1.0`, `decimal.js@^10.6.0`. @solana/kit compat via `as any` casts. Commit `b87b67c`
+- **Total x402 endpoints**: 27 gated + 11 free = 38 (was 22 + 8 = 30)
+
+### 2026-03-08 (v28/v28.1) — Cross-Chain Swaps + Kamino Vaults + Trading Dashboard
+- **Multi-Chain x402 Cross-Chain Swap System** — Complete Base↔Solana swap pipeline: USDC on Base → CCTP bridge → Solana USDC → Jupiter Ultra swap (SOL/BONK/JUP) → Kamino vault deposit → withdraw → bridge back. 7 new modules, 6 endpoints, batch queue, job lifecycle tracking in Supabase
+- **Standalone Kamino Vault Endpoints** — Direct `POST /kamino/deposit` ($0.15) and `POST /kamino/withdraw` ($0.15) for vault operations without full cross-chain flow
+- **Trading/DeFi Dashboard** — New `/trading` page with CrossChainPanel (queue stats, swap quote tool) and KaminoPanel (vault overview, deposit/withdraw UI with Solscan links)
+- **Jupiter Ultra API Key** — Wired API key authentication, verified: $10 USDC → 0.1225 SOL via multi-route aggregation
+- **DB Migration** — `cross_chain_jobs` + `cross_chain_batches` tables with RLS, indexes, triggers
 
 ### 2026-03-03 (v26) — Scholar Research Daemon + Bridge v1.6.0
 - **Scholar Research Daemon** — New 24/7 autonomous research agent (`scholar`). Cycles through 5 domains (ERC-8004, x402, Layer 2, stablecoins, SMB adoption) on scheduled intervals (15–60 min). Relevance scoring: novelty (0.35) + impact (0.30) + actionability (0.20) + recency (0.15). Auto-anchors significant findings (≥0.7) on-chain, shares high-value intel (≥0.6) to fleet memory, deduplicates against last 50 memories (70% keyword overlap). Room: Research. Color: Emerald (`#10b981`). Skills: `deep-research`, `relevance-scoring`, `knowledge-anchoring`. Arena desk at col 5, row 7. Meeting seat 75°. Connections: main, soul, oracle, midas, briefing. Runner: `scripts/scholar-agent.sh`. Runbook: `docs/agents/scholar.md`

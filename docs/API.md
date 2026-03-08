@@ -110,12 +110,20 @@ Service health and endpoint summary.
       "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
       "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
       "POST /kamino/deposit": "$0.15 — deposit into Kamino vault",
-      "POST /kamino/withdraw": "$0.15 — withdraw from Kamino vault"
+      "POST /kamino/withdraw": "$0.15 — withdraw from Kamino vault",
+      "GET /kamino/obligation": "$0.05 — user lending obligation (LTV, deposits, borrows)",
+      "POST /kamino/deposit-collateral": "$0.20 — deposit collateral into lending market",
+      "POST /kamino/borrow": "$0.20 — borrow assets against collateral",
+      "POST /kamino/repay": "$0.15 — repay a loan",
+      "POST /kamino/withdraw-collateral": "$0.20 — withdraw collateral from lending market"
     },
     "free": {
       "GET /health": "this endpoint",
       "GET /cross-chain/queue": "batch queue stats",
       "GET /cross-chain/vaults": "available Kamino vaults",
+      "GET /kamino/vault-details": "live vault data (APY, holdings, exchange rate via SDK)",
+      "GET /kamino/positions": "user vault positions across all vaults",
+      "GET /kamino/market": "lending market overview (TVL, reserves, APYs)",
       "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
       "GET /token-info": "XMETAV token info and tier table",
       "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
@@ -902,6 +910,183 @@ curl -X POST http://localhost:4021/kamino/withdraw \
   "explorerUrl": "https://solscan.io/tx/...",
   "timestamp": "2026-03-08T12:00:00.000Z"
 }
+```
+
+---
+
+## Kamino SDK Borrow/Lending Endpoints (v28.2)
+
+Full lending market integration via `@kamino-finance/klend-sdk`. SDK-first with API fallback.
+
+### `GET /kamino/vault-details` — Free
+
+Live vault data from the Kamino SDK (APY, holdings, exchange rate).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `vault` | string | Yes (query) | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/vault-details?vault=USDC_MAIN
+```
+
+**Response** `200`:
+```json
+{
+  "vault": "USDC_MAIN",
+  "totalDeposits": "15234567.89",
+  "apy": "8.42",
+  "exchangeRate": "1.0842",
+  "holdings": { "token": "USDC", "amount": "15234567.89" },
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/positions` — Free
+
+User vault positions across all vaults.
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/positions
+```
+
+**Response** `200`:
+```json
+{
+  "positions": [
+    { "vault": "USDC_MAIN", "shares": "100.00", "value": "108.42" },
+    { "vault": "SOL_MAIN", "shares": "5.00", "value": "5.21" }
+  ],
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/market` — Free
+
+Lending market overview with TVL, reserves, and APYs.
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/market
+```
+
+**Response** `200`:
+```json
+{
+  "market": "7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF",
+  "tvl": "1234567890.00",
+  "reserves": [
+    { "symbol": "USDC", "supplyApy": "8.42", "borrowApy": "12.31", "totalSupply": "500000000" },
+    { "symbol": "SOL", "supplyApy": "6.15", "borrowApy": "9.87", "totalSupply": "2000000" }
+  ],
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/obligation` — $0.05
+
+User lending obligation including LTV, deposited collateral, and borrowed assets.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `wallet` | string | No (query) | Override wallet address (defaults to server wallet) |
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/obligation
+```
+
+**Response** `200`:
+```json
+{
+  "obligation": {
+    "deposits": [{ "symbol": "USDC", "amount": "1000.00" }],
+    "borrows": [{ "symbol": "SOL", "amount": "2.5" }],
+    "ltv": "0.45",
+    "liquidationThreshold": "0.80"
+  },
+  "source": "sdk"
+}
+```
+
+---
+
+### `POST /kamino/deposit-collateral` — $0.20
+
+Deposit collateral into the Kamino lending market.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mint` | string | Yes | Token mint address (e.g., USDC mint) |
+| `amount` | string | Yes | Amount to deposit |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/deposit-collateral \
+  -H "Content-Type: application/json" \
+  -d '{"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
+```
+
+---
+
+### `POST /kamino/borrow` — $0.20
+
+Borrow assets against deposited collateral.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mint` | string | Yes | Token mint to borrow |
+| `amount` | string | Yes | Amount to borrow |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/borrow \
+  -H "Content-Type: application/json" \
+  -d '{"mint": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+```
+
+---
+
+### `POST /kamino/repay` — $0.15
+
+Repay a borrowed loan.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mint` | string | Yes | Token mint to repay |
+| `amount` | string | Yes | Amount to repay |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/repay \
+  -H "Content-Type: application/json" \
+  -d '{"mint": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+```
+
+---
+
+### `POST /kamino/withdraw-collateral` — $0.20
+
+Withdraw collateral from the lending market.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mint` | string | Yes | Token mint to withdraw |
+| `amount` | string | Yes | Amount to withdraw |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/withdraw-collateral \
+  -H "Content-Type: application/json" \
+  -d '{"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
 ```
 
 ---

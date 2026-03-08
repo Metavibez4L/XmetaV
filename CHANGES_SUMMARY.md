@@ -1,11 +1,63 @@
 # Changes Summary — March 8, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v28.1 (Standalone Kamino Endpoints + Trading/DeFi Dashboard)
+**XmetaV Version:** v28.2 (Kamino SDK Integration — Borrow/Lend + klend-sdk)
 
 ---
 
 ## Major Changes (March 8, 2026)
+
+### 0. Kamino SDK Integration — Borrow/Lend (commit `b87b67c`)
+
+Full `@kamino-finance/klend-sdk` integration: SDK-first vault operations, complete borrow/lending module, 8 new x402 endpoints, KaminoBorrowPanel dashboard component, OpenClaw skill files. 9 files changed, 8775 insertions, 1166 deletions.
+
+#### New Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| `@kamino-finance/klend-sdk` | ^7.3.20 | Kamino lending protocol SDK |
+| `@solana/kit` | ^6.1.0 | Modern Solana SDK (required by klend-sdk) |
+| `decimal.js` | ^10.6.0 | Precise decimal arithmetic |
+| `@solana-program/compute-budget` | ^0.7.0 | Compute budget instructions |
+
+#### New/Rewritten Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| `kamino-vault.ts` | `x402-server/` | Rewritten: SDK-first vault data (APY, holdings, exchange rate, user positions), SDK deposit/withdraw |
+| `kamino-borrow.ts` | `x402-server/` | New: KaminoMarket for market overview, KaminoAction for lending ops, user obligations with LTV |
+| `KaminoBorrowPanel.tsx` | `src/components/` | New: Market TVL, reserves with APY, user obligation LTV, 4-action form |
+| `kamino-borrow/route.ts` | `src/app/api/` | New: API proxy (GET+POST) for all lending endpoints |
+
+#### New Endpoints (8)
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `GET /kamino/vault-details` | free | Live vault data (APY, holdings, exchange rate via SDK) |
+| `GET /kamino/positions` | free | User vault positions across all vaults |
+| `GET /kamino/market` | free | Lending market overview (TVL, reserves, APYs) |
+| `GET /kamino/obligation` | $0.05 | User lending obligation (LTV, deposits, borrows) |
+| `POST /kamino/deposit-collateral` | $0.20 | Deposit collateral into lending market |
+| `POST /kamino/borrow` | $0.20 | Borrow assets against collateral |
+| `POST /kamino/repay` | $0.15 | Repay a loan |
+| `POST /kamino/withdraw-collateral` | $0.20 | Withdraw collateral from lending market |
+
+Total x402: **27 gated**, **11 free** = **38 endpoints** (was 22 gated, 8 free = 30).
+
+#### @solana/kit Compatibility
+
+klend-sdk uses `@solana/kit` types (Address, Rpc, TransactionSigner) while codebase uses `@solana/web3.js` (PublicKey, Connection, Keypair). Resolved with `as any` casts at SDK boundaries.
+
+#### Dashboard Updates
+
+- `trading/page.tsx`: 3-column layout, "Kamino Borrow/Lend" feature tag, 16 endpoints in reference
+- `KaminoBorrowPanel.tsx`: Market TVL, reserve APYs, user obligation LTV, 4-action form
+- `/api/kamino-borrow/route.ts`: API proxy for all lending endpoints
+
+#### OpenClaw Skill Files
+
+Installed at `~/.openclaw/workspace/skills/kamino/`:
+- `SKILL.md`, `references/setup.md`, `references/earn.md`, `references/borrow.md`, `references/api.md`
 
 ### 1. Multi-Chain x402 Cross-Chain Swap System (commit `bd2d844`)
 

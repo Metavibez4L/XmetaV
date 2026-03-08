@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-03-08  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v28.1 (Standalone Kamino Endpoints + Trading/DeFi Dashboard)  
+**XmetaV Version:** v28.2 (Kamino SDK Integration — Borrow/Lend + klend-sdk)  
 **Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -265,6 +265,65 @@ Three-stage fix for agent chat hung state:
 1. Increased idle timeout 30s→90s
 2. Replaced idle-kill with process liveness check (`kill(0)`)
 3. Root cause: OpenClaw buffers output during tool calls; idle timeout killed process before flush
+
+---
+
+## v28.2 Kamino SDK Integration — Borrow/Lend + klend-sdk (2026-03-08)
+
+Full Kamino SDK integration using `@kamino-finance/klend-sdk`. SDK-first vault operations, complete borrow/lending module, 8 new x402 endpoints, KaminoBorrowPanel dashboard component, and OpenClaw skill files. Commit `b87b67c`.
+
+### New Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| `@kamino-finance/klend-sdk` | ^7.3.20 | Kamino lending protocol SDK |
+| `@solana/kit` | ^6.1.0 | Modern Solana SDK (required by klend-sdk) |
+| `decimal.js` | ^10.6.0 | Precise decimal arithmetic |
+| `@solana-program/compute-budget` | ^0.7.0 | Compute budget instructions |
+
+### New Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| **kamino-vault.ts** | `x402-server/kamino-vault.ts` | Rewritten: SDK-first vault data (APY, holdings, exchange rate, user positions), SDK deposit/withdraw with @solana/kit compat |
+| **kamino-borrow.ts** | `x402-server/kamino-borrow.ts` | New: KaminoMarket for market overview, KaminoAction for deposit-collateral/borrow/repay/withdraw-collateral, user obligations with LTV |
+| **KaminoBorrowPanel** | `src/components/KaminoBorrowPanel.tsx` | New: Market TVL, reserves with APY, user obligation LTV, 4-action form (deposit-collateral, borrow, repay, withdraw-collateral) |
+
+### New Endpoints (8)
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `GET /kamino/vault-details` | free | Live vault data (APY, holdings, exchange rate via SDK) |
+| `GET /kamino/positions` | free | User vault positions across all vaults |
+| `GET /kamino/market` | free | Lending market overview (TVL, reserves, APYs) |
+| `GET /kamino/obligation` | $0.05 | User lending obligation (LTV, deposits, borrows) |
+| `POST /kamino/deposit-collateral` | $0.20 | Deposit collateral into lending market |
+| `POST /kamino/borrow` | $0.20 | Borrow assets against collateral |
+| `POST /kamino/repay` | $0.15 | Repay a loan |
+| `POST /kamino/withdraw-collateral` | $0.20 | Withdraw collateral from lending market |
+
+Total x402 gated endpoints: **27** (was 22). Total free endpoints: **11** (was 8). PaymentsDashboard: **38 endpoints** (was 30).
+
+### @solana/kit Compatibility
+
+klend-sdk uses `@solana/kit` types (Address, Rpc, TransactionSigner) while the codebase uses `@solana/web3.js` (PublicKey, Connection, Keypair). Resolved with `as any` casts at SDK boundaries — works at runtime.
+
+### OpenClaw Skill Files
+
+Kamino skill installed at `~/.openclaw/workspace/skills/kamino/`:
+- `SKILL.md` — main skill instructions, workflow guides, vault table, endpoint reference
+- `references/setup.md` — SDK installation, env vars, architecture notes
+- `references/earn.md` — vault deposit/withdraw operations
+- `references/borrow.md` — lending market operations, SDK implementation details
+- `references/api.md` — complete API endpoint reference, token mints, response formats
+
+### Dashboard Updates
+
+| Component | Change |
+|-----------|--------|
+| `trading/page.tsx` | 3-column layout, "Kamino Borrow/Lend" feature tag, 16 endpoints in reference |
+| `KaminoBorrowPanel.tsx` | New component on Trading page |
+| `/api/kamino-borrow/route.ts` | New API proxy (GET+POST → x402 market/obligation/deposit-collateral/borrow/repay/withdraw-collateral) |
 
 ---
 
@@ -1489,7 +1548,7 @@ Check live: `just revenue`
 | `EVM_ADDRESS` | `0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B` | Receives USDC |
 | `PORT` | `4021` | x402 server port |
 
-### Gated endpoints (x402-server)
+### Gated endpoints (x402-server) — 27 total
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
@@ -1509,8 +1568,22 @@ Check live: `just revenue`
 | `POST /execute-arb` | $0.10+ | Execute arbitrage (1% of profit) |
 | `GET /yield-optimize` | $0.50 | Yield farming optimization scan |
 | `POST /deploy-yield-strategy` | $3.00+ | Deploy yield capital (0.5% of capital) |
+| `GET /whale-alert` | $0.15 | Whale transfer/swap detection |
+| `GET /liquidation-signal` | $0.25 | DeFi liquidation signals |
+| `GET /arb-detection` | $0.20 | Cross-DEX arbitrage signals |
+| `GET /governance-signal` | $0.10 | Governance proposal tracker |
+| `POST /cross-chain-swap` | $0.65 | Initiate Base→Solana→Jupiter→Kamino swap |
+| `GET /bridge-status/:jobId` | $0.05 | Check cross-chain job status |
+| `POST /trigger-return/:jobId` | $0.25 | Trigger return bridge Solana→Base |
+| `POST /kamino/deposit` | $0.15 | Deposit tokens into Kamino vault |
+| `POST /kamino/withdraw` | $0.15 | Withdraw tokens from Kamino vault |
+| `GET /kamino/obligation` | $0.05 | User lending obligation (LTV, deposits, borrows) |
+| `POST /kamino/deposit-collateral` | $0.20 | Deposit collateral into lending market |
+| `POST /kamino/borrow` | $0.20 | Borrow assets against collateral |
+| `POST /kamino/repay` | $0.15 | Repay a loan |
+| `POST /kamino/withdraw-collateral` | $0.20 | Withdraw collateral from lending market |
 
-### Free endpoints (x402-server)
+### Free endpoints (x402-server) — 11 total
 
 | Endpoint | Description |
 |----------|-------------|
@@ -1519,6 +1592,12 @@ Check live: `just revenue`
 | `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
 | `GET /digest` | Trigger payment digest & memory write |
 | `GET /trade-fees` | Trade fee schedule & revenue projections |
+| `GET /cross-chain/queue` | Batch queue stats |
+| `GET /cross-chain/vaults` | Available Kamino vaults |
+| `GET /kamino/vault-details` | Live vault data (APY, holdings, exchange rate via SDK) |
+| `GET /kamino/positions` | User vault positions across all vaults |
+| `GET /kamino/market` | Lending market overview (TVL, reserves, APYs) |
+| `GET /pricing` | Dynamic pricing snapshot |
 
 ### Environment variables
 
