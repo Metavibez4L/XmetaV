@@ -209,13 +209,14 @@ cmd_update() {
           profile: 'coding',
           allow: ['exec', 'process', 'read', 'write'],
           deny: ['tts'],
-          exec: { host: 'gateway', security: 'full' }
+          exec: { host: 'gateway', security: 'allowlist', ask: 'on-miss', timeout: 300 }
         };
       } else if (newTools === 'full') {
         agent.tools = {
           profile: 'full',
           allow: ['group:fs', 'group:runtime', 'group:ui', 'group:web', 'group:sessions', 'group:automation'],
-          elevated: { enabled: true }
+          elevated: { enabled: true },
+          exec: { host: 'gateway', security: 'full', timeout: 300 }
         };
       }
       console.log('  ✓ Tools → ' + newTools);

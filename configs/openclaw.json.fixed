@@ -19,7 +19,10 @@
       "compaction": {
         "mode": "safeguard",
         "recentTurnsPreserve": 4,
-        "postCompactionSections": ["Session Startup", "Red Lines"]
+        "postCompactionSections": [
+          "Session Startup",
+          "Red Lines"
+        ]
       },
       "maxConcurrent": 2,
       "subagents": {
@@ -27,6 +30,48 @@
       },
       "model": {
         "primary": "ollama/kimi-k2.5:cloud"
+      },
+      "tools": {
+        "exec": {
+          "pathPrepend": [
+            "/opt/homebrew/bin",
+            "/usr/local/bin"
+          ],
+          "timeout": 300,
+          "notifyOnExit": true,
+          "safeBins": [
+            "cat",
+            "head",
+            "tail",
+            "grep",
+            "awk",
+            "sed",
+            "sort",
+            "uniq",
+            "wc",
+            "tr",
+            "cut",
+            "tee",
+            "diff",
+            "jq",
+            "less",
+            "find",
+            "ls",
+            "file",
+            "date",
+            "echo",
+            "printf",
+            "test",
+            "true",
+            "false",
+            "mktemp"
+          ],
+          "safeBinTrustedDirs": [
+            "/bin",
+            "/usr/bin",
+            "/opt/homebrew/bin"
+          ]
+        }
       }
     },
     "list": [
@@ -52,6 +97,11 @@
           ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -74,7 +124,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -96,6 +148,11 @@
           ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -118,7 +175,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -140,6 +199,11 @@
           ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -168,7 +232,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -191,7 +257,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 120
           }
         }
       },
@@ -214,7 +282,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
           }
         }
       },
@@ -241,7 +311,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -268,7 +340,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -303,7 +377,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -326,7 +402,9 @@
           ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -348,8 +426,10 @@
             "tts"
           ],
           "exec": {
-            "host": "gateway",
-            "security": "full"
+            "host": "sandbox",
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
           }
         }
       },
@@ -371,8 +451,10 @@
             "tts"
           ],
           "exec": {
-            "host": "gateway",
-            "security": "full"
+            "host": "sandbox",
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
           }
         }
       }
@@ -393,7 +475,9 @@
       "mode": "token",
       "token": "REPLACE_ME"
     },
-    "trustedProxies": ["127.0.0.1"]
+    "trustedProxies": [
+      "127.0.0.1"
+    ]
   },
   "session": {
     "reset": {

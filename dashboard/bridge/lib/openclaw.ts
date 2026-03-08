@@ -107,7 +107,9 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
     cwd: projectRoot,
     env: {
       ...process.env,
-      PATH: `${resolve(nodePath, "..")}:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}`,
+      // pathPrepend in ~/.openclaw/openclaw.json handles /opt/homebrew/bin + /usr/local/bin
+      // We only need the node binary's directory for the node process itself
+      PATH: `${resolve(nodePath, "..")}:${process.env.PATH}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
