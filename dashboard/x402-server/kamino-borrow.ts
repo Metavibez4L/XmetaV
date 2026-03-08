@@ -14,6 +14,7 @@ import {
   TransactionMessage,
   PublicKey,
 } from "@solana/web3.js";
+import { createSolanaRpc } from "@solana/kit";
 import bs58 from "bs58";
 import {
   KaminoMarket,
@@ -33,13 +34,25 @@ const SLOT_DURATION_MS = 400;
 
 let connection: Connection | null = null;
 let keypair: Keypair | null = null;
+let solanaRpc: ReturnType<typeof createSolanaRpc> | null = null;
+
+function getRpcUrl(): string {
+  return process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+}
 
 function getConnection(): Connection {
   if (!connection) {
-    const rpc = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-    connection = new Connection(rpc, "confirmed");
+    connection = new Connection(getRpcUrl(), "confirmed");
   }
   return connection;
+}
+
+/** v2 Rpc for klend-sdk (uses @solana/kit RPC protocol) */
+function getRpc() {
+  if (!solanaRpc) {
+    solanaRpc = createSolanaRpc(getRpcUrl());
+  }
+  return solanaRpc;
 }
 
 function getKeypair(): Keypair {
@@ -60,11 +73,11 @@ async function getMarket(): Promise<KaminoMarket> {
   if (marketCache && Date.now() - marketCache.loadedAt < MARKET_CACHE_TTL) {
     return marketCache.market;
   }
-  const conn = getConnection();
-  // klend-sdk expects @solana/kit Rpc, but works at runtime with web3.js Connection
+  const rpc = getRpc();
+  // klend-sdk 7.3.20+ expects @solana/kit v2 Rpc & Address types
   const market = await KaminoMarket.load(
-    conn as any,
-    new PublicKey(MAIN_MARKET) as any,
+    rpc as any,
+    MAIN_MARKET as any,
     SLOT_DURATION_MS,
     PROGRAM_ID,
   );
@@ -94,11 +107,13 @@ export interface ReserveInfo {
 
 export async function getMarketOverview(): Promise<MarketOverview> {
   const market = await getMarket();
-  const slot = await getConnection().getSlot();
+  const slotNum = await getConnection().getSlot();
+  const slot = BigInt(slotNum);
   const reserves = market.getReserves();
 
   const toNum = (v: any): number => {
     if (typeof v === "number") return v;
+    if (typeof v === "bigint") return Number(v);
     if (v && typeof v.toNumber === "function") return v.toNumber();
     return Number(v) || 0;
   };
@@ -138,12 +153,10 @@ export interface UserObligation {
 
 export async function getUserObligation(walletAddress?: string): Promise<UserObligation | null> {
   const market = await getMarket();
-  const wallet = walletAddress
-    ? new PublicKey(walletAddress)
-    : getKeypair().publicKey;
+  const walletAddr = walletAddress ?? getKeypair().publicKey.toBase58();
 
   const obligation = await market.getObligationByWallet(
-    wallet as any,
+    walletAddr as any,
     new VanillaObligation(PROGRAM_ID),
   );
 
@@ -151,6 +164,7 @@ export async function getUserObligation(walletAddress?: string): Promise<UserObl
 
   const toNum = (v: any): number => {
     if (typeof v === "number") return v;
+    if (typeof v === "bigint") return Number(v);
     if (v && typeof v.toNumber === "function") return v.toNumber();
     return Number(v) || 0;
   };
@@ -250,8 +264,8 @@ export async function depositCollateral(
     const depositAction = await KaminoAction.buildDepositTxns(
       market as any,
       amount,
-      new PublicKey(tokenMint) as any,
-      kp.publicKey as any,
+      tokenMint as any,
+      { address: kp.publicKey.toBase58() } as any,
       new VanillaObligation(PROGRAM_ID),
       false, // useV2Ixs
       undefined, // scopeRefreshConfig
@@ -302,8 +316,8 @@ export async function borrowAsset(
     const borrowAction = await KaminoAction.buildBorrowTxns(
       market as any,
       amount,
-      new PublicKey(tokenMint) as any,
-      kp.publicKey as any,
+      tokenMint as any,
+      { address: kp.publicKey.toBase58() } as any,
       new VanillaObligation(PROGRAM_ID),
       false, // useV2Ixs
       undefined, // scopeRefreshConfig
@@ -382,8 +396,8 @@ export async function withdrawCollateral(
     const withdrawAction = await KaminoAction.buildWithdrawTxns(
       market as any,
       amount,
-      new PublicKey(tokenMint) as any,
-      kp.publicKey as any,
+      tokenMint as any,
+      { address: kp.publicKey.toBase58() } as any,
       new VanillaObligation(PROGRAM_ID),
       false, // useV2Ixs
       undefined, // scopeRefreshConfig
