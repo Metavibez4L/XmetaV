@@ -104,10 +104,17 @@ Service health and endpoint summary.
       "GET /arb-opportunity": "$0.25 — arbitrage scan",
       "POST /execute-arb": "$0.10+ — execute arb (1% of profit)",
       "GET /yield-optimize": "$0.50 — yield farming scan",
-      "POST /deploy-yield-strategy": "$3.00+ — deploy yield capital (0.5%)"
+      "POST /deploy-yield-strategy": "$3.00+ — deploy yield capital (0.5%)",
+      "POST /cross-chain-swap": "$0.65 — initiate Base→Solana→Jupiter→Kamino swap",
+      "POST /cross-chain-swap/quote": "free — estimate output and fees",
+      "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
+      "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base"
     },
     "free": {
       "GET /health": "this endpoint",
+      "GET /cross-chain/queue": "batch queue stats",
+      "GET /cross-chain/vaults": "available Kamino vaults",
+      "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
       "GET /token-info": "XMETAV token info and tier table",
       "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
       "GET /digest": "trigger payment digest & memory write",
@@ -625,6 +632,201 @@ Generate transactions to deploy capital into a yield strategy.
 
 ---
 
+## Cross-Chain Swap Endpoints (Base↔Solana)
+
+Full multi-chain swap pipeline: bridge USDC from Base to Solana, swap via Jupiter Ultra, deposit into Kamino yield vaults, and optionally bridge returns back to Base.
+
+### `POST /cross-chain-swap/quote` (Free)
+
+Estimate output, fees, and Jupiter routing without executing.
+
+**Body**:
+```json
+{
+  "amount": "10",
+  "outputToken": "SOL",
+  "vaultStrategy": "USDC_MAIN",
+  "returnToBase": false
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `amount` | string | Yes | — | USDC amount (human-readable) |
+| `outputToken` | string | No | `"USDC"` | Target token: `SOL`, `USDC`, `BONK`, `JUP` |
+| `vaultStrategy` | string | No | `"none"` | Kamino vault: `USDC_MAIN`, `SOL_MAIN`, `none` |
+| `returnToBase` | boolean | No | `false` | Whether to bridge output back to Base |
+
+**Response** `200`:
+```json
+{
+  "input": 10,
+  "outputToken": "SOL",
+  "estimatedFees": 0.51,
+  "estimatedOutput": 9.49,
+  "margin": "94.9%",
+  "jupiterQuote": {
+    "estimatedOutput": 0.122511342,
+    "priceImpact": -0.0003,
+    "route": ["PancakeSwap", "Whirlpool", "Meteora DLMM", "TesseraV"],
+    "slippageBps": 50
+  },
+  "vaultInfo": null,
+  "batched": false,
+  "note": "Will execute immediately"
+}
+```
+
+---
+
+### `POST /cross-chain-swap` — $0.65
+
+Initiate a full cross-chain swap. Creates a job, optionally batches sub-threshold amounts.
+
+**Body**:
+```json
+{
+  "amount": "10",
+  "outputToken": "SOL",
+  "vaultStrategy": "USDC_MAIN",
+  "returnToBase": false
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `amount` | string | Yes | — | USDC amount ($0.65–$500) |
+| `outputToken` | string | No | `"USDC"` | `SOL`, `USDC`, `BONK`, `JUP` |
+| `vaultStrategy` | string | No | `"none"` | `USDC_MAIN`, `SOL_MAIN`, `none` |
+| `returnToBase` | boolean | No | `false` | Bridge output back to Base |
+
+**Response** `200`:
+```json
+{
+  "jobId": "292e31a9-...",
+  "status": "bridging_to_sol",
+  "estimatedCompletion": "5-20 minutes",
+  "breakdown": {
+    "payment": 10,
+    "estimatedFees": {
+      "bridgeToSolana": 0.25,
+      "jupiterSwap": 0.01,
+      "kaminoDeposit": 0,
+      "bridgeToBase": 0,
+      "total": 0.26
+    },
+    "estimatedOutput": 9.74,
+    "estimatedMargin": "97.4%"
+  },
+  "batched": false
+}
+```
+
+---
+
+### `GET /bridge-status/:jobId` — $0.05
+
+Check the status of a cross-chain job.
+
+**Response** `200`:
+```json
+{
+  "job": {
+    "id": "292e31a9-...",
+    "status": "swapped",
+    "payment_amount": "10.000000",
+    "output_token": "SOL",
+    "bridged_amount": 9.75,
+    "swap_output_amount": 0.122,
+    "created_at": "2026-03-08T...",
+    "updated_at": "2026-03-08T..."
+  }
+}
+```
+
+Job status progression: `pending` → `batched` → `bridging_to_sol` → `bridged` → `swapping` → `swapped` → `depositing` → `vaulted` → `withdrawing` → `bridging_to_base` → `completed`
+
+---
+
+### `POST /trigger-return/:jobId` — $0.25
+
+Trigger withdrawal from Kamino vault and bridge funds back to Base.
+
+**Response** `200`:
+```json
+{
+  "jobId": "292e31a9-...",
+  "status": "withdrawing",
+  "note": "Withdrawal initiated — funds will bridge back to Base"
+}
+```
+
+---
+
+### `GET /cross-chain/queue` (Free)
+
+Batch queue statistics.
+
+**Response** `200`:
+```json
+{
+  "pendingJobs": 0,
+  "pendingAmount": 0,
+  "activeJobs": 0,
+  "completedJobs": 0,
+  "failedJobs": 0,
+  "totalBatches": 0,
+  "batchThreshold": 6.5,
+  "batchTimeout": 3600,
+  "emergencyPause": false
+}
+```
+
+---
+
+### `GET /cross-chain/vaults` (Free)
+
+Available Kamino yield vaults.
+
+**Response** `200`:
+```json
+{
+  "vaults": {
+    "USDC_MAIN": {
+      "address": "HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E",
+      "name": "Kamino USDC Main Vault",
+      "token": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "estimatedApy": 8.5
+    },
+    "SOL_MAIN": {
+      "address": "ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5",
+      "name": "Kamino SOL Main Vault",
+      "token": "SOL",
+      "tokenMint": "So11111111111111111111111111111111111111112",
+      "estimatedApy": 7.2
+    }
+  },
+  "note": "APY estimates are approximate and subject to change"
+}
+```
+
+---
+
+### On-Chain Contracts (Cross-Chain)
+
+| Contract | Address | Network |
+|----------|---------|---------|
+| USDC Bridge (CCTP) | `0x3eff766C76a1be2Ce1aCF2B69c78bCae257D5188` | Base Mainnet |
+| Solana Token Messenger | `CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3` | Solana Mainnet |
+| USDC (Solana) | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Solana Mainnet |
+| SOL (Native) | `So11111111111111111111111111111111111111112` | Solana Mainnet |
+| Jupiter Program | `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4` | Solana Mainnet |
+| Kamino USDC Vault | `HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E` | Solana Mainnet |
+| Kamino SOL Vault | `ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5` | Solana Mainnet |
+
+---
+
 ### `GET /trade-fees` (Free)
 
 View the trade fee schedule, whale tiers, and projected monthly revenue.
@@ -658,6 +860,10 @@ View the trade fee schedule, whale tiers, and projected monthly revenue.
 | ERC-8004 Identity Registry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | Base Mainnet |
 | $XMETAV Token (ERC-20) | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` | Base Mainnet |
 | USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Base Mainnet |
+| USDC Bridge (CCTP) | `0x3eff766C76a1be2Ce1aCF2B69c78bCae257D5188` | Base Mainnet |
+| Solana Token Messenger | `CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3` | Solana Mainnet |
+| USDC (Solana) | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Solana Mainnet |
+| Jupiter Program | `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4` | Solana Mainnet |
 
 ---
 

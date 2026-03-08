@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v26
+Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28
 
 ```
  ___   ___                    __           ___   ___
@@ -18,6 +18,7 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v26
  |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
+ |   cross:    Base↔Solana bridge+Jupiter+Kamino |
  |   identity: ERC-8004 NFT #16905 (Base)        |
  |   token:    $XMETAV ERC-20 (Base)             |
  |   dashboard: Next.js + Supabase (cyberpunk)   |
@@ -50,6 +51,9 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v26
 - **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification: living crystals with XP/levels/star ratings (1-6★), class evolution (anchor→godhand), fusion recipes (FF7-style), memory summons with animated rituals, limit breaks spawning legendary 6★ crystals, explorable Memory Cosmos world map, achievements, and daily quests
 - **Memory Cosmos World** — Pannable/zoomable explorable memory landscape at `/memory-cosmos`: golden-spiral island layout with terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, star parallax background, hover info panels
 - **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
+- **Cross-Chain Swaps (Base↔Solana)** — Full multi-chain pipeline: USDC bridge (Base→Solana via CCTP), Jupiter Ultra swaps (SOL/BONK/JUP), Kamino vault deposits for yield, return bridge (Solana→Base). Batch queue for sub-threshold amounts, job lifecycle tracking in Supabase, x402 payment gating ($0.65/swap)
+- **Jupiter Ultra Integration** — RPC-less token swaps on Solana via Jupiter Ultra API with multi-route aggregation (PancakeSwap, Whirlpool, Meteora DLMM, TesseraV), automatic slippage protection, price impact safety checks
+- **Kamino Yield Vaults** — Deposit bridged USDC/SOL into Kamino Earn vaults (8.5% APY USDC, 7.2% APY SOL) with withdraw-and-return-bridge flow
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
@@ -75,7 +79,7 @@ Last updated: **2026-03-03** | OpenClaw 2026.2.17 | XmetaV Command Center v26
 - **Setup & Fix Scripts** -- Automated solutions for common issues
 - **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
 - **Documentation** -- Runbooks, checklists, and troubleshooting guides
-- **x402 Payment Service** -- Express server gating XmetaV endpoints with USDC micro-payments on Base
+- **x402 Payment Service** -- Express server gating XmetaV endpoints with USDC micro-payments on Base + cross-chain swap engine (Base↔Solana)
 - **ERC-8004 Identity** -- On-chain agent NFT (identity + reputation) on Base mainnet
 - **Agent Definitions** -- Multi-agent profiles and workspaces
 - **Infrastructure as Code** -- Reproducible OpenClaw deployments
@@ -103,7 +107,7 @@ XmetaV/
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
 |   |   +-- lib/              # openclaw CLI wrapper, Supabase client, x402 client
-|   |-- x402-server/          # x402 payment-gated Express service
+|   |-- x402-server/          # x402 payment-gated Express service + cross-chain swap engine
 |   |-- erc8004/              # ERC-8004 agent identity (registration, ABIs, client)
 |   |-- scripts/              # DB migrations (setup-db*.sql)
 |   +-- README.md             # Dashboard documentation

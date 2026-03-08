@@ -1,8 +1,8 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-05  
+**Last verified:** 2026-03-08  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v27 (Comprehensive Optimization + Bridge v1.6.0)  
-**Platform:** macOS 26.3 (Sequoia)  
+**XmetaV Version:** v28 (Cross-Chain Swap Engine + Jupiter Ultra)  
+**Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
 
@@ -55,7 +55,7 @@ openclaw --version
 | **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
-| **OpenClaw** | 2026.3.2 | npm global |
+| **OpenClaw** | 2026.3.7 | npm global |
 
 ## Active Services
 
@@ -206,6 +206,67 @@ Automated health monitor checking every 5 minutes:
 ```bash
 just logs-watchdog
 ```
+
+## v28 Cross-Chain Swap Engine (2026-03-08)
+
+Full multi-chain swap pipeline: Base ↔ Solana bridge, Jupiter Ultra swaps, Kamino vault yields. Commits `bd2d844`, `a288039`, `fe5f770`.
+
+### New Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **cross-chain-types** | `x402-server/cross-chain-types.ts` | Shared types, contract addresses (Base + Solana), safety config, fee estimates |
+| **bridge-solana** | `x402-server/bridge-solana.ts` | Base↔Solana USDC bridge via CCTP (`bridgeToSolana`, `bridgeToBase`, arrival waiters) |
+| **jupiter-swap** | `x402-server/jupiter-swap.ts` | Jupiter Ultra API swaps (RPC-less, multi-route: PancakeSwap/Whirlpool/Meteora/TesseraV) |
+| **kamino-vault** | `x402-server/kamino-vault.ts` | Kamino Earn vault deposit/withdraw (USDC 8.5% APY, SOL 7.2% APY) |
+| **cross-chain-queue** | `x402-server/cross-chain-queue.ts` | Batch queue + job lifecycle (pending→bridging→swapping→vaulted→completed) |
+| **cross-chain-routes** | `x402-server/cross-chain-routes.ts` | Express router: 6 endpoints (4 gated, 2 free) |
+
+### Endpoints Added
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /cross-chain-swap` | $0.65 | Initiate Base→Solana→Jupiter→Kamino swap |
+| `POST /cross-chain-swap/quote` | Free | Estimate output, fees, Jupiter routing |
+| `GET /bridge-status/:jobId` | $0.05 | Check cross-chain job status |
+| `POST /trigger-return/:jobId` | $0.25 | Trigger return bridge Solana→Base |
+| `GET /cross-chain/queue` | Free | Batch queue stats |
+| `GET /cross-chain/vaults` | Free | Available Kamino vaults |
+
+### Safety Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Min swap | $0.65 |
+| Batch threshold | $6.50 |
+| Max single swap | $500 |
+| Max slippage | 50 bps (0.5%) |
+| Max price impact | 3% |
+
+### DB Tables
+
+| Table | Purpose |
+|-------|---------|
+| `cross_chain_jobs` | Job tracking (UUID PK, 25+ columns, full lifecycle) |
+| `cross_chain_batches` | Batch aggregation for sub-threshold swaps |
+
+Migration: `dashboard/scripts/setup-db-crosschain.sql` (also in `supabase/migrations/20260308100000_cross_chain.sql`)
+
+### Jupiter Ultra API
+
+- API key authenticated (`x-api-key` header)
+- Endpoints: `GET /ultra/v1/order` → sign → `POST /ultra/v1/execute`
+- Multi-route aggregation: PancakeSwap, Whirlpool, Meteora DLMM, TesseraV
+- Verified: $10 USDC → 0.1225 SOL with -0.03% price impact
+
+### Agent Chat Fix (commits `97bae6a`, `fb7ba58`, `c34201b`)
+
+Three-stage fix for agent chat hung state:
+1. Increased idle timeout 30s→90s
+2. Replaced idle-kill with process liveness check (`kill(0)`)
+3. Root cause: OpenClaw buffers output during tool calls; idle timeout killed process before flush
+
+---
 
 ## v27 Comprehensive Optimization (2026-03-05)
 

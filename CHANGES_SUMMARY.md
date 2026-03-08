@@ -1,13 +1,75 @@
-# Changes Summary — March 5, 2026
+# Changes Summary — March 8, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v27 (Comprehensive Optimization + Bridge v1.6.0)
+**XmetaV Version:** v28 (Cross-Chain Swap Engine + Jupiter Ultra)
 
 ---
 
-## Major Changes (March 5, 2026)
+## Major Changes (March 8, 2026)
 
-### 1. Comprehensive 9-Point Optimization (commit `195a4b0`)
+### 1. Multi-Chain x402 Cross-Chain Swap System (commit `bd2d844`)
+
+Complete Base↔Solana swap pipeline with 7 new modules:
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `cross-chain-types.ts` | Types, contract addresses, safety config, fee estimates |
+| `bridge-solana.ts` | Base↔Solana USDC bridge via CCTP |
+| `jupiter-swap.ts` | Jupiter Ultra API swaps (RPC-less, multi-route) |
+| `kamino-vault.ts` | Kamino Earn vault deposit/withdraw |
+| `cross-chain-queue.ts` | Batch queue + job lifecycle manager |
+| `cross-chain-routes.ts` | x402-gated Express router (6 endpoints) |
+| `setup-db-crosschain.sql` | DB migration for job/batch tables |
+
+**Flow**: USDC on Base → CCTP bridge → Solana USDC → Jupiter swap → Kamino vault → withdraw → bridge back
+
+### 2. Cross-Chain Endpoints
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /cross-chain-swap` | $0.65 | Initiate Base→Solana→Jupiter→Kamino swap |
+| `POST /cross-chain-swap/quote` | Free | Estimate output, fees, Jupiter routing |
+| `GET /bridge-status/:jobId` | $0.05 | Check cross-chain job status |
+| `POST /trigger-return/:jobId` | $0.25 | Trigger return bridge Solana→Base |
+| `GET /cross-chain/queue` | Free | Batch queue stats |
+| `GET /cross-chain/vaults` | Free | Available Kamino vaults |
+
+### 3. DB Migration (commit `a288039`)
+
+- Executed `setup-db-crosschain.sql` via Supabase Management API
+- Created `cross_chain_jobs` table (UUID PK, 25+ columns, full lifecycle tracking)
+- Created `cross_chain_batches` table (batch aggregation for sub-threshold swaps)
+- RLS policies, indexes, `updated_at` trigger
+- Copied to `supabase/migrations/20260308100000_cross_chain.sql`
+
+### 4. Jupiter Ultra API Key (commit `fe5f770`)
+
+- Wired Jupiter API key via `x-api-key` header on both order and execute endpoints
+- Verified: $10 USDC → 0.1225 SOL via PancakeSwap + Whirlpool + Meteora DLMM + TesseraV
+- Price impact: -0.03% (near zero)
+
+### 5. Safety Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Min swap | $0.65 |
+| Batch threshold | $6.50 |
+| Max single swap | $500 |
+| Max slippage | 50 bps (0.5%) |
+| Max price impact | 3% |
+
+### 6. Agent Chat Hung Fix (commits `97bae6a`, `fb7ba58`, `c34201b`)
+
+Three-stage fix for agent chat hung state:
+1. Increased idle timeout 30s→90s (`fb7ba58`)
+2. Replaced idle-kill with process liveness check via `kill(0)` (`c34201b`)
+3. Root cause: OpenClaw buffers all output during tool calls; idle timeout was killing the process before output could flush
+
+---
+
+## Previous Changes (March 5, 2026)
+
+### v27 Comprehensive 9-Point Optimization (commit `195a4b0`)
 
 Full-stack optimization pass spanning Bridge, Scholar, x402, Dashboard, and Vox.
 
@@ -141,7 +203,7 @@ dashboard/x402-server/index.ts (dynamic pricing, /pricing endpoint)
 |---------|------|--------|
 | Dashboard | 3000 | ✅ Running (LaunchAgent) |
 | Bridge | 3001 | ✅ Running (v1.6.0 + Sentinel) |
-| x402 | 4021 | ✅ Running (+ Dynamic Pricing) |
+| x402 | 4021 | ✅ Running (+ Cross-Chain + Dynamic Pricing) |
 | Ollama | 11434 | ✅ System service |
 
 ---
@@ -158,16 +220,24 @@ curl -s http://localhost:3001/sentinel | jq .
 # Dynamic pricing snapshot
 curl -s http://localhost:4021/pricing | jq .
 
+# Cross-chain queue stats
+curl -s http://localhost:4021/cross-chain/queue | jq .
+
+# Cross-chain vaults
+curl -s http://localhost:4021/cross-chain/vaults | jq .
+
+# Cross-chain swap quote
+curl -s -X POST http://localhost:4021/cross-chain-swap/quote \
+  -H "Content-Type: application/json" \
+  -d '{"amount": "10", "outputToken": "SOL"}' | jq .
+
 # SSE stream test
 curl -N http://localhost:3000/api/events
 
 # Check all services
 launchctl list | grep com.xmetav
-
-# Scholar stats (from bridge logs)
-tail -f /tmp/xmetav-bridge.log | grep -i scholar
 ```
 
 ---
 
-*Generated: 2026-03-05*
+*Generated: 2026-03-08*
