@@ -24,9 +24,12 @@ const ALLOWED_AGENTS = new Set([
 /** Default timeout for agent calls (seconds) — 180s gives tool-heavy runs room */
 const DEFAULT_TIMEOUT_S = parseInt(process.env.AGENT_TIMEOUT || "180", 10);
 
-/** Idle timeout (seconds) — kill if no output for this long (tool hangs, etc.)
- *  90s allows room for tool calls (URL fetching, deep thinking) while still
- *  catching truly hung processes. */
+/** Idle timeout (seconds) — kill if no output AND process appears dead/stuck.
+ *  OpenClaw buffers all output during tool calls (URL fetch, code execution),
+ *  so we can't rely on stdout alone. Instead we check process liveness via
+ *  kill(0) and only kill after the hard timeout. The idle timeout now only
+ *  applies as a secondary signal — we send a heartbeat to the UI instead of
+ *  killing the agent. */
 const IDLE_TIMEOUT_S = parseInt(process.env.AGENT_IDLE_TIMEOUT || "90", 10);
 
 /** Retry timeout (seconds) — shorter than first attempt since we already waited */
@@ -111,9 +114,7 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
 
   let resolved = false;
   let timedOut = false;
-  let idleTimedOut = false;
   let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let lastOutputAt = Date.now();
 
   /** Kill the process with a reason label */
@@ -143,24 +144,46 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
     }, timeout * 1000);
   }
 
-  // Idle-output timeout: kill if no stdout/stderr for IDLE_TIMEOUT_S
-  // This catches hung tool calls (e.g. browser tools with no Chrome attached)
+  // Idle-output timeout: instead of killing on silence, we check if the process
+  // is still alive. OpenClaw buffers output during tool calls (URL fetches,
+  // code execution), so 90s+ of silence is normal. We only kill if:
+  //   1) The hard timeout expires (DEFAULT_TIMEOUT_S), OR
+  //   2) The process is no longer running (kill(0) throws)
+  // Meanwhile, we send heartbeat pings to the streamer so the UI knows
+  // the agent is working.
   const idleTimeout = IDLE_TIMEOUT_S;
+  let heartbeatCount = 0;
   function resetIdleTimer() {
     lastOutputAt = Date.now();
-    if (idleTimer) clearTimeout(idleTimer);
-    if (idleTimeout > 0 && !resolved) {
-      idleTimer = setTimeout(() => {
-        if (resolved) return;
-        idleTimedOut = true;
-        const silentSecs = Math.round((Date.now() - lastOutputAt) / 1000);
-        killWithReason(
-          `No output for ${silentSecs}s (idle timeout)`,
-          `Agent idle — no output for ${silentSecs}s (likely a hung tool call). Killing.`
-        );
-      }, idleTimeout * 1000);
-    }
+    heartbeatCount = 0;
   }
+
+  // Periodic liveness check: runs every IDLE_TIMEOUT_S seconds.
+  // If there's been no output, check if the process is still alive.
+  // If alive → send a heartbeat to UI. If dead → let exit handler deal with it.
+  const livenessInterval = idleTimeout > 0 ? setInterval(() => {
+    if (resolved) return;
+    const silentSecs = Math.round((Date.now() - lastOutputAt) / 1000);
+    if (silentSecs < idleTimeout) return; // output was recent, nothing to do
+
+    // Check if the process is still alive
+    try {
+      child.kill(0); // signal 0 = test if process exists, doesn't actually kill
+    } catch {
+      // Process is gone — exit handler will fire, nothing to do
+      console.log(`[openclaw] Process appears dead after ${silentSecs}s of silence`);
+      return;
+    }
+
+    // Process is alive but silent — send heartbeat to UI
+    heartbeatCount++;
+    const msg = heartbeatCount === 1
+      ? `\n[Bridge] Agent working (tool call in progress, no output for ${silentSecs}s)...\n`
+      : ""; // only send the first heartbeat message to avoid spam
+    if (msg) onChunk(msg);
+    console.log(`[openclaw] Heartbeat #${heartbeatCount}: process alive, silent for ${silentSecs}s`);
+  }, idleTimeout * 1000) : null;
+
   resetIdleTimer();
 
   // Stream stdout
@@ -178,9 +201,9 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   child.on("exit", (code) => {
     resolved = true;
     if (timeoutTimer) clearTimeout(timeoutTimer);
-    if (idleTimer) clearTimeout(idleTimer);
+    if (livenessInterval) clearInterval(livenessInterval);
     const exitCode = timedOut ? 124 : code;
-    const suffix = idleTimedOut ? " (idle timeout)" : timedOut ? " (timeout)" : "";
+    const suffix = timedOut ? " (timeout)" : "";
     console.log(`[openclaw] Process exited with code ${exitCode}${suffix}`);
     onExit(exitCode);
   });
@@ -188,7 +211,7 @@ export function runAgent(options: OpenClawOptions): ChildProcess {
   child.on("error", (err) => {
     resolved = true;
     if (timeoutTimer) clearTimeout(timeoutTimer);
-    if (idleTimer) clearTimeout(idleTimer);
+    if (livenessInterval) clearInterval(livenessInterval);
     console.error(`[openclaw] Spawn error:`, err.message);
     onChunk(`\n[Bridge Error] ${err.message}\n`);
     onExit(1);
