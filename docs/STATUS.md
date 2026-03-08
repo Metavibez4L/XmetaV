@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-03-08  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v28 (Cross-Chain Swap Engine + Jupiter Ultra)  
+**XmetaV Version:** v28.1 (Standalone Kamino Endpoints + Trading/DeFi Dashboard)  
 **Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -265,6 +265,46 @@ Three-stage fix for agent chat hung state:
 1. Increased idle timeout 30s→90s
 2. Replaced idle-kill with process liveness check (`kill(0)`)
 3. Root cause: OpenClaw buffers output during tool calls; idle timeout killed process before flush
+
+---
+
+## v28.1 Standalone Kamino Endpoints + Trading/DeFi Dashboard (2026-03-08)
+
+Standalone Kamino vault endpoints and full Trading/DeFi dashboard page. Commits `db3d9cf`, `866231c`.
+
+### New Endpoints
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /kamino/deposit` | $0.15 | Deposit directly into a Kamino vault (USDC/SOL) |
+| `POST /kamino/withdraw` | $0.15 | Withdraw from a Kamino vault |
+
+Total x402 gated endpoints: **22** (was 20). Total free endpoints: **8**. PaymentsDashboard: **30 endpoints** (was 24).
+
+### Dashboard: Trading/DeFi Page (`/trading`)
+
+New full-page Trading/DeFi hub accessible from the sidebar (item 16).
+
+| Component | Purpose |
+|-----------|--------|
+| **CrossChainPanel** | Queue stats (pending/active/completed/failed), total bridged USD, interactive swap quote tool |
+| **KaminoPanel** | Vault overview with APY, deposit/withdraw mode toggle, Solscan explorer links on success |
+
+### Dashboard Updates
+
+| Component | Change |
+|-----------|--------|
+| `PaymentsDashboard.tsx` | 24→30 endpoint cards (added 6 cross-chain/Kamino entries) |
+| `Sidebar.tsx` | 15→16 nav items (added "Trading / DeFi" with ArrowLeftRight icon) |
+| `SystemHealth.tsx` | Added x402 server health check via `/api/trading/health`, shows endpoint count |
+
+### New API Proxy Routes (Next.js → x402)
+
+| Route | Methods | Proxies To |
+|-------|---------|------------|
+| `/api/trading/health` | GET | x402 `/health` |
+| `/api/trading/cross-chain` | GET, POST | x402 `/cross-chain/queue`, `/cross-chain/vaults`, `/cross-chain-swap/quote`, `/cross-chain-swap` |
+| `/api/trading/kamino` | POST | x402 `/kamino/deposit`, `/kamino/withdraw` |
 
 ---
 

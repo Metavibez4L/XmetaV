@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28
+Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28.1
 
 ```
  ___   ___                    __           ___   ___
@@ -54,6 +54,8 @@ Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28
 - **Cross-Chain Swaps (Base↔Solana)** — Full multi-chain pipeline: USDC bridge (Base→Solana via CCTP), Jupiter Ultra swaps (SOL/BONK/JUP), Kamino vault deposits for yield, return bridge (Solana→Base). Batch queue for sub-threshold amounts, job lifecycle tracking in Supabase, x402 payment gating ($0.65/swap)
 - **Jupiter Ultra Integration** — RPC-less token swaps on Solana via Jupiter Ultra API with multi-route aggregation (PancakeSwap, Whirlpool, Meteora DLMM, TesseraV), automatic slippage protection, price impact safety checks
 - **Kamino Yield Vaults** — Deposit bridged USDC/SOL into Kamino Earn vaults (8.5% APY USDC, 7.2% APY SOL) with withdraw-and-return-bridge flow
+- **Standalone Kamino Endpoints** — Direct `POST /kamino/deposit` ($0.15) and `POST /kamino/withdraw` ($0.15) for vault operations without a full cross-chain swap
+- **Trading/DeFi Dashboard** — Dedicated `/trading` page with CrossChainPanel (queue stats, swap quotes) and KaminoPanel (vault overview, deposit/withdraw UI with Solscan links)
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
@@ -599,6 +601,7 @@ cd dashboard/bridge && npm install && npm start
 | `/memory-cosmos` | **Memory Cosmos** -- Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable world, achievements, quests |
 | `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
+| `/trading` | **Trading / DeFi** -- Cross-chain queue stats, swap quote tool, Kamino vault deposit/withdraw |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters

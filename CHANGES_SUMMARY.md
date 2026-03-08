@@ -1,7 +1,7 @@
 # Changes Summary — March 8, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v28 (Cross-Chain Swap Engine + Jupiter Ultra)
+**XmetaV Version:** v28.1 (Standalone Kamino Endpoints + Trading/DeFi Dashboard)
 
 ---
 
@@ -64,6 +64,35 @@ Three-stage fix for agent chat hung state:
 1. Increased idle timeout 30s→90s (`fb7ba58`)
 2. Replaced idle-kill with process liveness check via `kill(0)` (`c34201b`)
 3. Root cause: OpenClaw buffers all output during tool calls; idle timeout was killing the process before output could flush
+
+### 7. Standalone Kamino Vault Endpoints (commit `db3d9cf`)
+
+Added direct Kamino vault deposit/withdraw endpoints to `cross-chain-routes.ts`, bypassing the full cross-chain swap flow.
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /kamino/deposit` | $0.15 | Deposit into a Kamino vault (USDC/SOL) |
+| `POST /kamino/withdraw` | $0.15 | Withdraw from a Kamino vault |
+
+Health endpoint updated to include both in gated list. Total gated: 22, total free: 8.
+
+### 8. Trading/DeFi Dashboard Page (commit `866231c`)
+
+Full Trading/DeFi hub page at `/trading` with 9 new files (651 insertions):
+
+| File | Purpose |
+|------|--------|
+| `src/app/(dashboard)/trading/page.tsx` | Two-column layout: CrossChainPanel + KaminoPanel, feature tags, endpoint reference grid |
+| `src/components/CrossChainPanel.tsx` | Queue stats (pending/active/completed/failed), total bridged USD, interactive swap quote form |
+| `src/components/KaminoPanel.tsx` | Vault cards with APY, deposit/withdraw mode toggle, Solscan explorer links on success |
+| `src/app/api/trading/health/route.ts` | GET proxy → x402 `/health` |
+| `src/app/api/trading/cross-chain/route.ts` | GET/POST proxy → x402 cross-chain endpoints |
+| `src/app/api/trading/kamino/route.ts` | POST proxy → x402 Kamino endpoints |
+
+Also updated:
+- **PaymentsDashboard.tsx**: 24→30 endpoint cards (added 6 cross-chain/Kamino entries)
+- **Sidebar.tsx**: 15→16 nav items (added "Trading / DeFi" with ArrowLeftRight icon, shortcut 16)
+- **SystemHealth.tsx**: Added x402 server health check, shows endpoint count
 
 ---
 
@@ -197,13 +226,13 @@ dashboard/x402-server/index.ts (dynamic pricing, /pricing endpoint)
 
 ---
 
-## Service Status (v27)
+## Service Status (v28.1)
 
 | Service | Port | Status |
 |---------|------|--------|
-| Dashboard | 3000 | ✅ Running (LaunchAgent) |
+| Dashboard | 3000 | ✅ Running (LaunchAgent) — 12 pages incl. `/trading` |
 | Bridge | 3001 | ✅ Running (v1.6.0 + Sentinel) |
-| x402 | 4021 | ✅ Running (+ Cross-Chain + Dynamic Pricing) |
+| x402 | 4021 | ✅ Running (+ Cross-Chain + Kamino + Dynamic Pricing) |
 | Ollama | 11434 | ✅ System service |
 
 ---
@@ -230,6 +259,19 @@ curl -s http://localhost:4021/cross-chain/vaults | jq .
 curl -s -X POST http://localhost:4021/cross-chain-swap/quote \
   -H "Content-Type: application/json" \
   -d '{"amount": "10", "outputToken": "SOL"}' | jq .
+
+# Kamino standalone deposit
+curl -s -X POST http://localhost:4021/kamino/deposit \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "amount": "50"}' | jq .
+
+# Kamino standalone withdraw
+curl -s -X POST http://localhost:4021/kamino/withdraw \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "amount": "25"}' | jq .
+
+# Trading dashboard health proxy
+curl -s http://localhost:3000/api/trading/health | jq .
 
 # SSE stream test
 curl -N http://localhost:3000/api/events

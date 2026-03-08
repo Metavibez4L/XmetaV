@@ -186,7 +186,8 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs, Consciousness, Memory Cosmos
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs, Consciousness, Memory Cosmos, Trading/DeFi
+- **Trading/DeFi Page** (`/trading`): Two-column layout with `CrossChainPanel` (queue stats, swap quote tool) and `KaminoPanel` (vault overview, deposit/withdraw UI). API proxy routes: `/api/trading/health`, `/api/trading/cross-chain`, `/api/trading/kamino`
 
 ### XMETAV HQ — Isometric Office Visualization (PixiJS)
 
@@ -237,12 +238,13 @@ A standalone Express server that gates XmetaV API endpoints with USDC micro-paym
 - **Port**: 4021
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
 - **Dynamic Pricing Engine**: Demand-based multiplier (0.8×–1.5×), time-of-day adjustment, endpoint bundles (Research Pack, Swarm Suite, Memory Explorer). `GET /pricing` free endpoint for live snapshot. Syncs pricing to Supabase every 5 min (v1.6.0)
-- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+), `/cross-chain-swap` ($0.65), `/cross-chain-swap/quote` (free), `/bridge-status/:jobId` ($0.05), `/trigger-return/:jobId` ($0.25)
+- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+), `/cross-chain-swap` ($0.65), `/cross-chain-swap/quote` (free), `/bridge-status/:jobId` ($0.05), `/trigger-return/:jobId` ($0.25), `/kamino/deposit` ($0.15), `/kamino/withdraw` ($0.15)
 - **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
 - **Discovery**: `GET /agent/:agentId/payment-info` — public ERC-8004 lookup with x402 detection
 - **Payment Logging**: Writes to `x402_payments` Supabase table (agent_id, payer/payee, network, metadata)
 - **Token Tiers**: Checks caller's $XMETAV balance on-chain and applies tier discount to pricing
 - **Free endpoints**: `/health`, `/token-info`, `/agent/:agentId/payment-info`, `/digest`, `/trade-fees`, `/cross-chain/queue`, `/cross-chain/vaults`, `/pricing`
+- **Standalone Kamino**: Direct vault deposit/withdraw without full cross-chain swap flow (`POST /kamino/deposit`, `POST /kamino/withdraw` — $0.15 each)
 - **Settlement**: USDC on Base Mainnet
 - **Facilitator**: `@coinbase/x402` CDP facilitator with `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` JWT auth
 - **Location**: `dashboard/x402-server/`
@@ -258,6 +260,7 @@ Full multi-chain pipeline for executing USDC→Solana token swaps with vault yie
 - **Batch Queue**: Sub-threshold swaps ($6.50) batched with 1hr timeout. Direct execution for amounts above threshold
 - **Job Lifecycle**: `pending→batched→bridging_to_sol→bridged→swapping→swapped→depositing→vaulted→withdrawing→bridging_to_base→completed`
 - **Safety**: Min $0.65, max $500 per swap, 50bps slippage, 3% max price impact
+- **Standalone Kamino Endpoints**: `POST /kamino/deposit` and `POST /kamino/withdraw` ($0.15 each) for direct vault operations without a full cross-chain swap
 - **DB Tables**: `cross_chain_jobs`, `cross_chain_batches` — migration: `setup-db-crosschain.sql`
 - **Modules**: `cross-chain-types.ts`, `bridge-solana.ts`, `jupiter-swap.ts`, `kamino-vault.ts`, `cross-chain-queue.ts`, `cross-chain-routes.ts`
 - **Location**: `dashboard/x402-server/`

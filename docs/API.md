@@ -108,7 +108,9 @@ Service health and endpoint summary.
       "POST /cross-chain-swap": "$0.65 — initiate Base→Solana→Jupiter→Kamino swap",
       "POST /cross-chain-swap/quote": "free — estimate output and fees",
       "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
-      "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base"
+      "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
+      "POST /kamino/deposit": "$0.15 — deposit into Kamino vault",
+      "POST /kamino/withdraw": "$0.15 — withdraw from Kamino vault"
     },
     "free": {
       "GET /health": "this endpoint",
@@ -837,6 +839,68 @@ View the trade fee schedule, whale tiers, and projected monthly revenue.
   "endpoints": { ... },
   "projectedMonthlyRevenue": "$36,950.00",
   "xmetavDiscountTiers": { ... }
+}
+```
+
+---
+
+## Standalone Kamino Vault Endpoints
+
+Direct deposit/withdraw to Kamino yield vaults without a full cross-chain swap.
+
+### `POST /kamino/deposit` — $0.15
+
+Deposit funds into a Kamino vault.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `vault` | string | Yes | — | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+| `amount` | string | Yes | — | Amount to deposit (in token units) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/deposit \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "amount": "50"}'
+```
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "vault": "USDC_MAIN",
+  "amount": "50",
+  "explorerUrl": "https://solscan.io/tx/...",
+  "timestamp": "2026-03-08T12:00:00.000Z"
+}
+```
+
+---
+
+### `POST /kamino/withdraw` — $0.15
+
+Withdraw funds from a Kamino vault.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `vault` | string | Yes | — | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+| `amount` | string | Yes | — | Amount to withdraw (in token units) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/withdraw \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "amount": "25"}'
+```
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "vault": "USDC_MAIN",
+  "amount": "25",
+  "explorerUrl": "https://solscan.io/tx/...",
+  "timestamp": "2026-03-08T12:00:00.000Z"
 }
 ```
 
