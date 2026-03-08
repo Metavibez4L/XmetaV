@@ -1,11 +1,27 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { Server } from "lucide-react";
 
+interface X402Health {
+  status: string;
+  service: string;
+  network?: string;
+  gatedCount: number;
+  freeCount: number;
+}
+
 export const SystemHealth = React.memo(function SystemHealth() {
   const { session, isOnline } = useBridgeStatus();
+  const [x402, setX402] = useState<X402Health | null>(null);
+
+  useEffect(() => {
+    fetch("/api/trading/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setX402(d))
+      .catch(() => {});
+  }, []);
 
   const lastSeen = session
     ? new Date(session.last_heartbeat).toLocaleString()
@@ -63,6 +79,20 @@ export const SystemHealth = React.memo(function SystemHealth() {
             <code className="text-[10px] font-mono" style={{ color: '#00f0ff66' }}>{session.hostname}</code>
           </div>
         )}
+        {/* x402 Server Status */}
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono" style={{ color: '#4a6a8a' }}>x402 Server</span>
+          <span
+            className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded"
+            style={{
+              color: x402?.status === "ok" ? '#39ff14' : '#f59e0b',
+              background: x402?.status === "ok" ? '#39ff1408' : '#f59e0b08',
+              border: `1px solid ${x402?.status === "ok" ? '#39ff1420' : '#f59e0b20'}`,
+            }}
+          >
+            {x402 ? `${x402.gatedCount + x402.freeCount} endpoints` : "checking..."}
+          </span>
+        </div>
       </div>
     </div>
   );

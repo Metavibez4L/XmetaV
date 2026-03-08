@@ -246,7 +246,7 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4" style={{ color: "#00f0ff66" }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00f0ff66" }}>
-              x402 Gated Endpoints · 24 endpoints
+              x402 Gated Endpoints · 30 endpoints
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -300,6 +300,12 @@ export const PaymentsDashboard = React.memo(function PaymentsDashboard() {
             { ep: "POST /voice-calibrate", price: "$0.10", desc: "Calibrate brand voice" },
             { ep: "GET /competitor-intel", price: "$0.12", desc: "Competitor analysis scan" },
             { ep: "POST /content-strategy", price: "$0.08", desc: "Content strategy plan" },
+            { ep: "POST /cross-chain-swap", price: "$0.65", desc: "Base→Solana→Jupiter swap" },
+            { ep: "GET /bridge-status/:id", price: "$0.05", desc: "Cross-chain job status" },
+            { ep: "POST /trigger-return/:id", price: "$0.25", desc: "Return bridge Solana→Base" },
+            { ep: "POST /kamino/deposit", price: "$0.15", desc: "Kamino vault deposit" },
+            { ep: "POST /kamino/withdraw", price: "$0.15", desc: "Kamino vault withdraw" },
+            { ep: "POST /cross-chain/quote", price: "Free", desc: "Cross-chain swap quote" },
           ].map(({ ep, price, desc }) => (
             <div key={ep} className="p-2 rounded" style={{ background: "#060c18" }}>
               <div className="text-[10px] font-mono" style={{ color: "#4a6a8a" }}>
