@@ -810,10 +810,30 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `sentinel_healing_log` | Self-healing action audit trail | Authenticated: SELECT + Service role: ALL |
 | `sentinel_traces` | Distributed trace spans | Authenticated: SELECT + Service role: ALL |
 | `sentinel_resource_snapshots` | System resource snapshots (CPU/mem/disk/load) | Authenticated: SELECT + Service role: ALL |
+| `insight_shards` | Dream synthesis fused insight fragments | Service role: ALL |
+| `predictive_contexts` | Pre-loaded context from temporal/sequential patterns | Service role: ALL |
+| `memory_decay` | Decay-scored memories pending archive or compression | Service role: ALL |
+| `reforged_crystals` | Legendary crystals compressed from decayed memories | Service role: ALL |
+| `erc8004_registry_cache` | Cached on-chain ERC-8004 registry lookups | Service role: ALL |
+| `erc8004_scan_log` | ERC-8004 scan/discovery event log | Service role: ALL |
+| `revenue_metrics` | Midas revenue tracking and settlement status | Authenticated: SELECT + Service role: ALL |
+| `endpoint_analytics` | Per-endpoint usage analytics | Authenticated: SELECT + Service role: ALL |
+| `growth_opportunities` | AI-identified growth/optimization opportunities | Authenticated: SELECT + Service role: ALL |
+| `pricing_recommendations` | Dynamic pricing recommendation history | Authenticated: SELECT + Service role: ALL |
+| `pricing_experiments` | A/B pricing experiment tracking | Service role: ALL |
+| `swarm_spawn_billing` | Swarm spawn billing events | Service role: ALL |
+| `trade_executions` | Midas trade execution log (swaps, arb, rebalance) | Authenticated: SELECT + Service role: ALL |
+| `cross_chain_jobs` | Cross-chain bridge job tracking | Authenticated: SELECT + Service role: ALL |
+| `cross_chain_batches` | Cross-chain batch aggregation | Service role: ALL |
+| `vox_content_queue` | Vox content automation pipeline queue | Service role: ALL |
 
-All tables have Realtime enabled for live updates.
+**Total: 37 tables, 3 views, 4 enums** — all with Realtime enabled for live updates.
 
-View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments`.
+**Views:** `x402_daily_spend` (daily payment totals), `shared_memory` (cross-agent memory access), `crystal_level_thresholds` (XP → level lookup).
+
+**Enums:** `crystal_type`, `crystal_color`, `crystal_class`, `agent_relationship`.
+
+**Functions:** `cleanup_expired_memories()` (72h TTL), `auto_create_crystal()` (trigger), `update_crystal_xp()`, `compute_decay_score()`, `compress_to_legendary()`, `log_association_modification()`.
 
 ### Dashboard pages
 
@@ -1146,12 +1166,12 @@ XmetaV implements a complete 6-layer memory architecture — all layers are live
 |-------|--------|-----------|--------|
 | **1. Ephemeral** | ✅ Live | In-process TTL caches, circuit breakers, pin queues, dream flags | 0 (in-memory) |
 | **2. Session / Midterm** | ✅ Live | Command lifecycle, intent sessions, 72h TTL auto-expiry | 4 |
-| **3. Long-Term Persistent** | ✅ Live | Soul agent (12 modules), memory crystals, associations, dreams | 16 |
+| **3. Long-Term Persistent** | ✅ Live | Soul agent (12 modules), memory crystals, associations, dreams, synthesis, reforge, predictive | 20 |
 | **4. IPFS / Off-Chain** | ✅ Live | Pinata JSON pinning, batch queue (5min), circuit breaker | 0 (external) |
-| **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, auto-detect milestones | 2 (cache) |
-| **6. Cost Monitoring** | ✅ Live | 6-tier token system, x402 payment tracking, revenue analytics | 2 |
+| **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, batch queue (3 items OR 5min flush), auto-detect milestones | 2 (cache) |
+| **6. Cost / Revenue** | ✅ Live | 6-tier token system, x402 payment tracking, Midas revenue analytics, trade execution log | 7 |
 
-**Total:** 28 Supabase tables/views, 30+ source files, 12 Soul modules, 6 Sentinel modules
+**Total:** 37 Supabase tables, 3 views, 4 enums, 40+ source files, 12 Soul modules, 6 Sentinel modules
 
 ### Layer 1 — Ephemeral (In-Process)
 
@@ -1180,23 +1200,23 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 
 **Soul Agent Modules (12):**
 
-| Module | File | Purpose |
-|--------|------|---------|
-| Context orchestrator | `soul/context.ts` | Keyword-scored + association-boosted retrieval |
-| Keyword retrieval | `soul/retrieval.ts` | Scores memories by keyword match × kind weight + recency |
-| Association builder | `soul/associations.ts` | Builds up to 5 associations per memory |
-| Dream mode | `soul/dream.ts` | Triggers after 6h idle, clusters memories, generates insights |
-| Lucid dream proposals | `soul/dream-proposals.ts` | 7 categories of autonomous evolution proposals |
-| Dream synthesis | `soul/synthesis.ts` | Fuses 3+ related anchors into insight shards |
-| Predictive loading | `soul/predictive.ts` | Analyzes 14 days of command history for temporal patterns |
-| Memory reforging | `soul/reforge.ts` | Decay scoring (72h half-life), compression into legendary crystals |
+| Module | File | Lines | Purpose |
+|--------|------|-------|---------|
+| Context orchestrator | `soul/context.ts` | ~200 | Keyword-scored + association-boosted retrieval |
+| Keyword retrieval | `soul/retrieval.ts` | ~150 | Scores memories by keyword match × kind weight + recency |
+| Association builder | `soul/associations.ts` | ~180 | Builds up to 5 associations per memory |
+| Dream mode | `soul/dream.ts` | 398 | 9-step pipeline: triggers after 6h idle, clusters memories, generates insights |
+| Lucid dream proposals | `soul/dream-proposals.ts` | 993 | 7 categories of autonomous evolution proposals, auto-execute at ≥0.8 confidence |
+| Dream synthesis | `soul/synthesis.ts` | 441 | 5 pattern types, fuses 3+ related anchors into insight shards, blind spot detection |
+| Predictive loading | `soul/predictive.ts` | 424 | Time-of-day + sequential + shard cross-ref, analyzes 14 days of command history |
+| Memory reforging | `soul/reforge.ts` | 593 | Decay scoring (72h half-life), auto-archive, compression into legendary crystals |
 
 **Memory Crystal System (Materia Engine):**
 - Crystals with XP, 30 levels, star ratings (1-6★), class evolution (anchor → godhand)
 - 5 FF7-style fusion recipes, keyword-triggered summoning, limit breaks
 - Full game engine: `bridge/lib/memory-crystal.ts` (811 lines)
 
-**Long-Term Tables (16):** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `shared_memory` (view)
+**Long-Term Tables (20):** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots` + views: `shared_memory`, `crystal_level_thresholds`
 
 ### Layer 4 — IPFS / Off-Chain
 
@@ -1220,7 +1240,7 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 **Agent ID:** 16905  
 **Status:** ⚠️ Wallet `0x4Ba6...` needs ETH on Base for gas — code is proven, anchoring paused until funded.
 
-### Layer 6 — Cost Monitoring
+### Layer 6 — Cost / Revenue
 
 | Component | File | Notes |
 |-----------|------|-------|
@@ -1229,6 +1249,13 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 | Daily spend view | `x402_daily_spend` | Aggregated daily totals per agent |
 | Revenue analytics | `bridge/lib/midas-revenue.ts` | Revenue tracking + settlement status |
 | Dream pricing | `soul/dream-proposals.ts` | Soul proposes x402 pricing adjustments |
+| Trade execution log | `trade_executions` | Midas trade execution details (swaps, arb, rebalance) |
+| Endpoint analytics | `endpoint_analytics` | Per-endpoint usage and performance metrics |
+| Revenue metrics | `revenue_metrics` | Revenue tracking and settlement status |
+| Growth opportunities | `growth_opportunities` | AI-identified growth/optimization opportunities |
+| Pricing recommendations | `pricing_recommendations` | Dynamic pricing recommendation history |
+| Pricing experiments | `pricing_experiments` | A/B pricing experiment tracking |
+| Swarm spawn billing | `swarm_spawn_billing` | Swarm spawn billing events |
 
 ---
 
@@ -1239,7 +1266,7 @@ Memory orchestrator providing context curation, association building, dream cons
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, dream-proposals, retrieval, types) |
-| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` tables |
+| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals` tables |
 | Lucid Dreaming | Active | Phase 5 autonomous evolution — dream proposals, self-modification, meeting triggers |
 | Arena Presence | Active | Room: SOUL (private alcove), Color: Magenta (#ff006e) |
 | Arena Office | Active | L-shaped surveillance desk + arc of mini fleet-monitor screens |

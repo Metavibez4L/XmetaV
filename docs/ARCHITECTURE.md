@@ -209,7 +209,10 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables (authenticated SELECT on all user-facing tables; dream tables have both authenticated SELECT and service-role ALL)
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`
+- **Tables (37)**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `erc8004_registry_cache`, `erc8004_scan_log`, `revenue_metrics`, `endpoint_analytics`, `growth_opportunities`, `pricing_recommendations`, `pricing_experiments`, `swarm_spawn_billing`, `trade_executions`, `cross_chain_jobs`, `cross_chain_batches`, `vox_content_queue`
+- **Views (3)**: `x402_daily_spend`, `shared_memory`, `crystal_level_thresholds`
+- **Enums (4)**: `crystal_type`, `crystal_color`, `crystal_class`, `agent_relationship`
+- **Functions (6)**: `cleanup_expired_memories()`, `auto_create_crystal()`, `update_crystal_xp()`, `compute_decay_score()`, `compress_to_legendary()`, `log_association_modification()`
 - **Indexes**: `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` composite
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
@@ -327,9 +330,12 @@ A dedicated agent that sits between task dispatch and agent execution, curating 
 
 - **Room**: SOUL (private magenta alcove in Arena, cols 0–1, rows 2–5)
 - **Bridge Library**: `dashboard/bridge/lib/soul/` — context building, memory retrieval, association building, dream mode, dream proposals, type definitions
-- **DB Tables**: `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`
-- **Dream Mode**: When all agents are idle, Soul consolidates recent memories into clusters, generates insights, and saves them for future context injection
-- **Lucid Dreaming (Phase 5)**: During dream cycles, Soul generates actionable manifestations (proposals) across 7 categories: fusion, association, pricing, skill, meeting, pattern, correction. High-confidence safe proposals auto-execute; others await user approval via `/api/soul` or the Consciousness page
+- **DB Tables**: `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`
+- **Dream Mode**: When all agents are idle, Soul runs a 9-step dream pipeline: trigger check → fetch recent memories → cluster by keywords → generate insight per cluster → save dream_insights → build associations → run synthesis → run reforge → generate proposals
+- **Lucid Dreaming (Phase 5)**: During dream cycles, Soul generates actionable manifestations (proposals) across 7 categories: fusion, association, pricing, skill, meeting, pattern, correction. High-confidence safe proposals auto-execute (≥0.8 confidence); others await user approval via `/api/soul` or the Consciousness page
+- **Dream Synthesis** (`soul/synthesis.ts`, 441 lines): Fuses 3+ related anchors into insight shards across 5 pattern types, includes blind spot detection for under-explored memory regions
+- **Memory Reforging** (`soul/reforge.ts`, 593 lines): Decay scoring with 72h half-life, auto-archive of low-significance memories, compression of decayed patterns into legendary crystals
+- **Predictive Loading** (`soul/predictive.ts`, 424 lines): Time-of-day + sequential pattern + shard cross-reference analysis over 14 days of command history, pre-loads context into `predictive_contexts`
 - **Association Building**: After each new memory entry, Soul automatically builds associations (causal, similar, sequential, related) with existing memories
 - **Self-Modification**: Soul can propose and auto-execute association reinforcements, creating new links or boosting weak ones based on dream analysis
 - **Context Packets**: Soul builds contextual memory packets injected into agent prompts at dispatch time
@@ -371,11 +377,32 @@ A Final-Fantasy-inspired memory gamification layer at `/memory-cosmos` with 7 in
 - **Memory Cosmos**: Pannable/zoomable explorable world map with golden-spiral island layout, 3 terrain types, neon highway bridges with data particles
 - **Achievements**: 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers
 - **Daily Quests**: Auto-generated daily quests with type-based objectives and XP rewards
-- **Bridge Engine**: `dashboard/bridge/lib/memory-crystal.ts` — full game logic (~530 lines)
+- **Bridge Engine**: `dashboard/bridge/lib/memory-crystal.ts` — full game logic (~810 lines)
 - **DB Tables**: `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests` (3 custom enums, `crystal_level_thresholds` view)
 - **Hook**: `useMemoryCrystals` — Supabase queries + realtime subscriptions, 12s auto-refresh
 - **Components**: CrystalCard (canvas), CrystalInventory, FusionChamber, SummonOverlay, LimitBreakBanner, MemoryCosmos, QuestTracker
 - **Location**: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCrystals.ts`, `dashboard/bridge/lib/memory-crystal.ts`
+
+### Consciousness Dashboard (`/consciousness`)
+
+Dual-aspect awareness page providing a live window into the agent fleet's memory, anchoring, and dream activity. 12 components (4,139 total lines) arranged in an 8-section layout.
+
+- **Components (12)**: ConsciousnessPage (orchestrator), MemoryGraph (force-directed D3), AnchorTimeline (chronological anchor events), ContextMetrics (memory stats + health), DreamMode (live dream status + proposals), MiniArena (embedded PixiJS arena), MemoryStream (real-time memory feed), AssociationExplorer (graph traversal), InsightPanel (dream insights + synthesis shards), PredictivePanel (pre-loaded context display), DecayMonitor (memory decay + archive status), AwakeningMessages (post-dream awakening notifications)
+- **Data Hook**: `useConsciousness.ts` (309 lines) — 30s polling refresh, 3 Supabase Realtime subscriptions (`agent_memory`, `dream_insights`, `soul_dream_manifestations`)
+- **Tables Consumed**: `agent_memory`, `memory_associations`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`
+- **Page Layout**: Header metrics → Memory Graph + Anchor Timeline (side-by-side) → Dream Mode + Mini Arena → Memory Stream → Association Explorer → Insight Panel + Predictive Panel → Decay Monitor → Awakening Messages
+- **Location**: `dashboard/src/components/consciousness/`, `dashboard/src/hooks/useConsciousness.ts`, `dashboard/src/app/consciousness/page.tsx`
+
+### On-Chain Memory Anchoring Pipeline
+
+Three-module pipeline for permanent on-chain memory persistence: IPFS pinning → keccak256 hashing → Base Mainnet contract write.
+
+- **memory-anchor.ts** (480 lines): Batch queue (`queueAnchor()`) accumulates entries until 3 items OR 5-minute timer, then flushes via `flushPendingAnchors()`. Each anchor: pin JSON to IPFS → compute keccak256 of CID → write to `AgentMemoryAnchor` contract on Base (chain 8453). 5-minute TTL read cache for RPC calls.
+- **agent-memory.ts** (377 lines): `captureCommandOutcome()` stores to Supabase, then `anchorIfSignificant()` checks for milestone/decision/incident keywords and queues high-significance memories for anchoring. Auto-creates crystals via `createCrystal()`. Syncs to OpenClaw workspace memory.
+- **ipfs-pinata.ts** (157 lines): `pinJSON()` with circuit breaker (3 consecutive failures → 60s cooldown). Batch pin queue flushed every 5 min. Gateway URL: `https://gateway.pinata.cloud/ipfs/{cid}`.
+- **Contract**: `AgentMemoryAnchor` on Base Mainnet, Agent ID 16905
+- **Status**: ⚠️ Wallet `0x4Ba6...` needs ETH on Base for gas — code proven, anchoring paused until funded
+- **Location**: `dashboard/bridge/lib/memory-anchor.ts`, `dashboard/bridge/lib/agent-memory.ts`, `dashboard/bridge/lib/ipfs-pinata.ts`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`
