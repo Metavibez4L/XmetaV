@@ -287,6 +287,35 @@ export function AgentChat() {
 
   useAutoResize(inputRef, input);
 
+  // ── Hung command recovery: show cancel button after 30s ──
+  const [showCancel, setShowCancel] = useState(false);
+  useEffect(() => {
+    if (!sending) {
+      setShowCancel(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowCancel(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [sending]);
+
+  const handleCancel = useCallback(() => {
+    setActiveCommandId(null);
+    setSending(false);
+    setShowCancel(false);
+    completedRef.current = null;
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.role === "agent" && last.status === "pending") {
+        return [
+          ...prev.slice(0, -1),
+          { ...last, content: last.content || "[Cancelled — no response]", status: "failed" },
+        ];
+      }
+      return prev;
+    });
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
   // ── Load conversation from history ──
   const handleLoadConversation = useCallback(
     (entries: HistoryEntry[]) => {
@@ -973,6 +1002,24 @@ export function AgentChat() {
               <Send className="h-4 w-4" />
             )}
           </button>
+
+          {/* Cancel button — appears after 30s of sending */}
+          {showCancel && (
+            <button
+              onClick={handleCancel}
+              className="h-11 px-3 rounded flex items-center justify-center shrink-0 transition-all"
+              style={{
+                background: "#ff2d5e10",
+                border: "1px solid #ff2d5e30",
+                color: "#ff2d5e",
+              }}
+              title="Cancel hung command"
+            >
+              <span className="text-[9px] font-mono uppercase tracking-wider">
+                CANCEL
+              </span>
+            </button>
+          )}
         </div>
         <div className="mx-auto max-w-3xl mt-1.5 flex items-center justify-between">
           <span

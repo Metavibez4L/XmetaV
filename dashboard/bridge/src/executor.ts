@@ -421,6 +421,13 @@ export async function executeCommand(command: {
         // Flush any remaining batched tokens before ending the stream
         flushTokenBatch();
 
+        // Allow queued pipe chunks to drain before finalising the stream.
+        // Node.js can deliver buffered stdout/stderr after the 'exit' event,
+        // causing ghost chunks that get dropped. A short delay lets them arrive
+        // as normal writes instead.
+        await new Promise((r) => setTimeout(r, 80));
+        flushTokenBatch(); // flush any chunks that arrived during the drain
+
         await streamer.end(code);
 
         const status = code === 0 ? "completed" : "failed";
