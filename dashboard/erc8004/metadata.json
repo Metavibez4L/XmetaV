@@ -1,14 +1,14 @@
 {
   "type": "erc8004:agent-registration:1.0",
   "name": "XmetaV",
-  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, branding, research, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), brand voice & campaigns (vox), 24/7 deep research with relevance scoring (scholar), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), autonomous research with memory anchoring, and ERC-8004 identity on Base Mainnet.",
+  "description": "Orchestrator agent for the XmetaV multi-agent command center. Coordinates a fleet of 12 specialized agents across intel, development, operations, branding, research, and revenue — including on-chain intelligence (oracle), tokenomics analysis (alchemist), revenue & growth optimization (midas), blockchain development (web3dev), brand voice & campaigns (vox), 24/7 deep research with relevance scoring (scholar), and session continuity (briefing). Supports swarm execution, selective meetings, x402 payments, persistent agent memory, on-chain token swaps (Aerodrome DEX), voice-commanded trading, soul memory orchestration, revenue analytics, alpha intelligence feeds (whale alerts, liquidation signals, arb detection, governance tracking), autonomous research with memory anchoring, cross-chain swaps (Base↔Solana via CCTP bridge + Jupiter Ultra + Kamino vaults), and ERC-8004 identity on Base Mainnet.",
   "image": "",
   "external_url": "https://github.com/Metavibez4L/XmetaV",
   "services": [
     {
       "type": "x402",
       "url": "http://localhost:4021",
-      "description": "x402 payment-gated API — agent orchestration, trade execution, yield optimization, arbitrage, swarm, voice, memory endpoints (USDC on Base)"
+      "description": "x402 payment-gated API — agent orchestration, trade execution, yield optimization, arbitrage, cross-chain swaps (Base↔Solana), Jupiter Ultra, Kamino vaults, swarm, voice, memory endpoints (USDC on Base)"
     },
     {
       "type": "dashboard",
@@ -113,11 +113,19 @@
     "relevance-scoring",
     "knowledge-anchoring",
     "research-domain-scheduling",
-    "automated-memory-dedup"
+    "automated-memory-dedup",
+    "cross-chain-swap-execution",
+    "base-solana-bridge",
+    "jupiter-ultra-swaps",
+    "kamino-vault-deposits",
+    "multi-chain-yield",
+    "cctp-usdc-bridge",
+    "solana-token-swaps",
+    "batch-swap-queue"
   ],
   "fleet": {
     "agents": [
-      { "id": "main", "role": "Orchestrator & fleet commander", "room": "command", "skills": ["wallets"] },
+      { "id": "main", "role": "Orchestrator & fleet commander — cross-chain swaps, Jupiter Ultra, Kamino vaults", "room": "command", "skills": ["wallets", "cross-chain", "jupiter", "kamino"] },
       { "id": "sentinel", "role": "Agent lifecycle manager — spawn coordination, fleet health", "room": "command" },
       { "id": "briefing", "role": "Context curator — SITREP & memory consolidation", "room": "intel" },
       { "id": "oracle", "role": "On-chain intelligence — gas, prices, chain stats, sentiment", "room": "intel", "skills": ["gas", "l2s"] },
@@ -160,7 +168,7 @@
   "wallet": {
     "address": "0x4Ba6B07626E6dF28120b04f772C4a89CC984Cc80",
     "network": "eip155:8453",
-    "supports": ["USDC", "ETH", "WETH", "USDT", "DAI", "cbETH", "AERO", "$XMETAV"]
+    "supports": ["USDC", "ETH", "WETH", "USDT", "DAI", "cbETH", "AERO", "$XMETAV", "SOL", "BONK", "JUP"]
   },
   "x402Support": {
     "enabled": true,
@@ -189,7 +197,10 @@
       "GET /whale-alert": "$0.15",
       "GET /liquidation-signal": "$0.25",
       "GET /arb-detection": "$0.20",
-      "GET /governance-signal": "$0.10"
+      "GET /governance-signal": "$0.10",
+      "POST /cross-chain-swap": "$0.65",
+      "GET /bridge-status/:jobId": "$0.05",
+      "POST /trigger-return/:jobId": "$0.25"
     },
     "tokenDiscounts": {
       "token": "$XMETAV",

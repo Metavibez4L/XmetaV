@@ -339,7 +339,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "~/.openclaw/workspace",
     tools: "full",
     model: "ollama/kimi-k2.5:cloud",
-    skills: ["wallets"],
+    skills: ["wallets", "cross-chain", "jupiter", "kamino", "solana-bridge"],
   },
   {
     id: "akua",
