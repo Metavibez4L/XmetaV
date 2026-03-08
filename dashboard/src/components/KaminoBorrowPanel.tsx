@@ -206,7 +206,7 @@ export function KaminoBorrowPanel() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="text-[9px] font-mono mb-1" style={{ color: "#10b981" }}>Collateral</div>
-              {obligation.deposits.length > 0 ? obligation.deposits.map((d, i) => (
+              {obligation.deposits?.length > 0 ? obligation.deposits.map((d, i) => (
                 <div key={i} className="text-[10px] font-mono" style={{ color: "#e0e8f0" }}>
                   {d.amount} <span style={{ color: "#4a6a8a" }}>({d.reserve.slice(0, 8)}...)</span>
                 </div>
@@ -216,7 +216,7 @@ export function KaminoBorrowPanel() {
             </div>
             <div>
               <div className="text-[9px] font-mono mb-1" style={{ color: "#f59e0b" }}>Borrows</div>
-              {obligation.borrows.length > 0 ? obligation.borrows.map((b, i) => (
+              {obligation.borrows?.length > 0 ? obligation.borrows.map((b, i) => (
                 <div key={i} className="text-[10px] font-mono" style={{ color: "#e0e8f0" }}>
                   {b.amount} <span style={{ color: "#4a6a8a" }}>({b.reserve.slice(0, 8)}...)</span>
                 </div>
