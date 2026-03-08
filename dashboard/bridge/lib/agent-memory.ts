@@ -4,6 +4,9 @@ import type { MemoryCategoryType } from "./memory-anchor.js";
 import { processNewMemory } from "./soul/index.js";
 import { createCrystal } from "./memory-crystal.js";
 import { notifyMemoryWrite } from "./soul/session-buffer.js";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -34,10 +37,46 @@ export interface MemoryEntry {
 }
 
 /** Maximum characters of memory context to inject into a dispatch message */
-const MAX_CONTEXT_CHARS = 2000;
+const MAX_CONTEXT_CHARS = 4000;
 
 /** How many recent entries to fetch per agent */
-const RECENT_LIMIT = 15;
+const RECENT_LIMIT = 25;
+
+/** Kinds worth syncing to OpenClaw workspace memory (vector-searchable) */
+const SYNC_KINDS: Set<MemoryKind> = new Set(["outcome", "error", "fact"]);
+
+const OPENCLAW_MEMORY_DIR = join(homedir(), ".openclaw", "workspace", "memory");
+
+/**
+ * Sync a memory entry to OpenClaw's workspace memory directory as a markdown
+ * file, so the native nomic-embed-text vector search can recall it.
+ * Only syncs outcomes, errors, and facts — skips transient kinds.
+ */
+async function syncToOpenClawMemory(entry: MemoryEntry, memoryId: string): Promise<void> {
+  if (!SYNC_KINDS.has(entry.kind)) return;
+  if (entry.agent_id === "_shared") return;
+
+  try {
+    await mkdir(OPENCLAW_MEMORY_DIR, { recursive: true });
+    const date = new Date().toISOString().slice(0, 10);
+    const safeId = memoryId.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 12);
+    const filename = `${date}-${entry.agent_id}-${entry.kind}-${safeId}.md`;
+    const content = [
+      `# ${entry.kind.charAt(0).toUpperCase() + entry.kind.slice(1)}: ${entry.agent_id}`,
+      `**Date:** ${date}`,
+      `**Agent:** ${entry.agent_id}`,
+      `**Kind:** ${entry.kind}`,
+      `**Source:** ${entry.source ?? "bridge"}`,
+      "",
+      entry.content,
+    ].join("\n");
+
+    await writeFile(join(OPENCLAW_MEMORY_DIR, filename), content, "utf-8");
+  } catch (err) {
+    // Non-fatal — don't break Supabase memory flow
+    console.warn(`[memory-sync] Failed to sync to OpenClaw:`, (err as Error).message);
+  }
+}
 
 // ---- Read ----
 
@@ -125,6 +164,11 @@ export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
     id: data?.id,
     created_at: new Date().toISOString(),
   });
+
+  // Sync significant memories to OpenClaw workspace for vector search
+  if (data?.id) {
+    syncToOpenClawMemory(entry, data.id).catch(() => {});
+  }
 
   return data?.id ?? null;
 }

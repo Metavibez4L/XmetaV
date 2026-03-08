@@ -395,6 +395,19 @@
     },
     "trustedProxies": ["127.0.0.1"]
   },
+  "session": {
+    "reset": {
+      "mode": "daily",
+      "idleMinutes": 240
+    },
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "30d",
+      "maxEntries": 500,
+      "rotateBytes": "10mb",
+      "maxDiskBytes": "50mb"
+    }
+  },
   "skills": {
     "install": {
       "nodeManager": "npm"
