@@ -18,6 +18,7 @@ import {
 } from "./payment-memory.js";
 import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
 import { createAlphaFeedsRouter, ALPHA_FEE_SCHEDULES } from "./alpha-feeds.js";
+import { createCrossChainRouter, CROSS_CHAIN_FEE_SCHEDULES } from "./cross-chain-routes.js";
 import {
   recordDemand,
   getDynamicPriceString,
@@ -1140,9 +1141,16 @@ app.get("/health", (_req, res) => {
         "GET /liquidation-signal": "$0.25 — DeFi liquidation signals",
         "GET /arb-detection": "$0.20 — cross-DEX arbitrage signals",
         "GET /governance-signal": "$0.10 — governance proposal tracker",
+        // Cross-Chain Swaps
+        "POST /cross-chain-swap": "$0.65 — initiate Base→Solana→Jupiter→Kamino swap",
+        "POST /cross-chain-swap/quote": "free — estimate output and fees",
+        "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
+        "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
       },
       free: {
         "GET /health": "this endpoint",
+        "GET /cross-chain/queue": "batch queue stats",
+        "GET /cross-chain/vaults": "available Kamino vaults",
         "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
@@ -1166,6 +1174,13 @@ const alphaRouter = createAlphaFeedsRouter(
   (callerAddress) => getCallerTier(callerAddress)
 );
 app.use(alphaRouter);
+
+// ---- Cross-Chain Swap Routes (Base ↔ Solana / Jupiter / Kamino) ----
+const crossChainRouter = createCrossChainRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(crossChainRouter);
 
 // ---- On-Demand Payment Digest ----
 app.post("/digest", async (_req, res) => {
