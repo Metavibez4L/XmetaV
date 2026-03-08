@@ -227,6 +227,7 @@ A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
 - **Sentinel Engine**: Autonomous monitoring system with event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing (see below)
 - **Anchor Batch Queue**: `queueAnchor()` + `flushPendingAnchors()` — batches memory anchoring (IPFS + on-chain) in groups of 3, auto-flushes every 5 min (v1.6.0)
+- **Exec Tool Config**: `pathPrepend` in `~/.openclaw/openclaw.json` handles `/opt/homebrew/bin` + `/usr/local/bin` for all agents. Bridge only prepends node binary dir to PATH. Coding agents use `security=allowlist` + `ask=on-miss`; scholar/vox sandboxed. 24 `safeBins` whitelisted fleet-wide.
 - **Payment Cache Invalidation**: Subscribes to `x402_payments` Realtime channel, triggers `invalidateOnPayment()` for session buffer TTL (v1.6.0)
 - **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, stops Sentinel engine, flushes pending anchors, sets session offline
 - **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next

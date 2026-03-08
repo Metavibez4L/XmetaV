@@ -129,7 +129,8 @@ This command center uses:
 - **Ollama** OpenAI-compatible API at `http://127.0.0.1:11434/v1`
 - **API mode**: `openai-responses` (required for tool calling)
 - **API key**: `"local"` (required placeholder for OpenClaw auth checks)
-- **Tools profile**: `full` for `main`, `coding` for repo agents, `full` for `_web` companions
+- **Tools profile**: `full` for `main` + `_web` (exec `security=full`, elevated), `coding` for repo agents (exec `security=allowlist`, `ask=on-miss`), `sandbox` host for `scholar`/`vox`
+- **Exec defaults**: `pathPrepend=[/opt/homebrew/bin, /usr/local/bin]`, 24 `safeBins`, `notifyOnExit=true`, per-agent timeouts (120s–600s)
 - **Dashboard**: Next.js 16 + Supabase (Realtime + Postgres)
 - **Bridge Daemon**: Node.js process bridging dashboard to OpenClaw CLI
 

@@ -755,6 +755,28 @@ With `tools.profile=full` (main) or `coding` (repo agents) and `api=openai-respo
 - Browse the web via `browser` tool (full profile)
 - Fetch web pages via `web_fetch` / `web_search` tools (full profile)
 
+### Exec Tool Configuration (Optimized 2026-03-08)
+
+Agent defaults provide fleet-wide exec settings (`agents.defaults.tools.exec`):
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `pathPrepend` | `["/opt/homebrew/bin", "/usr/local/bin"]` | Consistent PATH for all agents (replaces manual bridge construction) |
+| `timeout` | `300` (default) | Wall-clock kill (per-agent overrides below) |
+| `notifyOnExit` | `true` | Background jobs emit system events on completion |
+| `safeBins` | 24 entries | stdin-only filters: `cat`, `grep`, `jq`, `sed`, `awk`, `sort`, `wc`, etc. |
+| `safeBinTrustedDirs` | `/bin`, `/usr/bin`, `/opt/homebrew/bin` | Trusted directories for safeBin resolution |
+
+Per-agent exec security:
+
+| Agent | Host | Security | Ask | Timeout | Notes |
+|-------|------|----------|-----|---------|-------|
+| `main`, `*_web` | gateway | `full` | — | 300s | Elevated access, unrestricted |
+| `basedintern`, `akua`, `midas`, `oracle`, `alchemist`, `web3dev`, `soul` | gateway | `allowlist` | `on-miss` | 300s | Approval prompts for unlisted commands |
+| `sentinel` | gateway | `allowlist` | `on-miss` | 120s | Short timeout for monitoring loops |
+| `briefing` | gateway | `allowlist` | `on-miss` | 600s | Longer timeout for deep research |
+| `scholar`, `vox` | **sandbox** | `allowlist` | `on-miss` | 600s | Isolated from host filesystem |
+
 Test:
 ```bash
 openclaw agent --agent main --local --thinking off \
@@ -765,6 +787,7 @@ Notes:
 - If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
 - The `openai-responses` API mode is required for tool schemas to be passed to the model.
+- Session overrides available via `/exec host=gateway security=allowlist ask=on-miss`.
 
 ## Control Plane Dashboard
 
@@ -1068,7 +1091,7 @@ Three new bash skills installed for the main agent:
 | `supabase` | `~/.openclaw/workspace/skills/supabase/` | Direct database access with service role key |
 | `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
 
-Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unrestricted shell access.
+Main agent `tools.profile` set to `full` with `exec.security=full`. Coding agents use `security=allowlist` + `ask=on-miss`. Scholar/vox sandboxed (`host=sandbox`). Fleet-wide `safeBins` (24 entries) + `pathPrepend` configured in agent defaults.
 
 ### Dispatch skill fix (v13)
 
