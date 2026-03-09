@@ -55,7 +55,7 @@ openclaw --version
 | **Ollama** | 0.17.7 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
-| **OpenClaw** | 2026.3.7 | npm global |
+| **OpenClaw** | 2026.3.8 | npm global |
 
 ## Active Services
 
