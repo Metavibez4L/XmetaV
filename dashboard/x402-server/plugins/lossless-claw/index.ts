@@ -274,7 +274,7 @@ export default function register(api: any) {
   // Register a hook to inject lossless context metadata into prompts
   api.on?.(
     "before_prompt_build",
-    (_event: unknown, _ctx: unknown) => {
+    async (_event: unknown, _ctx: unknown) => {
       return {
         appendSystemContext:
           "Context engine: lossless-claw — full conversation history is preserved. Earlier messages may appear as summaries but no context has been discarded.",
