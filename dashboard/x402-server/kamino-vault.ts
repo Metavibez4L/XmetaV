@@ -17,6 +17,7 @@ import {
   Transaction,
   PublicKey,
 } from "@solana/web3.js";
+import { createSolanaRpc } from "@solana/kit";
 import bs58 from "bs58";
 import { KaminoVault } from "@kamino-finance/klend-sdk";
 import Decimal from "decimal.js";
@@ -26,13 +27,25 @@ import { APIS, SOLANA_CONTRACTS } from "./cross-chain-types.js";
 
 let connection: Connection | null = null;
 let keypair: Keypair | null = null;
+let solanaRpc: ReturnType<typeof createSolanaRpc> | null = null;
+
+function getRpcUrl(): string {
+  return process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+}
 
 function getConnection(): Connection {
   if (!connection) {
-    const rpc = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-    connection = new Connection(rpc, "confirmed");
+    connection = new Connection(getRpcUrl(), "confirmed");
   }
   return connection;
+}
+
+/** v2 Rpc for klend-sdk (uses @solana/kit RPC protocol) */
+function getRpc() {
+  if (!solanaRpc) {
+    solanaRpc = createSolanaRpc(getRpcUrl());
+  }
+  return solanaRpc;
 }
 
 function getKeypair(): Keypair {
@@ -79,9 +92,9 @@ async function getKaminoVault(vaultAddress: string): Promise<KaminoVault> {
   if (cached && Date.now() - cached.loadedAt < CACHE_TTL) {
     return cached.vault;
   }
-  const conn = getConnection();
-  // klend-sdk expects @solana/kit Rpc, but works at runtime with web3.js Connection
-  const vault = new KaminoVault(conn as any, new PublicKey(vaultAddress) as any);
+  const rpc = getRpc();
+  // klend-sdk 7.3.20+ expects @solana/kit v2 Rpc & Address types
+  const vault = new KaminoVault(rpc as any, vaultAddress as any);
   await vault.getState();
   vaultCache.set(vaultAddress, { vault, loadedAt: Date.now() });
   return vault;
@@ -138,10 +151,8 @@ export async function getUserVaultShares(
   walletAddress?: string
 ): Promise<any> {
   const vault = await getKaminoVault(vaultAddress);
-  const wallet = walletAddress
-    ? new PublicKey(walletAddress)
-    : getKeypair().publicKey;
-  return vault.getUserShares(wallet as any);
+  const walletAddr = walletAddress ?? getKeypair().publicKey.toBase58();
+  return vault.getUserShares(walletAddr as any);
 }
 
 /**
@@ -161,19 +172,17 @@ export async function listVaults(): Promise<VaultInfo[]> {
  * Queries each vault in KAMINO_VAULTS for user shares.
  */
 export async function getUserPositions(walletAddress?: string): Promise<any> {
-  const wallet = walletAddress
-    ? new PublicKey(walletAddress)
-    : getKeypair().publicKey;
+  const walletAddr = walletAddress ?? getKeypair().publicKey.toBase58();
   const results: Record<string, any> = {};
   for (const [key, info] of Object.entries(KAMINO_VAULTS)) {
     try {
       const vault = await getKaminoVault(info.address);
-      results[key] = await vault.getUserShares(wallet as any);
+      results[key] = await vault.getUserShares(walletAddr as any);
     } catch {
       results[key] = null;
     }
   }
-  return { wallet: wallet.toBase58(), positions: results };
+  return { wallet: walletAddr, positions: results };
 }
 
 // ── Deposit into Vault (SDK-first, API fallback) ────────────────
@@ -202,7 +211,7 @@ export async function depositToVault(
   try {
     const vault = await getKaminoVault(vaultAddress);
     const depositAmount = new Decimal(amount);
-    const ixResult: any = await vault.depositIxs(kp.publicKey as any, depositAmount);
+    const ixResult: any = await vault.depositIxs({ address: kp.publicKey.toBase58() } as any, depositAmount);
 
     // DepositIxs may be an object with instruction arrays or a flat array
     const ixs: any[] = Array.isArray(ixResult)
@@ -305,7 +314,7 @@ export async function withdrawFromVault(
   try {
     const vault = await getKaminoVault(vaultAddress);
     const shareAmount = new Decimal(shares);
-    const ixResult: any = await vault.withdrawIxs(kp.publicKey as any, shareAmount);
+    const ixResult: any = await vault.withdrawIxs({ address: kp.publicKey.toBase58() } as any, shareAmount);
 
     // WithdrawIxs may be an object with instruction arrays or a flat array
     const ixs: any[] = Array.isArray(ixResult)
