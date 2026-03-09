@@ -1,6 +1,6 @@
 # Architecture — XmetaV OpenClaw Command Center
 
-**Last updated:** 2026-03-03  
+**Last updated:** 2026-03-08  
 **Platform:** Mac Studio (M3 Ultra, 96GB) — macOS 26.3  
 **Location:** NYC (always-on headless server)  
 **Remote access:** Tailscale VPN from MacBook Air (NC)
@@ -248,8 +248,8 @@ A standalone Express server that gates XmetaV API endpoints with USDC micro-paym
 - **Payment Logging**: Writes to `x402_payments` Supabase table (agent_id, payer/payee, network, metadata)
 - **Token Tiers**: Checks caller's $XMETAV balance on-chain and applies tier discount to pricing
 - **Free endpoints**: `/health`, `/token-info`, `/agent/:agentId/payment-info`, `/digest`, `/trade-fees`, `/cross-chain/queue`, `/cross-chain/vaults`, `/pricing`, `/kamino/vault-details`, `/kamino/positions`, `/kamino/market`
-- **Kamino Vaults**: SDK-first (`@kamino-finance/klend-sdk`) with REST API fallback. USDC vault (`HDsayq...WRS5E`, ~8.5% APY), SOL vault (`ByYiZx...DvCN`, ~7.2% APY)
-- **Kamino Borrow/Lend**: Full lending market integration via klend-sdk — KaminoMarket overview, user obligations with LTV, deposit-collateral/borrow/repay/withdraw-collateral via KaminoAction
+- **Kamino Vaults**: SDK-first (`@kamino-finance/klend-sdk`) via v2 RPC (`createSolanaRpc()`). USDC vault (`HDsayq...WRS5E`, ~1.2% APY, $70M AUM), SOL vault (`DcCRSd...hpg`, ~8.6% APY, 18.7K SOL AUM)
+- **Kamino Borrow/Lend**: Full lending market integration via klend-sdk — KaminoMarket overview ($1.67B deposits, 55 reserves), user obligations with LTV, deposit-collateral/borrow/repay/withdraw-collateral via KaminoAction
 - **Settlement**: USDC on Base Mainnet
 - **Facilitator**: `@coinbase/x402` CDP facilitator with `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` JWT auth
 - **Location**: `dashboard/x402-server/`

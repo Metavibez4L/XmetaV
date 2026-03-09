@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
 **Last verified:** 2026-03-08  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v28.2 (Kamino SDK Integration — Borrow/Lend + klend-sdk)  
+**XmetaV Version:** v28.3 (v2 RPC Compat + Vault Address Fixes)  
 **Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -49,10 +49,10 @@ openclaw --version
 
 | Tool | Version | Install Method |
 |------|---------|---------------|
-| **Node** | 25.6.1 | Homebrew |
-| **npm** | 11.9.0 | Bundled with Node |
+| **Node** | 25.8.0 | Homebrew |
+| **npm** | 11.11.0 | Bundled with Node |
 | **pnpm** | 10.30.3 | Homebrew |
-| **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
+| **Ollama** | 0.17.7 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
 | **OpenClaw** | 2026.3.7 | npm global |
@@ -218,7 +218,7 @@ Full multi-chain swap pipeline: Base ↔ Solana bridge, Jupiter Ultra swaps, Kam
 | **cross-chain-types** | `x402-server/cross-chain-types.ts` | Shared types, contract addresses (Base + Solana), safety config, fee estimates |
 | **bridge-solana** | `x402-server/bridge-solana.ts` | Base↔Solana USDC bridge via CCTP (`bridgeToSolana`, `bridgeToBase`, arrival waiters) |
 | **jupiter-swap** | `x402-server/jupiter-swap.ts` | Jupiter Ultra API swaps (RPC-less, multi-route: PancakeSwap/Whirlpool/Meteora/TesseraV) |
-| **kamino-vault** | `x402-server/kamino-vault.ts` | Kamino Earn vault deposit/withdraw (USDC 8.5% APY, SOL 7.2% APY) |
+| **kamino-vault** | `x402-server/kamino-vault.ts` | Kamino Earn vault deposit/withdraw (USDC 1.2% APY, SOL 8.6% APY) — v2 RPC via `createSolanaRpc()` |
 | **cross-chain-queue** | `x402-server/cross-chain-queue.ts` | Batch queue + job lifecycle (pending→bridging→swapping→vaulted→completed) |
 | **cross-chain-routes** | `x402-server/cross-chain-routes.ts` | Express router: 6 endpoints (4 gated, 2 free) |
 
@@ -268,6 +268,50 @@ Three-stage fix for agent chat hung state:
 
 ---
 
+## v28.3 v2 RPC Compat + Vault Address Fixes (2026-03-08)
+
+Four fixes addressing klend-sdk v2 RPC incompatibility and incorrect vault configuration. Commits `a473283`, `39f4399`, `a97458b`, `a1829f9`.
+
+### Fixes
+
+| Commit | Fix | File |
+|--------|-----|------|
+| `a473283` | **kamino-borrow v2 RPC**: Replaced `Connection` with `createSolanaRpc()` for klend-sdk 7.3.20 compat; added BigInt slot handling for APY calculations | `kamino-borrow.ts` |
+| `39f4399` | **Guard undefined deposits/borrows**: Added optional chaining (`deposits?.length`, `borrows?.length`) to prevent runtime crashes when user has no obligations | `KaminoBorrowPanel.tsx` |
+| `a97458b` | **kamino-vault v2 RPC**: Same v2 RPC migration — `createSolanaRpc()` singleton, updated `KaminoVault` constructor, `getUserShares`, deposit/withdraw instruction builders | `kamino-vault.ts` |
+| `a1829f9` | **Correct SOL_MAIN vault address**: Old address (`ByYiZxp8Q...DVJ5`) was a klend lending reserve (wrong program). New address (`DcCRSdUMg...hpg`) is the actual kvault — 18,773 SOL AUM, 8.59% APY, exchange rate 1.022 | `kamino-vault.ts` |
+
+### Kamino Vault Addresses (Verified)
+
+| Vault | Address | AUM | APY | Exchange Rate |
+|-------|---------|-----|-----|---------------|
+| **USDC_MAIN** | `HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E` | $70M | 1.17% | 1.037 |
+| **SOL_MAIN** | `DcCRSdUMgAt6ZMeuL4BJAsZmJgND2LQd74Zq4z6ckhpg` | 18,773 SOL | 8.59% | 1.022 |
+
+### Multichain Endpoint Test Results (All Pass)
+
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| `GET /health` | ✅ | Server healthy |
+| `POST /cross-chain-swap/quote` | ✅ | 10 USDC → 9.49 output |
+| `GET /cross-chain/vaults` | ✅ | 2 configured + 104 live SDK vaults |
+| `GET /kamino/vault-details?vault=USDC_MAIN` | ✅ | $70M AUM, 1.17% APY |
+| `GET /kamino/vault-details?vault=SOL_MAIN` | ✅ | 18,773 SOL, 8.59% APY |
+| `GET /kamino/positions` | ✅ | USDC_MAIN: 0 shares, SOL_MAIN: null |
+| `GET /kamino/market` | ✅ | $1.67B deposits, $0.59B borrows, 55 reserves |
+| `GET /cross-chain/queue` | ✅ | 0 pending |
+| `GET /pricing` | ✅ | Dynamic demand/time multipliers |
+| `GET /trade-fees` | ✅ | 6 schedules, 5 examples |
+| Dashboard proxy | ✅ | Next.js → x402 working |
+
+### OpenClaw Config Fix
+
+Removed invalid keys from `~/.openclaw/openclaw.json`:
+- `agents.defaults.tools` — not valid at defaults level
+- `agents.list.*.tools.exec.timeout` — not valid inside exec block (all 14 agents)
+
+---
+
 ## v28.2 Kamino SDK Integration — Borrow/Lend + klend-sdk (2026-03-08)
 
 Full Kamino SDK integration using `@kamino-finance/klend-sdk`. SDK-first vault operations, complete borrow/lending module, 8 new x402 endpoints, KaminoBorrowPanel dashboard component, and OpenClaw skill files. Commit `b87b67c`.
@@ -304,9 +348,11 @@ Full Kamino SDK integration using `@kamino-finance/klend-sdk`. SDK-first vault o
 
 Total x402 gated endpoints: **27** (was 22). Total free endpoints: **11** (was 8). PaymentsDashboard: **38 endpoints** (was 30).
 
-### @solana/kit Compatibility
+### @solana/kit v2 RPC Compatibility
 
-klend-sdk uses `@solana/kit` types (Address, Rpc, TransactionSigner) while the codebase uses `@solana/web3.js` (PublicKey, Connection, Keypair). Resolved with `as any` casts at SDK boundaries — works at runtime.
+klend-sdk 7.3.20 requires `@solana/kit` v2 Rpc protocol — **not** the legacy `@solana/web3.js` Connection. Both `kamino-vault.ts` and `kamino-borrow.ts` now use `createSolanaRpc()` from `@solana/kit` for v2 compat. Type bridging uses `as any` casts at SDK boundaries.
+
+**Commits:** `a473283` (kamino-borrow), `a97458b` (kamino-vault)
 
 ### OpenClaw Skill Files
 

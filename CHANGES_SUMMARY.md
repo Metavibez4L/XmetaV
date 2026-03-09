@@ -1,11 +1,53 @@
 # Changes Summary — March 8, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v28.2 (Kamino SDK Integration — Borrow/Lend + klend-sdk)
+**XmetaV Version:** v28.3 (v2 RPC Compat + Vault Address Fixes)
 
 ---
 
 ## Major Changes (March 8, 2026)
+
+### v28.3 — v2 RPC Compat + Vault Address Fixes
+
+Four commits fixing klend-sdk v2 RPC incompatibility, UI crash guard, and incorrect SOL vault address.
+
+#### Fixes
+
+| Commit | Fix | File |
+|--------|-----|------|
+| `a473283` | kamino-borrow v2 RPC — replaced `Connection` with `createSolanaRpc()`, BigInt slot handling | `kamino-borrow.ts` |
+| `39f4399` | Guard undefined deposits/borrows — optional chaining to prevent runtime crash | `KaminoBorrowPanel.tsx` |
+| `a97458b` | kamino-vault v2 RPC — `createSolanaRpc()` singleton, updated constructor + deposit/withdraw | `kamino-vault.ts` |
+| `a1829f9` | Correct SOL_MAIN vault address — old was klend reserve, new is kvault (18.7K SOL, 8.59% APY) | `kamino-vault.ts` |
+
+#### Kamino Vault Addresses (Verified Live)
+
+| Vault | Address | AUM | APY | Rate |
+|-------|---------|-----|-----|------|
+| USDC_MAIN | `HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E` | $70M | 1.17% | 1.037 |
+| SOL_MAIN | `DcCRSdUMgAt6ZMeuL4BJAsZmJgND2LQd74Zq4z6ckhpg` | 18,773 SOL | 8.59% | 1.022 |
+
+#### Multichain Test Results (All Pass)
+
+| Endpoint | Result |
+|----------|--------|
+| `GET /health` | ✅ |
+| `POST /cross-chain-swap/quote` | ✅ 10 USDC → 9.49 |
+| `GET /cross-chain/vaults` | ✅ 2 configured + 104 live |
+| `GET /kamino/vault-details?vault=USDC_MAIN` | ✅ $70M, 1.17% APY |
+| `GET /kamino/vault-details?vault=SOL_MAIN` | ✅ 18.7K SOL, 8.59% APY |
+| `GET /kamino/positions` | ✅ |
+| `GET /kamino/market` | ✅ $1.67B deposits, 55 reserves |
+| `GET /cross-chain/queue` | ✅ |
+| `GET /pricing` | ✅ |
+| `GET /trade-fees` | ✅ |
+| Dashboard proxy | ✅ |
+
+#### OpenClaw Config Fix
+
+Removed invalid keys from `~/.openclaw/openclaw.json`: `agents.defaults.tools` and `exec.timeout` from all 14 agents.
+
+---
 
 ### 0. Kamino SDK Integration — Borrow/Lend (commit `b87b67c`)
 
@@ -278,13 +320,13 @@ dashboard/x402-server/index.ts (dynamic pricing, /pricing endpoint)
 
 ---
 
-## Service Status (v28.1)
+## Service Status (v28.3)
 
 | Service | Port | Status |
 |---------|------|--------|
 | Dashboard | 3000 | ✅ Running (LaunchAgent) — 12 pages incl. `/trading` |
 | Bridge | 3001 | ✅ Running (v1.6.0 + Sentinel) |
-| x402 | 4021 | ✅ Running (+ Cross-Chain + Kamino + Dynamic Pricing) |
+| x402 | 4021 | ✅ Running (+ Cross-Chain + Kamino v2 RPC + Dynamic Pricing) |
 | Ollama | 11434 | ✅ System service |
 
 ---
