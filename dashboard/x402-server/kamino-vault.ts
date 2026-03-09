@@ -74,11 +74,11 @@ export const KAMINO_VAULTS: Record<string, {
     estimatedApy: 8.5,
   },
   SOL_MAIN: {
-    address: "ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5",
+    address: "DcCRSdUMgAt6ZMeuL4BJAsZmJgND2LQd74Zq4z6ckhpg",
     name: "Kamino SOL Main Vault",
     token: "SOL",
     tokenMint: SOLANA_CONTRACTS.SOL_MINT,
-    estimatedApy: 7.2,
+    estimatedApy: 8.6,
   },
 };
 
