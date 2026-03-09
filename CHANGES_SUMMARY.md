@@ -1,11 +1,59 @@
-# Changes Summary — March 8, 2026
+# Changes Summary — March 9, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v28.3 (v2 RPC Compat + Vault Address Fixes)
+**XmetaV Version:** v28.4 (Lossless Context Engine Plugin)
 
 ---
 
-## Major Changes (March 8, 2026)
+## Major Changes (March 9, 2026)
+
+### v28.4 — Lossless Context Engine Plugin
+
+New `lossless-claw` context engine plugin leveraging the OpenClaw 2026.3.8 Context Engine Plugin API (`api.registerContextEngine()`). Replaces legacy `safeguard` compaction with zero-context-loss architecture.
+
+#### What Changed
+
+| Before | After |
+|--------|-------|
+| `compaction.mode: "safeguard"` | `plugins.slots.contextEngine: "lossless-claw"` |
+| Drops older turns beyond `recentTurnsPreserve: 4` | 8 recent turns verbatim + rolling summary of all older turns |
+| Context silently discarded | No context ever lost — older turns compressed, not deleted |
+
+#### Plugin Architecture
+
+- **`ingest()`**: Accepts all messages unconditionally
+- **`assemble()`**: Sliding-window — system messages first, rolling summary of older turns (2048 token budget), then 8 most recent turns verbatim
+- **`compact()`**: Returns `{ ok: true, compacted: false }` — plugin owns compaction, core doesn't discard
+- **`before_prompt_build` hook**: Appends context engine metadata to system prompt
+
+#### Plugin Config
+
+```json
+{
+  "plugins": {
+    "allow": ["lossless-claw"],
+    "slots": { "contextEngine": "lossless-claw" },
+    "entries": {
+      "lossless-claw": {
+        "enabled": true,
+        "config": { "recentTurnsFullPreserve": 8, "summaryMaxTokens": 2048 }
+      }
+    }
+  }
+}
+```
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `~/.openclaw/extensions/lossless-claw/index.ts` | Plugin entry — context engine factory |
+| `~/.openclaw/extensions/lossless-claw/openclaw.plugin.json` | Manifest (kind: context-engine, configSchema, uiHints) |
+| `x402-server/plugins/lossless-claw/` | Repo copy for version control |
+
+---
+
+## Previous Changes (March 8, 2026)
 
 ### v28.3 — v2 RPC Compat + Vault Address Fixes
 

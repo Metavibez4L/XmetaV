@@ -1,0 +1,31 @@
+{
+  "id": "lossless-claw",
+  "name": "Lossless Claw",
+  "version": "1.0.0",
+  "description": "Context engine plugin that preserves full session memory without compaction loss. Uses sliding-window assembly with intelligent summarization of older turns instead of discarding them.",
+  "kind": "context-engine",
+  "entrypoint": "index.ts",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "maxContextTokens": {
+        "type": "number",
+        "description": "Maximum token budget for assembled context (default: uses agent contextTokens)"
+      },
+      "recentTurnsFullPreserve": {
+        "type": "number",
+        "description": "Number of most recent turns to always include uncompressed (default: 8)"
+      },
+      "summaryMaxTokens": {
+        "type": "number",
+        "description": "Max tokens for the rolling summary of older turns (default: 2048)"
+      }
+    }
+  },
+  "uiHints": {
+    "maxContextTokens": { "label": "Max Context Tokens", "placeholder": "131072" },
+    "recentTurnsFullPreserve": { "label": "Recent Turns (full)", "placeholder": "8" },
+    "summaryMaxTokens": { "label": "Summary Max Tokens", "placeholder": "2048" }
+  }
+}

@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-08  
+**Last verified:** 2026-03-09  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v28.3 (v2 RPC Compat + Vault Address Fixes)  
+**XmetaV Version:** v28.4 (Lossless Context Engine Plugin)  
 **Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -56,6 +56,18 @@ openclaw --version
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
 | **OpenClaw** | 2026.3.8 | npm global |
+
+## Context Engine
+
+| Setting | Value |
+|---------|-------|
+| **Plugin** | `lossless-claw` v1.0.0 (Context Engine Plugin API) |
+| **Slot** | `plugins.slots.contextEngine: "lossless-claw"` |
+| **Mode** | Full memory preservation — no compaction loss |
+| **Recent Turns (full)** | 8 (verbatim) |
+| **Summary Budget** | 2048 tokens (rolling summary of older turns) |
+| **Source** | `~/.openclaw/extensions/lossless-claw/index.ts` |
+| **Replaces** | Legacy `compaction.mode: "safeguard"` (which discarded older turns) |
 
 ## Active Services
 
@@ -265,6 +277,50 @@ Three-stage fix for agent chat hung state:
 1. Increased idle timeout 30s→90s
 2. Replaced idle-kill with process liveness check (`kill(0)`)
 3. Root cause: OpenClaw buffers output during tool calls; idle timeout killed process before flush
+
+---
+
+## v28.4 Lossless Context Engine Plugin (2026-03-09)
+
+New `lossless-claw` context engine plugin using the OpenClaw 2026.3.8 Context Engine Plugin API. Replaces legacy `safeguard` compaction with zero-context-loss strategy.
+
+### Plugin: lossless-claw
+
+- **Type**: Context Engine Plugin (`api.registerContextEngine()`)
+- **Slot**: `plugins.slots.contextEngine: "lossless-claw"` (exclusive, replaces `"legacy"`)
+- **Strategy**: Sliding-window assembly — 8 most recent turns kept verbatim, older turns compressed into rolling summary (2048 token budget)
+- **Compaction**: `ownsCompaction: true` — core never discards turns; plugin handles via summarization in `assemble()`
+- **Prompt hook**: Injects context engine metadata via `before_prompt_build` (priority 5)
+- **Trust**: Pinned via `plugins.allow: ["lossless-claw"]`
+
+### Config (in `~/.openclaw/openclaw.json`)
+
+```json
+{
+  "plugins": {
+    "allow": ["lossless-claw"],
+    "slots": { "contextEngine": "lossless-claw" },
+    "entries": {
+      "lossless-claw": {
+        "enabled": true,
+        "config": {
+          "recentTurnsFullPreserve": 8,
+          "summaryMaxTokens": 2048
+        }
+      }
+    }
+  }
+}
+```
+
+### Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `index.ts` | `~/.openclaw/extensions/lossless-claw/` | Plugin entry — context engine factory |
+| `openclaw.plugin.json` | `~/.openclaw/extensions/lossless-claw/` | Plugin manifest (kind: context-engine) |
+| `package.json` | `~/.openclaw/extensions/lossless-claw/` | Package metadata for OpenClaw discovery |
+| Repo copy | `x402-server/plugins/lossless-claw/` | Version-controlled source |
 
 ---
 
