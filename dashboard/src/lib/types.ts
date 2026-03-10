@@ -339,7 +339,7 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     workspace: "~/.openclaw/workspace",
     tools: "full",
     model: "ollama/kimi-k2.5:cloud",
-    skills: ["wallets"],
+    skills: ["wallets", "cross-chain", "jupiter", "kamino", "solana-bridge"],
   },
   {
     id: "akua",
@@ -409,5 +409,21 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     tools: "coding",
     model: "ollama/kimi-k2.5:cloud",
     skills: ["security", "monitoring", "alerts"],
+  },
+  {
+    id: "vox",
+    name: "Vox (Brand & Campaigns)",
+    workspace: "/home/manifest/vox",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["content-strategy", "voice-calibration", "competitor-analysis"],
+  },
+  {
+    id: "scholar",
+    name: "Scholar (Deep Research)",
+    workspace: "/home/manifest/scholar",
+    tools: "coding",
+    model: "ollama/kimi-k2.5:cloud",
+    skills: ["deep-research", "relevance-scoring", "knowledge-anchoring"],
   },
 ];

@@ -2,7 +2,7 @@
 
 > **Your central hub for managing OpenClaw agents, gateways, and infrastructure on Mac Studio (M3 Ultra)**
 
-Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
+Last updated: **2026-03-08** | OpenClaw 2026.3.2 | XmetaV Command Center v28.2
 
 ```
  ___   ___                    __           ___   ___
@@ -14,10 +14,11 @@ Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
       [ COMMAND CENTER : AGENT ORCHESTRATION ]
   _______________________________________________
  |                                               |
- |   agents:  12 (+ dynamic)                     |
+ |   agents:  14 (+ dynamic)                     |
  |   skills:  12 ethskills (wallets/tools/l2s..) |
  |   swarm:   parallel | pipeline | collab       |
  |   payments: x402 USDC micro-payments (Base)   |
+ |   cross:    Base↔Solana bridge+Jupiter+Kamino |
  |   identity: ERC-8004 NFT #16905 (Base)        |
  |   token:    $XMETAV ERC-20 (Base)             |
  |   dashboard: Next.js + Supabase (cyberpunk)   |
@@ -50,11 +51,17 @@ Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
 - **Memory Crystal System (Materia)** — Final-Fantasy-inspired memory gamification: living crystals with XP/levels/star ratings (1-6★), class evolution (anchor→godhand), fusion recipes (FF7-style), memory summons with animated rituals, limit breaks spawning legendary 6★ crystals, explorable Memory Cosmos world map, achievements, and daily quests
 - **Memory Cosmos World** — Pannable/zoomable explorable memory landscape at `/memory-cosmos`: golden-spiral island layout with terrain types (city/wasteland/forest), neon highway bridges with data particles, crystal-topped islands, star parallax background, hover info panels
 - **Swarm Network View** — Canvas-based neural network topology on the Consciousness page: circular node layout with agent colors, curved links with chromatic aberration, pipeline arrows, data flow particles, run status ticker, and empty-state handling
+- **Cross-Chain Swaps (Base↔Solana)** — Full multi-chain pipeline: USDC bridge (Base→Solana via CCTP), Jupiter Ultra swaps (SOL/BONK/JUP), Kamino vault deposits for yield, return bridge (Solana→Base). Batch queue for sub-threshold amounts, job lifecycle tracking in Supabase, x402 payment gating ($0.65/swap)
+- **Jupiter Ultra Integration** — RPC-less token swaps on Solana via Jupiter Ultra API with multi-route aggregation (PancakeSwap, Whirlpool, Meteora DLMM, TesseraV), automatic slippage protection, price impact safety checks
+- **Kamino Yield Vaults** — SDK-first via `@kamino-finance/klend-sdk`: vault data (APY, holdings, exchange rate), user positions, deposit/withdraw with @solana/kit compat. REST API fallback
+- **Kamino Borrow/Lend** — Full lending market integration via klend-sdk: KaminoMarket overview, user obligations with LTV tracking, deposit-collateral/borrow/repay/withdraw-collateral via KaminoAction. 5 gated + 3 free endpoints
+- **Standalone Kamino Endpoints** — Direct `POST /kamino/deposit` ($0.15) and `POST /kamino/withdraw` ($0.15) for vault operations without a full cross-chain swap
+- **Trading/DeFi Dashboard** — Dedicated `/trading` page with 3-column layout: CrossChainPanel (queue stats, swap quotes), KaminoPanel (vault overview, deposit/withdraw), KaminoBorrowPanel (market TVL, reserves, obligations, 4-action form)
 - **Swap Execution** — Agent-initiated token swaps with gas/balance pre-checks, voice normalization (spoken aliases → canonical symbols), and swap history tracking via `agent_swaps` table
 - **Streaming Pipeline v2** — 2.5× faster response rendering: chunk size 160, flush 80ms, token batching (6/15ms), RAF-aligned 50ms throttle, React.memo StreamingBubble
 - **$XMETAV Token** — ERC-20 on Base Mainnet (`0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54`) with tiered discounts (10-50% off) on x402 endpoints
 - **EthSkills Integration** — 12 blockchain/Ethereum skills from [ethskills.com](https://ethskills.com) installed across fleet agents: wallets (main), tools/l2s/orchestration/addresses/concepts/security/standards/frontend-ux/frontend-playbook/building-blocks (web3dev), gas/l2s (oracle), gas/standards/addresses/concepts (midas). Skills displayed as badges in Fleet table and Identity page
-- Multi-agent management (12 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web
+- Multi-agent management (14 agents + dynamic): main, sentinel, soul, briefing, oracle, alchemist, midas, web3dev, akua, akua_web, basedintern, basedintern_web, vox, scholar
 - Multi-model support (local qwen2.5 + cloud kimi-k2.5:cloud with 256k context)
 - App scaffolding (Node.js, Python, Next.js, Hardhat, bots, FastAPI)
 - GitHub integration for automated repo creation and pushing
@@ -75,7 +82,7 @@ Last updated: **2026-03-02** | OpenClaw 2026.2.17 | XmetaV Command Center v24
 - **Setup & Fix Scripts** -- Automated solutions for common issues
 - **Configuration Templates** -- Battle-tested configs for Ollama + Kimi K2.5
 - **Documentation** -- Runbooks, checklists, and troubleshooting guides
-- **x402 Payment Service** -- Express server gating XmetaV endpoints with USDC micro-payments on Base
+- **x402 Payment Service** -- Express server gating XmetaV endpoints with USDC micro-payments on Base + cross-chain swap engine (Base↔Solana)
 - **ERC-8004 Identity** -- On-chain agent NFT (identity + reputation) on Base mainnet
 - **Agent Definitions** -- Multi-agent profiles and workspaces
 - **Infrastructure as Code** -- Reproducible OpenClaw deployments
@@ -103,7 +110,7 @@ XmetaV/
 |   |-- bridge/               # Bridge Daemon (Node.js)
 |   |   |-- src/              # executor, swarm-executor, streamer, heartbeat
 |   |   +-- lib/              # openclaw CLI wrapper, Supabase client, x402 client
-|   |-- x402-server/          # x402 payment-gated Express service
+|   |-- x402-server/          # x402 payment-gated Express service + cross-chain swap engine
 |   |-- erc8004/              # ERC-8004 agent identity (registration, ABIs, client)
 |   |-- scripts/              # DB migrations (setup-db*.sql)
 |   +-- README.md             # Dashboard documentation
@@ -457,6 +464,33 @@ Manages agent lifecycles and fleet health. Coordinates agent spawning, monitors 
 
 See [docs/agents/sentinel.md](docs/agents/sentinel.md) for full documentation.
 
+### Agent: `vox` (brand & campaigns)
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Brand voice & X campaign specialist — content strategy, voice calibration, competitor analysis |
+| **Workspace** | `~/.openclaw/agents/vox` |
+| **Tools** | `coding` (exec, read, write) |
+| **Model** | `ollama/kimi-k2.5:cloud` |
+| **Skills** | `content-strategy`, `voice-calibration`, `competitor-analysis` |
+| **Room** | OPS Outreach |
+| **Color** | Cyan (`#06b6d4`) |
+
+Generates tweet threads, audits brand voice consistency, monitors competitor messaging, and creates content calendars. Integrates with midas (revenue milestones), oracle (market events), briefing (SITREP recaps), and soul (engagement memory). Commands: `campaign`, `voice --audit`, `calendar`, `competitor`, `crisis`, `report`, `health`.
+
+```bash
+# Generate a campaign thread
+./scripts/agent-task.sh vox "Create a thread about our memory anchoring system"
+
+# Voice consistency audit
+./scripts/vox-agent.sh --voice
+
+# Weekly content calendar
+./scripts/vox-agent.sh --calendar
+```
+
+See [docs/agents/vox.md](docs/agents/vox.md) for full documentation.
+
 ### Agent: `basedintern` (coding) + `basedintern_web` (full)
 
 | Property | `basedintern` | `basedintern_web` |
@@ -568,6 +602,7 @@ cd dashboard/bridge && npm install && npm start
 | `/memory-cosmos` | **Memory Cosmos** -- Crystal materia inventory, fusion chamber, summon overlay, limit breaks, explorable world, achievements, quests |
 | `/arena` | **XMETAV HQ** -- Isometric office visualization with live agent activity (PixiJS) |
 | `/logs` | **Live Logs** -- Real-time log streaming with severity/agent filters and search |
+| `/trading` | **Trading / DeFi** -- Cross-chain queue stats, swap quote tool, Kamino vault deposit/withdraw |
 
 **Key Features:**
 - **Swarm Dashboard** -- Create swarms from templates or custom builder, "Let Main Agent Decide" button, live progress bars, per-task streaming output, run history with filters
@@ -836,6 +871,46 @@ All contracts are deployed on **Base Mainnet** (chain ID `8453`, `eip155:8453`).
 ---
 
 ## Changelog
+
+### 2026-03-08 (v28.2) — Kamino SDK Integration (Borrow/Lend + klend-sdk)
+- **Kamino SDK Integration** — Full `@kamino-finance/klend-sdk` integration: SDK-first vault operations (replaced REST API), complete borrow/lending module (`kamino-borrow.ts`), 8 new x402 endpoints (3 free data + 5 gated lending), KaminoBorrowPanel dashboard component, OpenClaw skill files at `~/.openclaw/workspace/skills/kamino/`. New deps: `@kamino-finance/klend-sdk@^7.3.20`, `@solana/kit@^6.1.0`, `decimal.js@^10.6.0`. @solana/kit compat via `as any` casts. Commit `b87b67c`
+- **Total x402 endpoints**: 27 gated + 11 free = 38 (was 22 + 8 = 30)
+
+### 2026-03-08 (v28/v28.1) — Cross-Chain Swaps + Kamino Vaults + Trading Dashboard
+- **Multi-Chain x402 Cross-Chain Swap System** — Complete Base↔Solana swap pipeline: USDC on Base → CCTP bridge → Solana USDC → Jupiter Ultra swap (SOL/BONK/JUP) → Kamino vault deposit → withdraw → bridge back. 7 new modules, 6 endpoints, batch queue, job lifecycle tracking in Supabase
+- **Standalone Kamino Vault Endpoints** — Direct `POST /kamino/deposit` ($0.15) and `POST /kamino/withdraw` ($0.15) for vault operations without full cross-chain flow
+- **Trading/DeFi Dashboard** — New `/trading` page with CrossChainPanel (queue stats, swap quote tool) and KaminoPanel (vault overview, deposit/withdraw UI with Solscan links)
+- **Jupiter Ultra API Key** — Wired API key authentication, verified: $10 USDC → 0.1225 SOL via multi-route aggregation
+- **DB Migration** — `cross_chain_jobs` + `cross_chain_batches` tables with RLS, indexes, triggers
+
+### 2026-03-03 (v26) — Scholar Research Daemon + Bridge v1.6.0
+- **Scholar Research Daemon** — New 24/7 autonomous research agent (`scholar`). Cycles through 5 domains (ERC-8004, x402, Layer 2, stablecoins, SMB adoption) on scheduled intervals (15–60 min). Relevance scoring: novelty (0.35) + impact (0.30) + actionability (0.20) + recency (0.15). Auto-anchors significant findings (≥0.7) on-chain, shares high-value intel (≥0.6) to fleet memory, deduplicates against last 50 memories (70% keyword overlap). Room: Research. Color: Emerald (`#10b981`). Skills: `deep-research`, `relevance-scoring`, `knowledge-anchoring`. Arena desk at col 5, row 7. Meeting seat 75°. Connections: main, soul, oracle, midas, briefing. Runner: `scripts/scholar-agent.sh`. Runbook: `docs/agents/scholar.md`
+- **Bridge Daemon v1.6.0** — Upgraded from v1.5.0 with Scholar Research Loop integration, new `/scholar` health endpoint, graceful Scholar shutdown on SIGTERM/SIGINT
+- **Research Engine Modules** — `bridge/lib/scholar/`: types (domain configs), scorer (4-dimension relevance scoring), research-loop (continuous daemon with round-robin domain scheduling), index (public exports)
+- **Full Stack Integration** — Scholar added to: Arena (research room, desk, meeting seat, connections), office workstations, KNOWN_AGENTS, AgentChat, AgentIdentity (emerald color, 📚 room icon), ERC-8004 metadata+registration (fleet of 12, 5 new capabilities), Supabase (agent_controls + memory seeds), FLEET_AGENTS heartbeat, ALLOWED_AGENTS openclaw, both shutdown offline arrays
+
+### 2026-03-03 (v25) — Sentinel Monitoring Engine + Vox Branding Agent + Bridge v1.5.0
+- **Vox Branding Agent** — New brand voice & campaign specialist (`vox`). Content strategy, voice calibration, competitor monitoring. Room: OPS Outreach. Color: Cyan (`#06b6d4`). Skills: `content-strategy`, `voice-calibration`, `competitor-analysis`. Arena desk at col 1, row 5.5. Meeting seat 105°. Connections: main, midas, oracle, briefing, soul. Runner: `scripts/vox-agent.sh`. x402 pricing: campaign $0.15, voice audit $0.25, competitor $0.20, calendar $0.30, crisis $0.50
+- **Sentinel Monitoring Engine** — Full autonomous monitoring system embedded in the Bridge Daemon with 6 interconnected modules:
+  - **EventMonitor** — Event-driven service health checks with adaptive polling (5s–120s) and Supabase Realtime subscriptions
+  - **AlertManager** — Anti-fatigue alerting with escalation levels (immediate → warning → critical) and configurable cooldowns
+  - **SelfHealer** — Automated remediation for downed services via `launchctl kickstart`, stale lock cleanup, log rotation
+  - **PredictiveHealth** — macOS resource collection (CPU, memory, disk, load), linear regression trend prediction, z-score anomaly detection
+  - **DistributedTracer** — Span-based request tracing with P95 latency, throughput, and error rate metrics
+  - **Sentinel Orchestrator** — Singleton lifecycle manager wiring all sub-systems, auto-heals on service:down events, triggers SITREP on critical alerts
+- **Bridge Daemon v1.5.0** — Upgraded from v1.4.0 with Sentinel integration, new `/sentinel` health endpoint, graceful Sentinel shutdown on SIGTERM/SIGINT
+- **4 New Supabase Tables** — `sentinel_incidents` (alert tracking), `sentinel_healing_log` (remediation audit), `sentinel_traces` (distributed spans), `sentinel_resource_snapshots` (system resources); all with RLS, indexes, and Realtime
+- **Dashboard Sentinel API** — `GET /api/sentinel` authenticated endpoint returning health, incidents, healing log, resources, and traces
+- **Watchdog LaunchAgent** — `com.xmetav.watchdog.plist` running every 5 minutes via launchd
+- **Dashboard CWD Fix** — Fixed `launchd-dashboard.sh` working directory (`/tmp` → `${REPO}/dashboard`) resolving Tailwind CSS / PostCSS build errors under launchd
+
+### 2026-03-02 (v24) — Tooling + Benchmarks + Live x402 Verified
+- **LaunchAgent Auto-Restart** — All three core services (dashboard, bridge, x402) managed by macOS launchd with KeepAlive + RunAtLoad. Auto-restart on crash with 10s throttle
+- **Bridge Manager Refactor** — Replaced `spawn()` with `launchctl` integration for service control from dashboard UI
+- **Launchd Wrapper Scripts** — `launchd-bridge.sh`, `launchd-dashboard.sh`, `launchd-x402.sh` with auto npm install, watch mode, port conflict detection
+- **Live x402 Payment Verification** — All 4 core endpoints verified with real USDC on Base Mainnet (100% pass rate, $0.11 total)
+- **Service Benchmarks** — Sub-10ms response times across all local services (Dashboard 7ms, Bridge 1ms, x402 1ms, Gateway 1.5ms)
+- **System Specs Report** — Comprehensive `SYSTEM_SPECS.md` with hardware, services, fleet, performance metrics, and health scoring
 
 ### 2026-02-15 (v23) — Optimization Pass (Security + Performance + Build)
 - **API Security Hardening** — Auth guards (`requireAuth()`) on all 5 data API routes (`/api/soul`, `/api/agents/memory`, `/api/midas`, `/api/erc8004/identity`, `/api/anchors`). UUID validation and limit clamping on user-supplied params. New shared utility `src/lib/api-auth.ts` with `requireAuth()`, `isValidUUID()`, `clampLimit()`
@@ -1110,5 +1185,5 @@ MIT -- See [LICENSE](LICENSE)
 
 <p align="center">
   <b>XmetaV -- Your OpenClaw Command Center</b><br>
-  <sub>Built for Mac Studio M3 Ultra | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting</sub>
+  <sub>Built for Mac Studio M3 Ultra | Powered by Kimi K2.5 + Ollama | Cyberpunk Dashboard + Supabase | XMETAV HQ Arena (PixiJS) | Memory Cosmos (Crystal Materia) | Consciousness Tab | Agent Factory + GitHub | Swarm Orchestration | x402 Payments | ERC-8004 Identity | Soul Memory Orchestrator | Swap Execution | EthSkills (12 skills) | Oracle Identity Scouting | Sentinel Monitoring Engine</sub>
 </p>

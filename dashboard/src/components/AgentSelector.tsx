@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { KNOWN_AGENTS } from "@/lib/types";
 
 interface AgentSelectorProps {
@@ -7,7 +8,7 @@ interface AgentSelectorProps {
   onChange: (value: string) => void;
 }
 
-export function AgentSelector({ value, onChange }: AgentSelectorProps) {
+export const AgentSelector = React.memo(function AgentSelector({ value, onChange }: AgentSelectorProps) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: '#00f0ff44' }}>
@@ -32,4 +33,4 @@ export function AgentSelector({ value, onChange }: AgentSelectorProps) {
       </select>
     </div>
   );
-}
+});

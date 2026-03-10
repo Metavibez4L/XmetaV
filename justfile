@@ -1,37 +1,57 @@
-# XmetaV — Mac Studio Command Runner
+# XmetaV — Mac Studio Command Runner (launchd-native)
 # Usage: just <command>
+# All services managed by LaunchAgents (KeepAlive + RunAtLoad)
 
 set dotenv-load := false
 root := justfile_directory()
 dashboard := root / "dashboard"
 bridge := dashboard / "bridge"
 x402 := dashboard / "x402-server"
+uid := `id -u`
 
 # List all available commands
 default:
     @just --list
 
-# ── Services ──────────────────────────────────────────
+# ── Services (launchd) ───────────────────────────────
 
-# Start all services (dashboard + bridge + x402)
-all: dashboard bridge x402
-    @echo "✅ All services started"
+# Start all services via launchd
+all:
+    @launchctl kickstart -k gui/{{uid}}/com.xmetav.dashboard
+    @launchctl kickstart -k gui/{{uid}}/com.xmetav.bridge
+    @launchctl kickstart -k gui/{{uid}}/com.xmetav.x402
+    @echo "✅ All services started (launchd)"
 
-# Start Next.js dashboard (port 3000)
-dashboard:
-    cd {{dashboard}} && npm run dev &
+# Restart all services
+restart: all
 
-# Start bridge daemon (port 3001)
-bridge:
-    cd {{bridge}} && npm run dev &
-
-# Start x402 payment server (port 4021)
-x402:
-    cd {{x402}} && npm run dev &
+# Restart a single service (dashboard|bridge|x402)
+restart-one svc:
+    launchctl kickstart -k gui/{{uid}}/com.xmetav.{{svc}}
 
 # Start OpenClaw gateway (port 18789)
 gateway:
     openclaw gateway start
+
+# Stop all services (launchd bootout — they won't restart until bootstrap)
+stop:
+    @echo "Stopping services (bootout)..."
+    -@launchctl bootout gui/{{uid}}/com.xmetav.dashboard 2>/dev/null
+    -@launchctl bootout gui/{{uid}}/com.xmetav.bridge 2>/dev/null
+    -@launchctl bootout gui/{{uid}}/com.xmetav.x402 2>/dev/null
+    @sleep 1
+    @just status
+
+# Re-bootstrap services after stop
+start:
+    @launchctl bootstrap gui/{{uid}} ~/Library/LaunchAgents/com.xmetav.dashboard.plist
+    @launchctl bootstrap gui/{{uid}} ~/Library/LaunchAgents/com.xmetav.bridge.plist
+    @launchctl bootstrap gui/{{uid}} ~/Library/LaunchAgents/com.xmetav.x402.plist
+    @echo "✅ All services bootstrapped"
+
+# Kill a specific service by port (one-off, launchd will restart it)
+kill port:
+    @lsof -iTCP:{{port}} -sTCP:LISTEN -t 2>/dev/null | xargs kill 2>/dev/null && echo "Killed on :{{port}} (launchd will restart)" || echo "Nothing on :{{port}}"
 
 # ── Status ────────────────────────────────────────────
 
@@ -43,23 +63,59 @@ status:
     @lsof -iTCP:4021 -sTCP:LISTEN >/dev/null 2>&1 && echo "  x402       :4021  ✅ UP" || echo "  x402       :4021  ❌ DOWN"
     @lsof -iTCP:18789 -sTCP:LISTEN >/dev/null 2>&1 && echo "  Gateway    :18789 ✅ UP" || echo "  Gateway    :18789 ❌ DOWN"
     @curl -s http://localhost:11434/api/tags >/dev/null 2>&1 && echo "  Ollama     :11434 ✅ UP" || echo "  Ollama     :11434 ❌ DOWN"
+    @echo ""
+    @echo "── LaunchAgent Status ──"
+    @launchctl list com.xmetav.dashboard >/dev/null 2>&1 && echo "  dashboard: ✅ loaded" || echo "  dashboard: ❌ not loaded"
+    @launchctl list com.xmetav.bridge >/dev/null 2>&1 && echo "  bridge:    ✅ loaded" || echo "  bridge:    ❌ not loaded"
+    @launchctl list com.xmetav.x402 >/dev/null 2>&1 && echo "  x402:      ✅ loaded" || echo "  x402:      ❌ not loaded"
+    @echo ""
     @echo "── Tailscale ──"
     @tailscale status --peers=false 2>/dev/null || echo "  Tailscale  ❌ Not connected"
 
-# ── Stop ──────────────────────────────────────────────
+# Check for cold starts (Ollama model status)
+cold-check:
+    @echo "── Ollama Models Loaded ──"
+    @curl -s http://localhost:11434/api/ps | python3 -c "import sys,json; d=json.load(sys.stdin); models=d.get('models',[]); print(f'  Loaded: {len(models)} model(s)') if models else print('  ⚠️  NONE loaded — cold start risk!'); [print(f'  {m[\"name\"]}  VRAM={m[\"size\"]/1e9:.1f}GB  expires={m.get(\"expires_at\",\"?\")[:10]}') for m in models]"
 
-# Kill all XmetaV services
-killall:
-    @echo "Stopping services..."
-    -@pkill -f "next-server" 2>/dev/null
-    -@pkill -f "tsx watch src/index.ts" 2>/dev/null
-    -@pkill -f "tsx watch index.ts" 2>/dev/null
-    @sleep 1
-    @just status
+# Pin models in memory (keep_alive=-1)
+warm:
+    @echo "Warming models..."
+    @curl -s http://localhost:11434/api/generate -d '{"model":"qwen2.5:7b-instruct","prompt":"","keep_alive":-1,"stream":false,"options":{"num_predict":0}}' > /dev/null
+    @curl -s http://localhost:11434/api/generate -d '{"model":"kimi-k2.5:cloud","prompt":"","keep_alive":-1,"stream":false,"options":{"num_predict":0}}' > /dev/null
+    @echo "✅ Models pinned (keep_alive=-1)"
+    @just cold-check
 
-# Kill a specific service by port
-kill port:
-    @lsof -iTCP:{{port}} -sTCP:LISTEN -t 2>/dev/null | xargs kill 2>/dev/null && echo "Killed process on :{{port}}" || echo "Nothing on :{{port}}"
+# ── Logs ──────────────────────────────────────────────
+
+# Tail dashboard logs
+logs-dashboard:
+    tail -f /tmp/xmetav-dashboard.log /tmp/xmetav-dashboard.err
+
+# Tail bridge logs
+logs-bridge:
+    tail -f /tmp/xmetav-bridge.log /tmp/xmetav-bridge.err
+
+# Tail x402 logs
+logs-x402:
+    tail -f /tmp/xmetav-x402.log /tmp/xmetav-x402.err
+
+# Tail watchdog logs
+logs-watchdog:
+    tail -f /tmp/xmetav-watchdog.log
+
+# Tail all service logs
+logs:
+    tail -f /tmp/xmetav-*.log /tmp/xmetav-*.err
+
+# ── Agents ────────────────────────────────────────────
+
+# List all OpenClaw agents
+agents:
+    @openclaw agent list 2>/dev/null || echo "Gateway not running"
+
+# Run an agent task
+agent-task agent msg:
+    openclaw agent --agent {{agent}} -m "{{msg}}"
 
 # ── Development ───────────────────────────────────────
 
@@ -75,21 +131,15 @@ lint:
 typecheck:
     cd {{dashboard}} && npx tsc --noEmit
 
-# ── Logs ──────────────────────────────────────────────
-
-# Tail bridge logs
-logs-bridge:
-    tail -f {{bridge}}/bridge.log 2>/dev/null || echo "No bridge log file found"
-
-# Tail watchdog logs
-logs-watchdog:
-    tail -f /tmp/xmetav-watchdog.log 2>/dev/null || echo "No watchdog log found"
-
 # ── Ollama ────────────────────────────────────────────
 
-# List loaded Ollama models
+# List available Ollama models
 models:
     @ollama list
+
+# List loaded (hot) Ollama models
+models-hot:
+    @curl -s http://localhost:11434/api/ps | python3 -m json.tool
 
 # Pull a model
 pull model:
@@ -106,15 +156,118 @@ revenue:
 
 # ── Health ────────────────────────────────────────────
 
-# Full health check (services + remote access + power)
+# Full health check (services + remote access + power + models)
 health:
     @just status
     @echo ""
+    @just cold-check
+    @echo ""
     @echo "── Power Settings ──"
-    @sudo pmset -g | grep -E "sleep|autorestart|powernap" 2>/dev/null || echo "  (requires sudo)"
+    @sudo pmset -g 2>/dev/null | grep -E "sleep|autorestart|powernap" || echo "  (requires sudo)"
     @echo ""
     @echo "── Disk ──"
     @df -h / | tail -1 | awk '{print "  Used: " $3 " / " $2 " (" $5 " full)"}'
     @echo ""
     @echo "── Memory ──"
     @vm_stat | awk '/Pages free/ {free=$3} /Pages active/ {active=$3} END {printf "  Free: %.1f GB  Active: %.1f GB\n", free*4096/1073741824, active*4096/1073741824}'
+
+# ── Headless Server ──────────────────────────────────
+
+# Launch tmux headless server session (7 windows: control, logs, htop, redis, docker, dev, agents)
+tmux-up:
+    @bash {{root}}/scripts/tmux-server.sh detach
+
+# Attach to tmux server session
+tmux-attach:
+    @bash {{root}}/scripts/tmux-server.sh
+
+# Kill tmux server session
+tmux-kill:
+    @bash {{root}}/scripts/tmux-server.sh kill
+
+# ── Redis ─────────────────────────────────────────────
+
+# Start Redis with XmetaV config
+redis-start:
+    @redis-server /opt/homebrew/etc/redis.conf --include {{root}}/configs/redis.conf --daemonize yes && echo "✅ Redis started" && redis-cli ping
+
+# Stop Redis
+redis-stop:
+    @redis-cli shutdown && echo "Redis stopped"
+
+# Redis status
+redis-status:
+    @redis-cli ping 2>/dev/null && echo "  Redis  :6379  ✅ UP ($(redis-cli INFO memory | grep used_memory_human | cut -d: -f2 | tr -d '\r') used)" || echo "  Redis  :6379  ❌ DOWN"
+
+# ── Docker ────────────────────────────────────────────
+
+# Docker status
+docker-status:
+    @docker ps --format "table {{{{.Names}}\t{{{{.Status}}\t{{{{.Ports}}" 2>/dev/null || echo "  Docker  ❌ Not running"
+
+# ── Caddy ─────────────────────────────────────────────
+
+# Start Caddy reverse proxy
+caddy-start:
+    @brew services start caddy && echo "✅ Caddy started"
+
+# Stop Caddy
+caddy-stop:
+    @brew services stop caddy && echo "Caddy stopped"
+
+# Reload Caddy config
+caddy-reload:
+    @caddy reload --config /opt/homebrew/etc/Caddyfile && echo "✅ Caddy reloaded"
+
+# ── System Update ─────────────────────────────────────
+
+# Run system update now (macOS, Homebrew, Ollama, npm, git)
+update:
+    @bash {{root}}/scripts/system-update.sh
+
+# Schedule system update in N minutes (default: 5)
+update-later min="5":
+    @nohup bash {{root}}/scripts/system-update.sh --delay {{min}} >/dev/null 2>&1 & echo "✅ Update scheduled in {{min}} min (PID $$!)"
+
+# Check system update log
+update-log:
+    @tail -30 /tmp/xmetav-system-update.log 2>/dev/null || echo "No update log yet"
+
+# ── Full Server Setup ─────────────────────────────────
+
+# Start everything: Redis, Caddy, Docker, tmux session, XmetaV services
+server-up:
+    @echo "═══ Starting XmetaV Headless Server ═══"
+    @redis-server /opt/homebrew/etc/redis.conf --include {{root}}/configs/redis.conf --daemonize yes 2>/dev/null && echo "  ✅ Redis" || echo "  ⚠️  Redis (already running?)"
+    @brew services start caddy 2>/dev/null && echo "  ✅ Caddy" || echo "  ⚠️  Caddy (already running?)"
+    @open -a Docker 2>/dev/null && echo "  ✅ Docker Desktop" || echo "  ⚠️  Docker"
+    @just all
+    @bash {{root}}/scripts/tmux-server.sh detach
+    @echo ""
+    @echo "═══ Server Ready ═══"
+    @just server-status
+
+# Full server status
+server-status:
+    @echo "── XmetaV Server Status ──"
+    @just status
+    @echo ""
+    @just redis-status
+    @echo ""
+    @curl -sf http://localhost:80 >/dev/null 2>&1 && echo "  Caddy    :80    ✅ UP" || echo "  Caddy    :80    ❌ DOWN"
+    @docker info >/dev/null 2>&1 && echo "  Docker          ✅ UP ($(docker ps -q | wc -l | tr -d ' ') containers)" || echo "  Docker          ❌ DOWN"
+    @tmux has-session -t xmetav 2>/dev/null && echo "  tmux            ✅ UP ($(tmux list-windows -t xmetav | wc -l | tr -d ' ') windows)" || echo "  tmux            ❌ No session"
+
+# ── Remote Reboot ─────────────────────────────────────
+
+# Pre-flight check (verify safe to reboot remotely)
+reboot-check:
+    @bash {{root}}/scripts/safe-reboot.sh --check
+
+# Safe reboot (graceful shutdown + reboot)
+reboot:
+    @bash {{root}}/scripts/safe-reboot.sh
+
+# Install macOS update + reboot (downloads, installs, restarts)
+reboot-update:
+    @bash {{root}}/scripts/safe-reboot.sh --update

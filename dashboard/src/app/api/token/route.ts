@@ -75,7 +75,9 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to fetch token data";
     console.error("[api/token]", message);

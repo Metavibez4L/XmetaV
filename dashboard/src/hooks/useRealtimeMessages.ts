@@ -148,8 +148,54 @@ export function useRealtimeMessages(commandId: string | null) {
       )
       .subscribe();
 
+    // Safety poll: if realtime misses is_final, catch it via DB query
+    const POLL_INTERVAL = 15_000; // 15s
+    const MAX_POLL_TIME = 210_000; // 3.5min — stop polling after this
+    const pollStart = Date.now();
+    const pollTimer = setInterval(async () => {
+      if (cancelled) return;
+      if (Date.now() - pollStart > MAX_POLL_TIME) {
+        // Hard timeout — force-complete as failed
+        if (!cancelled) {
+          flushNow();
+          setIsComplete(true);
+        }
+        return;
+      }
+      try {
+        const { data: cmd } = await supabase
+          .from("agent_commands")
+          .select("status")
+          .eq("id", commandId)
+          .single();
+        if (cancelled) return;
+        if (cmd?.status === "completed" || cmd?.status === "failed") {
+          // Command is done — fetch any missed response chunks
+          const { data: rows } = await supabase
+            .from("agent_responses")
+            .select("*")
+            .eq("command_id", commandId)
+            .order("created_at", { ascending: true });
+          if (cancelled) return;
+          if (rows && rows.length > 0) {
+            let text = "";
+            rows.forEach((r) => {
+              seenIds.current.add(r.id);
+              text += r.content;
+            });
+            textRef.current = text;
+          }
+          flushNow();
+          setIsComplete(true);
+        }
+      } catch {
+        // Ignore poll errors — will retry next interval
+      }
+    }, POLL_INTERVAL);
+
     return () => {
       cancelled = true;
+      clearInterval(pollTimer);
       if (throttleRef.current) clearTimeout(throttleRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       supabase.removeChannel(channel);

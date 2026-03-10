@@ -25,9 +25,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Use getSession() instead of getUser() — validates JWT locally
+  // without a network round-trip to Supabase on every request.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   // If not logged in and not on auth pages, redirect to login
   if (

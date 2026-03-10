@@ -226,6 +226,7 @@
       #00f0ff04 40px
     );
   animation: grid-scroll 8s linear infinite;
+  will-change: transform;
   pointer-events: none;
   z-index: 0;
 }
@@ -244,6 +245,7 @@
   height: 2px;
   background: linear-gradient(90deg, transparent, #00f0ff15, transparent);
   animation: scanline 4s linear infinite;
+  will-change: transform;
   pointer-events: none;
   z-index: 9999;
 }
@@ -355,13 +357,14 @@
   width: 200%;
   height: 200%;
   background: conic-gradient(from 0deg, transparent, #00f0ff11, transparent);
-  animation: spin 4s linear infinite;
+  animation: none;
   opacity: 0;
   transition: opacity 0.2s;
 }
 
 .cyber-btn:hover::before {
   opacity: 1;
+  animation: spin 4s linear infinite;
 }
 
 .cyber-btn:hover {
@@ -444,4 +447,14 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .scanline-overlay::after,
+  .cyber-bg::before,
+  .cyber-btn::before,
+  .pulse-dot::after {
+    animation: none !important;
+  }
 }

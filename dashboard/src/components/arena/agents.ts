@@ -1,4 +1,4 @@
-export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops" | "soul";
+export type Room = "command" | "meeting" | "intel" | "web3Lab" | "devFloor" | "ops" | "soul" | "opsOutreach" | "research";
 
 /** Agent node configuration for the HQ office visualization */
 export interface AgentNodeConfig {
@@ -57,6 +57,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     size: 30,
   },
 
+  // ── OPS OUTREACH (left side, between soul and intel) ───────────
+  {
+    id: "vox",
+    label: "VOX",
+    color: 0x06b6d4,
+    colorHex: "#06b6d4",
+    room: "opsOutreach",
+    tile: { col: 1, row: 5.5 },
+    size: 26,
+  },
+
   // ── INTEL ROOM (bottom-left, glass enclosed) ────────────────────
   {
     id: "briefing",
@@ -93,6 +104,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     room: "intel",
     tile: { col: 3, row: 9 },
     size: 26,
+  },
+
+  // ── RESEARCH ROOM (below ops outreach, dedicated scholar alcove) ─
+  {
+    id: "scholar",
+    label: "SCHOLAR",
+    color: 0x10b981,
+    colorHex: "#10b981",
+    room: "research",
+    tile: { col: 5, row: 7 },
+    size: 28,
   },
 
   // ── WEB3 LAB (private cubicle, right of meeting area) ─────────
@@ -164,6 +186,8 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "sentinel", angle: 300 },        // upper-right (near operator)
   { agentId: "soul", angle: 195 },              // lower-left (observer seat)
   { agentId: "midas", angle: 165 },              // between oracle & alchemist
+  { agentId: "vox", angle: 105 },                // ops outreach seat
+  { agentId: "scholar", angle: 75 },             // research seat
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -199,4 +223,16 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["midas", "alchemist"],
   ["midas", "main"],
   ["midas", "soul"],
+  // Vox branding connections
+  ["vox", "main"],
+  ["vox", "midas"],
+  ["vox", "oracle"],
+  ["vox", "briefing"],
+  ["vox", "soul"],
+  // Scholar research connections
+  ["scholar", "main"],
+  ["scholar", "soul"],
+  ["scholar", "oracle"],
+  ["scholar", "midas"],
+  ["scholar", "briefing"],
 ];

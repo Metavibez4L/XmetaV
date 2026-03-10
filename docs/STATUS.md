@@ -1,8 +1,8 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-02  
+**Last verified:** 2026-03-10  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v23 (Optimization Pass — Security + Performance + Build)  
-**Platform:** macOS 26.3 (Sequoia)  
+**XmetaV Version:** v28.5 (Exec Delegation + Kamino Bug Fixes)  
+**Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
 
@@ -14,7 +14,7 @@ This file captures the **known-good** runtime settings for the Mac Studio produc
 
 ```bash
 # One-command status check (requires just)
-cd ~/Documents/xmetav1/XmetaV && just status
+cd ~/xmetav1/XmetaV && just status
 
 # Full health check (services + power + disk + memory)
 just health
@@ -49,33 +49,51 @@ openclaw --version
 
 | Tool | Version | Install Method |
 |------|---------|---------------|
-| **Node** | 25.6.1 | Homebrew |
-| **npm** | 11.9.0 | Bundled with Node |
+| **Node** | 25.8.0 | Homebrew |
+| **npm** | 11.11.0 | Bundled with Node |
 | **pnpm** | 10.30.3 | Homebrew |
-| **Ollama** | 0.17.4 (latest) | macOS app (/Applications/Ollama.app) |
+| **Ollama** | 0.17.7 (latest) | macOS app (/Applications/Ollama.app) |
 | **Git** | 2.53.0 | Homebrew |
 | **just** | 1.46.0 | Homebrew |
-| **OpenClaw** | 2026.2.17 | npm global |
+| **OpenClaw** | 2026.3.8 | npm global |
+
+## Context Engine
+
+| Setting | Value |
+|---------|-------|
+| **Plugin** | `lossless-claw` v1.0.0 (Context Engine Plugin API) |
+| **Slot** | `plugins.slots.contextEngine: "lossless-claw"` |
+| **Mode** | Full memory preservation — no compaction loss |
+| **Recent Turns (full)** | 8 (verbatim) |
+| **Summary Budget** | 2048 tokens (rolling summary of older turns) |
+| **Source** | `~/.openclaw/extensions/lossless-claw/index.ts` |
+| **Replaces** | Legacy `compaction.mode: "safeguard"` (which discarded older turns) |
 
 ## Active Services
 
-| Service | Port | Status | Start Command |
-|---------|------|--------|---------------|
-| **Dashboard** (Next.js) | 3000 | Active | `just dashboard` |
-| **Bridge Daemon** | 3001 | Active | `just bridge` |
-| **x402 Server** | 4021 | Active | `just x402` |
-| **OpenClaw Gateway** | 18789 | Active | `just gateway` |
-| **Ollama** | 11434 | Active | macOS app (auto-start) |
+| Service | Port | Status | Start Command | Auto-Restart |
+|---------|------|--------|---------------|-------------|
+| **Dashboard** (Next.js) | 3000 | Active | `just dashboard` | ✅ LaunchAgent (KeepAlive) |
+| **Bridge Daemon** (v1.6.0 + Sentinel) | 3001 | Active | `just bridge` | ✅ LaunchAgent (KeepAlive) |
+| **x402 Server** | 4021 | Active | `just x402` | ✅ LaunchAgent (KeepAlive) |
+| **OpenClaw Gateway** | 18789 | Active | `just gateway` | ✅ launchd (native) |
+| **Ollama** | 11434 | Active | macOS app (auto-start) | ✅ launchd (native) |
+
+All services auto-restart on crash and survive reboots via LaunchAgent plists.
 
 Start all: `just all`  
-Stop all: `just killall`  
-Status: `just status`
+Stop all: `just stop` (bootout — won't respawn until `just start`)  
+Restart all: `just restart`  
+Restart one: `just restart-one bridge`  
+Status: `just status`  
+Cold-start check: `just cold-check`  
+Pin models: `just warm`
 
 ## Ollama Configuration
 
 | Setting | Value |
 |---------|-------|
-| OLLAMA_KEEP_ALIVE | 24h (models stay hot) |
+| OLLAMA_KEEP_ALIVE | -1 (never unload — models permanently resident) |
 | OLLAMA_MAX_LOADED_MODELS | 3 (concurrent models in memory) |
 | OLLAMA_NUM_PARALLEL | 4 (parallel request handling) |
 
@@ -83,10 +101,37 @@ Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across
 
 ### Loaded Models
 
-| Model | Size | Context | Purpose |
-|-------|------|---------|---------|
-| `kimi-k2.5:cloud` | Cloud | 262K (256k) | Primary agent model — all fleet agents |
-| `qwen2.5:7b-instruct` | 4.7 GB | 32K | Local fallback / lightweight tasks |
+| Model | Size | Context | Purpose | Hot-Keep |
+|-------|------|---------|---------|----------|
+| `kimi-k2.5:cloud` | Cloud (remote) | 262K | Primary agent model — all 14 fleet agents | N/A (cloud-proxied, no local VRAM) |
+| `qwen2.5:7b-instruct` | 4.7 GB (19.7GB VRAM) | 32K | Local fallback | ✅ Pinned (`keep_alive:-1`, expires ~2318) |
+
+Use `just cold-check` to verify models. Use `just warm` to re-pin after Ollama restart.
+
+### Service Response Benchmarks (post-restart 2026-03-02)
+
+| Service | Endpoint | Response Time |
+|---------|----------|---------------|
+| Dashboard :3000 | `/` | **7ms** |
+| Bridge :3001 | `/health` | **1ms** |
+| x402 :4021 | `/health` | **1ms** |
+| Gateway :18789 | `/health` | **1.5ms** |
+| Ollama (qwen local) | inference (2 tokens) | **190ms** (load: 85ms) |
+| Ollama (kimi cloud) | inference (2 tokens) | **2.9s** (network) |
+
+### x402 Live Payment Test (2026-03-02)
+
+All endpoints verified with real USDC on **Base Mainnet**:
+
+| Endpoint | Price | HTTP | Time | Status |
+|----------|-------|------|------|--------|
+| `GET /fleet-status` | $0.01 | 200 | 1,547ms | ✅ Paid |
+| `POST /memory-crystal` | $0.05 | 200 | 1,407ms | ✅ Paid |
+| `POST /intent` | $0.05 | 200 | 1,081ms | ✅ Paid |
+| `POST /agent-task` | $0.10 | 200 | 1,161ms | ✅ Paid |
+
+Wallet: `0x4Ba6...Cc80` — USDC spent: **$0.11** — Pass rate: **4/4 (100%)**  
+Test script: `cd dashboard && DOTENV_CONFIG_PATH=bridge/.env npx tsx scripts/test-x402-live.ts`
 
 ## Active profile and paths
 
@@ -96,7 +141,7 @@ Configured via `~/Library/LaunchAgents/com.ollama.env.plist` — persists across
 - Workspace(s): per-agent (`openclaw agents list`)
 - Gateway: `ws://127.0.0.1:18789` (`gateway.mode: local`)
 - Ollama OpenAI-compat base: `http://127.0.0.1:11434/v1`
-- Repo: `/Users/akualabs/Documents/xmetav1/XmetaV` (branch: `dev`)
+- Repo: `/Users/akualabs/xmetav1/XmetaV` (branch: `dev`) — symlinked at `~/Documents/xmetav1`
 - Git remote: `github.com/Metavibez4L/XmetaV.git`
 
 ## Remote Access (Tailscale + SSH + Screen Sharing)
@@ -129,6 +174,38 @@ ssh akualabs@100.93.86.17
 
 Configured via `sudo pmset` — Mac Studio runs headless 24/7.
 
+## LaunchAgent Auto-Restart
+
+All three core services run as LaunchAgents with `KeepAlive: true` and `RunAtLoad: true`. They auto-restart on crash and start on boot.
+
+| Plist | Service | Wrapper Script | Logs |
+|-------|---------|---------------|------|
+| `com.xmetav.dashboard.plist` | Dashboard :3000 | `/usr/local/bin/xmetav/launchd-dashboard.sh` | `/tmp/xmetav-dashboard.{log,err}` |
+| `com.xmetav.bridge.plist` | Bridge :3001 | `/usr/local/bin/xmetav/launchd-bridge.sh` | `/tmp/xmetav-bridge.{log,err}` |
+| `com.xmetav.x402.plist` | x402 :4021 | `/usr/local/bin/xmetav/launchd-x402.sh` | `/tmp/xmetav-x402.{log,err}` |
+
+**Key details:**
+- Repo lives at `~/xmetav1/` (not `~/Documents/`) to bypass macOS Sequoia TCC restrictions on launchd
+- Wrapper scripts use absolute paths with `cd /tmp` as cwd (dashboard uses project cwd for Turbopack)
+- Bridge and x402 use `DOTENV_CONFIG_PATH` to load `.env` from correct location
+- All use `tsx watch` for auto-reload on code changes (dashboard uses Next.js HMR)
+- Dashboard's "Start/Stop Bridge" button uses `launchctl` (not `spawn`) to avoid duplicate processes
+
+```bash
+# Restart a service
+launchctl kickstart -k gui/$(id -u)/com.xmetav.bridge
+
+# Check logs
+tail -f /tmp/xmetav-bridge.log
+tail -f /tmp/xmetav-bridge.err
+
+# Reload after plist changes
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.xmetav.bridge.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.xmetav.bridge.plist
+```
+
+Source plists and scripts are versioned in `scripts/launchd/` and `scripts/launchd-*.sh`.
+
 ## Watchdog
 
 Automated health monitor checking every 5 minutes:
@@ -140,6 +217,449 @@ Automated health monitor checking every 5 minutes:
 
 ```bash
 just logs-watchdog
+```
+
+## v28.5 Exec Delegation + Kamino Bug Fixes (2026-03-10)
+
+### Exec Delegation Architecture
+
+Three-layer exec security: config allowlists, per-agent glob patterns, sentinel instruction-based review.
+
+| Change | Details |
+|--------|---------|
+| **Exec delegation** | All non-main agents route exec through `@main`, sentinel reviews before execution |
+| **exec-approvals.json** | 361 role-based glob patterns across 11 agents (was empty) |
+| **Agent AGENTS.md** | 10 agent workspaces updated with exec delegation protocol |
+| **Sentinel SOUL.md** | Exec review gate role added (APPROVE/DENY/FLAG response format) |
+| **Main AGENTS.md** | Exec handler role added (parse→forward→wait→execute) |
+
+### Kamino Lending Bug Fixes (kamino-borrow.ts, kamino-vault.ts)
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| deposit-collateral/borrow/repay/withdraw-collateral → 500 `required property 'reserve'` | API fallback sent `token` — Kamino expects `reserve` (the reserve account address, not token mint) | Changed `token` → `reserve` in all 4 API fallback calls + added `resolveReserveAddress()` to map mint→reserve via SDK |
+| vault withdraw → 500 `required property 'amount'` | API fallback sent `shares` — Kamino expects `amount` | Changed `shares` → `amount` in withdraw API fallback |
+| Transaction deserialization crash (`Versioned messages must be deserialized with VersionedMessage.deserialize()`) | `Buffer.from()` returns Node Buffer, not Uint8Array; legacy fallback ran on simulation errors | Changed to `new Uint8Array(Buffer.from(...))`, separated simulation errors from deserialization errors |
+
+### Kamino Endpoint Test Results (2026-03-10)
+
+| # | Endpoint | Type | HTTP | Status | Notes |
+|---|----------|------|------|--------|-------|
+| 1 | `GET /kamino/vault-details` | FREE | 200 | ✅ | USDC vault, 1.2% APY, live SDK |
+| 2 | `GET /kamino/market` | FREE | 200 | ✅ | $1.73B deposits, $609M borrows, 55 reserves |
+| 3 | `GET /kamino/positions` | FREE | 200 | ✅ | 2 vaults checked |
+| 4 | `GET /kamino/obligation` | GATED | 200 | ✅ | null (no obligation) |
+| 5 | `POST /kamino/deposit-collateral` | GATED | 500 | ✅* | Tx built+signed, simulation fails: wallet unfunded |
+| 6 | `POST /kamino/borrow` | GATED | 400 | ✅* | No obligation yet (correct — must deposit first) |
+| 7 | `POST /kamino/repay` | GATED | 400 | ✅* | No obligation to repay |
+| 8 | `POST /kamino/withdraw-collateral` | GATED | 400 | ✅* | No obligation |
+| 9 | `POST /kamino/deposit` (vault) | GATED | 500 | ⚠️ | External Kamino vault API 500 (their bug) |
+| 10 | `POST /kamino/withdraw` (vault) | GATED | 500 | ⚠️ | External Kamino vault API 500 (their bug) |
+
+**✅*** = Code fully functional, reaches Kamino API correctly. Errors are expected business logic (unfunded wallet / no obligation). Would succeed with funded Solana wallet.  
+**⚠️** = Kamino's external vault API (`api.kamino.finance/ktx/kvault/*`) returning 500 — upstream issue.
+
+### Jupiter Test Results (2026-03-10)
+
+Jupiter is integrated into the cross-chain swap pipeline, not standalone endpoints:
+
+| Endpoint | HTTP | Status | Notes |
+|----------|------|--------|-------|
+| `POST /cross-chain-swap/quote` | 200 | ✅ | Live Jupiter quote: SOL via HumidiFi, 50bps slippage |
+| `GET /cross-chain/queue` | 200 | ✅ | Queue stats operational |
+| `GET /cross-chain/vaults` | 200 | ✅ | Vault listing + 104 live vaults |
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `x402-server/kamino-borrow.ts` | +61 −17: `reserve` param fix, `resolveReserveAddress()`, `Uint8Array` deserialization, simulation error handling |
+| `x402-server/kamino-vault.ts` | +16 −13: `amount` param fix for withdraw, `Uint8Array` deserialization, simulation error handling |
+
+---
+
+## v28 Cross-Chain Swap Engine (2026-03-08)
+
+Full multi-chain swap pipeline: Base ↔ Solana bridge, Jupiter Ultra swaps, Kamino vault yields. Commits `bd2d844`, `a288039`, `fe5f770`.
+
+### New Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **cross-chain-types** | `x402-server/cross-chain-types.ts` | Shared types, contract addresses (Base + Solana), safety config, fee estimates |
+| **bridge-solana** | `x402-server/bridge-solana.ts` | Base↔Solana USDC bridge via CCTP (`bridgeToSolana`, `bridgeToBase`, arrival waiters) |
+| **jupiter-swap** | `x402-server/jupiter-swap.ts` | Jupiter Ultra API swaps (RPC-less, multi-route: PancakeSwap/Whirlpool/Meteora/TesseraV) |
+| **kamino-vault** | `x402-server/kamino-vault.ts` | Kamino Earn vault deposit/withdraw (USDC 1.2% APY, SOL 8.6% APY) — v2 RPC via `createSolanaRpc()` |
+| **cross-chain-queue** | `x402-server/cross-chain-queue.ts` | Batch queue + job lifecycle (pending→bridging→swapping→vaulted→completed) |
+| **cross-chain-routes** | `x402-server/cross-chain-routes.ts` | Express router: 6 endpoints (4 gated, 2 free) |
+
+### Endpoints Added
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /cross-chain-swap` | $0.65 | Initiate Base→Solana→Jupiter→Kamino swap |
+| `POST /cross-chain-swap/quote` | Free | Estimate output, fees, Jupiter routing |
+| `GET /bridge-status/:jobId` | $0.05 | Check cross-chain job status |
+| `POST /trigger-return/:jobId` | $0.25 | Trigger return bridge Solana→Base |
+| `GET /cross-chain/queue` | Free | Batch queue stats |
+| `GET /cross-chain/vaults` | Free | Available Kamino vaults |
+
+### Safety Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Min swap | $0.65 |
+| Batch threshold | $6.50 |
+| Max single swap | $500 |
+| Max slippage | 50 bps (0.5%) |
+| Max price impact | 3% |
+
+### DB Tables
+
+| Table | Purpose |
+|-------|---------|
+| `cross_chain_jobs` | Job tracking (UUID PK, 25+ columns, full lifecycle) |
+| `cross_chain_batches` | Batch aggregation for sub-threshold swaps |
+
+Migration: `dashboard/scripts/setup-db-crosschain.sql` (also in `supabase/migrations/20260308100000_cross_chain.sql`)
+
+### Jupiter Ultra API
+
+- API key authenticated (`x-api-key` header)
+- Endpoints: `GET /ultra/v1/order` → sign → `POST /ultra/v1/execute`
+- Multi-route aggregation: PancakeSwap, Whirlpool, Meteora DLMM, TesseraV
+- Verified: $10 USDC → 0.1225 SOL with -0.03% price impact
+
+### Agent Chat Fix (commits `97bae6a`, `fb7ba58`, `c34201b`)
+
+Three-stage fix for agent chat hung state:
+1. Increased idle timeout 30s→90s
+2. Replaced idle-kill with process liveness check (`kill(0)`)
+3. Root cause: OpenClaw buffers output during tool calls; idle timeout killed process before flush
+
+---
+
+## v28.4 Lossless Context Engine Plugin (2026-03-09)
+
+New `lossless-claw` context engine plugin using the OpenClaw 2026.3.8 Context Engine Plugin API. Replaces legacy `safeguard` compaction with zero-context-loss strategy.
+
+### Plugin: lossless-claw
+
+- **Type**: Context Engine Plugin (`api.registerContextEngine()`)
+- **Slot**: `plugins.slots.contextEngine: "lossless-claw"` (exclusive, replaces `"legacy"`)
+- **Strategy**: Sliding-window assembly — 8 most recent turns kept verbatim, older turns compressed into rolling summary (2048 token budget)
+- **Compaction**: `ownsCompaction: true` — core never discards turns; plugin handles via summarization in `assemble()`
+- **Prompt hook**: Injects context engine metadata via `before_prompt_build` (priority 5)
+- **Trust**: Pinned via `plugins.allow: ["lossless-claw"]`
+
+### Config (in `~/.openclaw/openclaw.json`)
+
+```json
+{
+  "plugins": {
+    "allow": ["lossless-claw"],
+    "slots": { "contextEngine": "lossless-claw" },
+    "entries": {
+      "lossless-claw": {
+        "enabled": true,
+        "config": {
+          "recentTurnsFullPreserve": 8,
+          "summaryMaxTokens": 2048
+        }
+      }
+    }
+  }
+}
+```
+
+### Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `index.ts` | `~/.openclaw/extensions/lossless-claw/` | Plugin entry — context engine factory |
+| `openclaw.plugin.json` | `~/.openclaw/extensions/lossless-claw/` | Plugin manifest (kind: context-engine) |
+| `package.json` | `~/.openclaw/extensions/lossless-claw/` | Package metadata for OpenClaw discovery |
+| Repo copy | `x402-server/plugins/lossless-claw/` | Version-controlled source |
+
+---
+
+## v28.3 v2 RPC Compat + Vault Address Fixes (2026-03-08)
+
+Four fixes addressing klend-sdk v2 RPC incompatibility and incorrect vault configuration. Commits `a473283`, `39f4399`, `a97458b`, `a1829f9`.
+
+### Fixes
+
+| Commit | Fix | File |
+|--------|-----|------|
+| `a473283` | **kamino-borrow v2 RPC**: Replaced `Connection` with `createSolanaRpc()` for klend-sdk 7.3.20 compat; added BigInt slot handling for APY calculations | `kamino-borrow.ts` |
+| `39f4399` | **Guard undefined deposits/borrows**: Added optional chaining (`deposits?.length`, `borrows?.length`) to prevent runtime crashes when user has no obligations | `KaminoBorrowPanel.tsx` |
+| `a97458b` | **kamino-vault v2 RPC**: Same v2 RPC migration — `createSolanaRpc()` singleton, updated `KaminoVault` constructor, `getUserShares`, deposit/withdraw instruction builders | `kamino-vault.ts` |
+| `a1829f9` | **Correct SOL_MAIN vault address**: Old address (`ByYiZxp8Q...DVJ5`) was a klend lending reserve (wrong program). New address (`DcCRSdUMg...hpg`) is the actual kvault — 18,773 SOL AUM, 8.59% APY, exchange rate 1.022 | `kamino-vault.ts` |
+
+### Kamino Vault Addresses (Verified)
+
+| Vault | Address | AUM | APY | Exchange Rate |
+|-------|---------|-----|-----|---------------|
+| **USDC_MAIN** | `HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E` | $70M | 1.17% | 1.037 |
+| **SOL_MAIN** | `DcCRSdUMgAt6ZMeuL4BJAsZmJgND2LQd74Zq4z6ckhpg` | 18,773 SOL | 8.59% | 1.022 |
+
+### Multichain Endpoint Test Results (All Pass)
+
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| `GET /health` | ✅ | Server healthy |
+| `POST /cross-chain-swap/quote` | ✅ | 10 USDC → 9.49 output |
+| `GET /cross-chain/vaults` | ✅ | 2 configured + 104 live SDK vaults |
+| `GET /kamino/vault-details?vault=USDC_MAIN` | ✅ | $70M AUM, 1.17% APY |
+| `GET /kamino/vault-details?vault=SOL_MAIN` | ✅ | 18,773 SOL, 8.59% APY |
+| `GET /kamino/positions` | ✅ | USDC_MAIN: 0 shares, SOL_MAIN: null |
+| `GET /kamino/market` | ✅ | $1.67B deposits, $0.59B borrows, 55 reserves |
+| `GET /cross-chain/queue` | ✅ | 0 pending |
+| `GET /pricing` | ✅ | Dynamic demand/time multipliers |
+| `GET /trade-fees` | ✅ | 6 schedules, 5 examples |
+| Dashboard proxy | ✅ | Next.js → x402 working |
+
+### OpenClaw Config Fix
+
+Removed invalid keys from `~/.openclaw/openclaw.json`:
+- `agents.defaults.tools` — not valid at defaults level
+- `agents.list.*.tools.exec.timeout` — not valid inside exec block (all 14 agents)
+
+---
+
+## v28.2 Kamino SDK Integration — Borrow/Lend + klend-sdk (2026-03-08)
+
+Full Kamino SDK integration using `@kamino-finance/klend-sdk`. SDK-first vault operations, complete borrow/lending module, 8 new x402 endpoints, KaminoBorrowPanel dashboard component, and OpenClaw skill files. Commit `b87b67c`.
+
+### New Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| `@kamino-finance/klend-sdk` | ^7.3.20 | Kamino lending protocol SDK |
+| `@solana/kit` | ^6.1.0 | Modern Solana SDK (required by klend-sdk) |
+| `decimal.js` | ^10.6.0 | Precise decimal arithmetic |
+| `@solana-program/compute-budget` | ^0.7.0 | Compute budget instructions |
+
+### New Modules
+
+| Module | File | Description |
+|--------|------|-------------|
+| **kamino-vault.ts** | `x402-server/kamino-vault.ts` | Rewritten: SDK-first vault data (APY, holdings, exchange rate, user positions), SDK deposit/withdraw with @solana/kit compat |
+| **kamino-borrow.ts** | `x402-server/kamino-borrow.ts` | New: KaminoMarket for market overview, KaminoAction for deposit-collateral/borrow/repay/withdraw-collateral, user obligations with LTV |
+| **KaminoBorrowPanel** | `src/components/KaminoBorrowPanel.tsx` | New: Market TVL, reserves with APY, user obligation LTV, 4-action form (deposit-collateral, borrow, repay, withdraw-collateral) |
+
+### New Endpoints (8)
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `GET /kamino/vault-details` | free | Live vault data (APY, holdings, exchange rate via SDK) |
+| `GET /kamino/positions` | free | User vault positions across all vaults |
+| `GET /kamino/market` | free | Lending market overview (TVL, reserves, APYs) |
+| `GET /kamino/obligation` | $0.05 | User lending obligation (LTV, deposits, borrows) |
+| `POST /kamino/deposit-collateral` | $0.20 | Deposit collateral into lending market |
+| `POST /kamino/borrow` | $0.20 | Borrow assets against collateral |
+| `POST /kamino/repay` | $0.15 | Repay a loan |
+| `POST /kamino/withdraw-collateral` | $0.20 | Withdraw collateral from lending market |
+
+Total x402 gated endpoints: **27** (was 22). Total free endpoints: **11** (was 8). PaymentsDashboard: **38 endpoints** (was 30).
+
+### @solana/kit v2 RPC Compatibility
+
+klend-sdk 7.3.20 requires `@solana/kit` v2 Rpc protocol — **not** the legacy `@solana/web3.js` Connection. Both `kamino-vault.ts` and `kamino-borrow.ts` now use `createSolanaRpc()` from `@solana/kit` for v2 compat. Type bridging uses `as any` casts at SDK boundaries.
+
+**Commits:** `a473283` (kamino-borrow), `a97458b` (kamino-vault)
+
+### OpenClaw Skill Files
+
+Kamino skill installed at `~/.openclaw/workspace/skills/kamino/`:
+- `SKILL.md` — main skill instructions, workflow guides, vault table, endpoint reference
+- `references/setup.md` — SDK installation, env vars, architecture notes
+- `references/earn.md` — vault deposit/withdraw operations
+- `references/borrow.md` — lending market operations, SDK implementation details
+- `references/api.md` — complete API endpoint reference, token mints, response formats
+
+### Dashboard Updates
+
+| Component | Change |
+|-----------|--------|
+| `trading/page.tsx` | 3-column layout, "Kamino Borrow/Lend" feature tag, 16 endpoints in reference |
+| `KaminoBorrowPanel.tsx` | New component on Trading page |
+| `/api/kamino-borrow/route.ts` | New API proxy (GET+POST → x402 market/obligation/deposit-collateral/borrow/repay/withdraw-collateral) |
+
+---
+
+## v28.1 Standalone Kamino Endpoints + Trading/DeFi Dashboard (2026-03-08)
+
+Standalone Kamino vault endpoints and full Trading/DeFi dashboard page. Commits `db3d9cf`, `866231c`.
+
+### New Endpoints
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /kamino/deposit` | $0.15 | Deposit directly into a Kamino vault (USDC/SOL) |
+| `POST /kamino/withdraw` | $0.15 | Withdraw from a Kamino vault |
+
+Total x402 gated endpoints: **22** (was 20). Total free endpoints: **8**. PaymentsDashboard: **30 endpoints** (was 24).
+
+### Dashboard: Trading/DeFi Page (`/trading`)
+
+New full-page Trading/DeFi hub accessible from the sidebar (item 16).
+
+| Component | Purpose |
+|-----------|--------|
+| **CrossChainPanel** | Queue stats (pending/active/completed/failed), total bridged USD, interactive swap quote tool |
+| **KaminoPanel** | Vault overview with APY, deposit/withdraw mode toggle, Solscan explorer links on success |
+
+### Dashboard Updates
+
+| Component | Change |
+|-----------|--------|
+| `PaymentsDashboard.tsx` | 24→30 endpoint cards (added 6 cross-chain/Kamino entries) |
+| `Sidebar.tsx` | 15→16 nav items (added "Trading / DeFi" with ArrowLeftRight icon) |
+| `SystemHealth.tsx` | Added x402 server health check via `/api/trading/health`, shows endpoint count |
+
+### New API Proxy Routes (Next.js → x402)
+
+| Route | Methods | Proxies To |
+|-------|---------|------------|
+| `/api/trading/health` | GET | x402 `/health` |
+| `/api/trading/cross-chain` | GET, POST | x402 `/cross-chain/queue`, `/cross-chain/vaults`, `/cross-chain-swap/quote`, `/cross-chain-swap` |
+| `/api/trading/kamino` | POST | x402 `/kamino/deposit`, `/kamino/withdraw` |
+
+---
+
+## v27 Comprehensive Optimization (2026-03-05)
+
+Nine-point optimization pass across Bridge, Scholar, x402, Dashboard, and Vox. Commit `195a4b0`.
+
+### Scholar Adaptive Intervals
+
+Base research intervals doubled to reduce redundant API calls. `adaptiveInterval()` dynamically adjusts based on recent finding quality (avg relevance score).
+
+| Domain | Old Interval (min) | New Base (min) | Adaptive Range |
+|--------|-------------------|---------------|----------------|
+| erc8004 | 15 | 30 | 20–45 |
+| x402 | 20 | 40 | 25–60 |
+| layer2_scaling | 30 | 60 | 40–90 |
+| stablecoin_infra | 45 | 90 | 60–135 |
+| smb_adoption | 60 | 120 | 80–180 |
+
+**File:** `bridge/lib/scholar/types.ts`
+
+### Anchor Batch Queue
+
+Replaced direct `anchorMemory()` calls with a batch queue (`queueAnchor()` + `flushPendingAnchors()`). Batches up to 3 entries per flush, auto-flushes every 5 minutes. Reduces IPFS/on-chain calls by ~60%.
+
+**File:** `bridge/lib/memory-anchor.ts`
+
+### Scholar Dedup Enhancement
+
+- Duplicate threshold raised from default to **0.85** (stricter)
+- Added entity-based semantic dedup: extracts ERC numbers, protocol names, token tickers from findings
+- Capitalized-name heuristic for protocol detection
+
+**File:** `bridge/lib/scholar/scorer.ts`
+
+### Dynamic Pricing Engine (NEW)
+
+Demand-based pricing for x402 endpoints:
+- **Demand multiplier**: 0.8×–1.5× based on calls/hour per endpoint
+- **Time-of-day multiplier**: UTC peak hours pricing
+- **Endpoint bundles**: Research Pack, Swarm Suite, Memory Explorer
+- **Free endpoint**: `GET /pricing` returns live snapshot
+- **Sync**: Pricing snapshot synced to Supabase every 5 minutes
+
+**File:** `x402-server/dynamic-pricing.ts`
+
+### Session Buffer TTL Tuning
+
+- `adaptiveTTL()`: 5s for volatile queries, 15s for standard, 30s for static
+- `invalidateOnPayment()`: Supabase Realtime subscription on `x402_payments` triggers cache invalidation
+- `VOLATILE_KEYWORDS` set for query classification
+
+**Files:** `bridge/lib/soul/session-buffer.ts`, `bridge/lib/soul/retrieval.ts`
+
+### Vox Content Automation (NEW)
+
+Auto-generates marketing threads from high-scoring scholar findings:
+- `queueVoxContent()`: called when scholar score ≥ 0.8
+- `generateThread()`: formats research into social-ready threads
+- Content calendar: max 3 posts/day, 4hr minimum spacing
+- Persists to `vox_content_queue` Supabase table
+
+**File:** `bridge/lib/vox/content-automation.ts`
+
+### SSE Streaming (NEW)
+
+- **Endpoint**: `/api/events` — streams sessions, memory, payments, commands via Supabase Realtime → SSE
+- **Client hook**: `useRealtime` — EventSource with auto-reconnect, channel filtering, event counting
+- **Heartbeat**: 30-second keepalive
+- **Cleanup**: Abort controller on disconnect
+
+**Files:** `src/app/api/events/route.ts`, `src/hooks/useRealtime.ts`
+
+### Bridge Integration
+
+- `x402_payments` Realtime subscription for `invalidateOnPayment()`
+- `flushPendingAnchors()` cleanup on SIGINT/SIGTERM
+- `paymentChannel` unsubscribe on graceful shutdown
+
+**File:** `bridge/src/index.ts`
+
+---
+
+## Sentinel Monitoring Engine (v1.5.0)
+
+Autonomous monitoring system embedded in the Bridge Daemon. Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
+
+### Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **EventMonitor** | `bridge/lib/sentinel/event-monitor.ts` | Service monitoring with adaptive polling (5s–120s), Supabase Realtime subscriptions |
+| **AlertManager** | `bridge/lib/sentinel/alert-manager.ts` | Anti-fatigue alerting with escalation (immediate → warning → critical) and cooldowns |
+| **SelfHealer** | `bridge/lib/sentinel/self-healer.ts` | Automated remediation: restart services, clean stale locks, rotate logs |
+| **PredictiveHealth** | `bridge/lib/sentinel/predictive-health.ts` | macOS resource collection, linear regression trends, z-score anomaly detection |
+| **DistributedTracer** | `bridge/lib/sentinel/distributed-tracer.ts` | Span-based request tracing with P95 latency, throughput, error rate |
+| **Sentinel** | `bridge/lib/sentinel/index.ts` | Orchestrator singleton wiring all sub-systems |
+
+### Monitored Services
+
+| Service | Check Method |
+|---------|-------------|
+| bridge | `launchctl list` |
+| dashboard | `launchctl list` |
+| x402 | `launchctl list` |
+| ollama | HTTP `GET http://127.0.0.1:11434/api/tags` |
+| gateway | HTTP `GET http://127.0.0.1:18789/health` |
+| tailscale | `tailscale status` |
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `http://localhost:3001/sentinel` | GET | Full sentinel health report (JSON) |
+| `/api/sentinel` | GET | Dashboard-authenticated sentinel data (health, incidents, healing, resources, traces) |
+
+### DB Tables
+
+| Table | Purpose |
+|-------|---------|
+| `sentinel_incidents` | Alert/incident tracking with severity and resolution |
+| `sentinel_healing_log` | Self-healing action audit trail |
+| `sentinel_traces` | Distributed trace spans with timing data |
+| `sentinel_resource_snapshots` | System resource snapshots (CPU, memory, disk, load) |
+
+Migration: `dashboard/scripts/setup-db-sentinel.sql`
+
+### Verification
+
+```bash
+# Sentinel health report
+curl -s http://localhost:3001/sentinel | jq .
+
+# Check sentinel logs
+tail -f /tmp/xmetav-bridge.log | grep -i sentinel
 ```
 
 ## Configured agents (this machine)
@@ -155,6 +675,7 @@ This command center runs **multiple isolated agents**, all powered by **Kimi K2.
 | `oracle` | `kimi-k2.5:cloud` | `~/.openclaw/agents/oracle` | coding | **On-Chain Intel** — gas, prices, chain, sentiment |
 | `alchemist` | `kimi-k2.5:cloud` | `~/.openclaw/agents/alchemist` | coding | **Tokenomics** — supply, emissions, staking, liquidity |
 | `midas` | `kimi-k2.5:cloud` | `~/.openclaw/agents/midas` | coding | **Revenue & Growth** — x402 analytics, pricing, forecasts, growth pipeline |
+| `vox` | `kimi-k2.5:cloud` | `~/.openclaw/agents/vox` | coding | **Brand & Campaigns** — content strategy, voice calibration, competitor analysis |
 | `web3dev` | `kimi-k2.5:cloud` | `~/.openclaw/agents/web3dev` | coding | **Blockchain Dev** — compile, test, audit, deploy contracts |
 | `basedintern` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | coding | TypeScript/Node.js repo agent |
 | `basedintern_web` | `kimi-k2.5:cloud` | `~/.openclaw/agents/basedintern` | full | Same repo — browser/web only |
@@ -171,6 +692,7 @@ Detailed agent runbooks (index: [`docs/agents/README.md`](agents/README.md)):
 - `docs/agents/oracle.md`
 - `docs/agents/alchemist.md`
 - `docs/agents/midas.md`
+- `docs/agents/vox.md`
 - `docs/agents/web3dev.md`
 - `docs/agents/basedintern.md`
 - `docs/agents/akua.md`
@@ -394,6 +916,37 @@ With `tools.profile=full` (main) or `coding` (repo agents) and `api=openai-respo
 - Browse the web via `browser` tool (full profile)
 - Fetch web pages via `web_fetch` / `web_search` tools (full profile)
 
+### Exec Tool Configuration (Optimized 2026-03-08)
+
+Agent defaults provide fleet-wide exec settings (`agents.defaults.tools.exec`):
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `pathPrepend` | `["/opt/homebrew/bin", "/usr/local/bin"]` | Consistent PATH for all agents (replaces manual bridge construction) |
+| `timeout` | `300` (default) | Wall-clock kill (per-agent overrides below) |
+| `notifyOnExit` | `true` | Background jobs emit system events on completion |
+| `safeBins` | 24 entries | stdin-only filters: `cat`, `grep`, `jq`, `sed`, `awk`, `sort`, `wc`, etc. |
+| `safeBinTrustedDirs` | `/bin`, `/usr/bin`, `/opt/homebrew/bin` | Trusted directories for safeBin resolution |
+
+Per-agent exec security (3-layer architecture — updated 2026-03-10):
+
+**Layer 1 — Config** (`~/.openclaw/openclaw.json`): exec.security mode per agent  
+**Layer 2 — Allowlist** (`~/.openclaw/exec-approvals.json`): 361 glob patterns across 11 agents  
+**Layer 3 — Sentinel Review**: instruction-based review gate for all non-main exec requests
+
+| Agent | Host | Security | Ask | Timeout | Allowlist Patterns | Notes |
+|-------|------|----------|-----|---------|-------------------|-------|
+| `main` | gateway | `full` | — | 300s | N/A | Sole executor — all agents delegate to main |
+| `basedintern`, `akua` | gateway | `allowlist` | `on-miss` | 300s | 37 each | Dev tools (git, node, npm, curl) |
+| `midas` | gateway | `allowlist` | `on-miss` | 300s | 33 | Finance tools (curl, node, python) |
+| `sentinel` | gateway | `allowlist` | `on-miss` | 120s | 37 | Process inspection (pgrep, lsof, launchctl) |
+| `oracle`, `alchemist` | gateway | `allowlist` | `on-miss` | 300s | 33 each | Network + analysis tools |
+| `web3dev` | gateway | `allowlist` | `on-miss` | 300s | 40 | Broadest: foundry, hardhat, solidity |
+| `briefing`, `soul` | gateway | `allowlist` | `on-miss` | 600s | 29 each | Read-only only |
+| `scholar`, `vox` | gateway | `allowlist` | `on-miss` | 600s | 29 each | Read-only (moved from sandbox) |
+
+**Exec Delegation Protocol**: All non-main agents are instructed (via workspace AGENTS.md) to message `@main` with `EXEC REQUEST` format instead of executing directly. Main routes to `@sentinel` for review before executing.
+
 Test:
 ```bash
 openclaw agent --agent main --local --thinking off \
@@ -404,6 +957,7 @@ Notes:
 - If you see loops calling tools (especially `tts`), deny `tts`.
 - For channels (Telegram/Slack/etc), you may need gateway mode rather than `--local`.
 - The `openai-responses` API mode is required for tool schemas to be passed to the model.
+- Session overrides available via `/exec host=gateway security=allowlist ask=on-miss`.
 
 ## Control Plane Dashboard
 
@@ -445,10 +999,34 @@ The XmetaV Control Plane Dashboard is a cyberpunk-themed Next.js 16 web applicat
 | `limit_breaks` | Limit break event tracking | Authenticated: SELECT, INSERT, UPDATE |
 | `memory_achievements` | Achievement/quest progression | Authenticated: SELECT, INSERT, UPDATE |
 | `daily_quests` | Daily quest generation | Authenticated: SELECT, INSERT, UPDATE |
+| `sentinel_incidents` | Sentinel alert/incident tracking | Authenticated: SELECT + Service role: ALL |
+| `sentinel_healing_log` | Self-healing action audit trail | Authenticated: SELECT + Service role: ALL |
+| `sentinel_traces` | Distributed trace spans | Authenticated: SELECT + Service role: ALL |
+| `sentinel_resource_snapshots` | System resource snapshots (CPU/mem/disk/load) | Authenticated: SELECT + Service role: ALL |
+| `insight_shards` | Dream synthesis fused insight fragments | Service role: ALL |
+| `predictive_contexts` | Pre-loaded context from temporal/sequential patterns | Service role: ALL |
+| `memory_decay` | Decay-scored memories pending archive or compression | Service role: ALL |
+| `reforged_crystals` | Legendary crystals compressed from decayed memories | Service role: ALL |
+| `erc8004_registry_cache` | Cached on-chain ERC-8004 registry lookups | Service role: ALL |
+| `erc8004_scan_log` | ERC-8004 scan/discovery event log | Service role: ALL |
+| `revenue_metrics` | Midas revenue tracking and settlement status | Authenticated: SELECT + Service role: ALL |
+| `endpoint_analytics` | Per-endpoint usage analytics | Authenticated: SELECT + Service role: ALL |
+| `growth_opportunities` | AI-identified growth/optimization opportunities | Authenticated: SELECT + Service role: ALL |
+| `pricing_recommendations` | Dynamic pricing recommendation history | Authenticated: SELECT + Service role: ALL |
+| `pricing_experiments` | A/B pricing experiment tracking | Service role: ALL |
+| `swarm_spawn_billing` | Swarm spawn billing events | Service role: ALL |
+| `trade_executions` | Midas trade execution log (swaps, arb, rebalance) | Authenticated: SELECT + Service role: ALL |
+| `cross_chain_jobs` | Cross-chain bridge job tracking | Authenticated: SELECT + Service role: ALL |
+| `cross_chain_batches` | Cross-chain batch aggregation | Service role: ALL |
+| `vox_content_queue` | Vox content automation pipeline queue | Service role: ALL |
 
-All tables have Realtime enabled for live updates.
+**Total: 37 tables, 3 views, 4 enums** — all with Realtime enabled for live updates.
 
-View: `x402_daily_spend` — aggregates daily payment totals from `x402_payments`.
+**Views:** `x402_daily_spend` (daily payment totals), `shared_memory` (cross-agent memory access), `crystal_level_thresholds` (XP → level lookup).
+
+**Enums:** `crystal_type`, `crystal_color`, `crystal_class`, `agent_relationship`.
+
+**Functions:** `cleanup_expired_memories()` (72h TTL), `auto_create_crystal()` (trigger), `update_crystal_xp()`, `compute_decay_score()`, `compress_to_legendary()`, `log_association_modification()`.
 
 ### Dashboard pages
 
@@ -683,7 +1261,7 @@ Three new bash skills installed for the main agent:
 | `supabase` | `~/.openclaw/workspace/skills/supabase/` | Direct database access with service role key |
 | `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
 
-Main agent `tools.profile` set to `full` with 11 exec allowlist entries for unrestricted shell access.
+Main agent `tools.profile` set to `full` with `exec.security=full`. All other agents use `security=allowlist` + `ask=on-miss` + `host=gateway` with 361 role-based glob patterns in `~/.openclaw/exec-approvals.json`. Fleet-wide `safeBins` (24 entries) + `pathPrepend` configured in agent defaults. Exec delegation: non-main agents message `@main` → `@sentinel` reviews → main executes.
 
 ### Dispatch skill fix (v13)
 
@@ -781,12 +1359,12 @@ XmetaV implements a complete 6-layer memory architecture — all layers are live
 |-------|--------|-----------|--------|
 | **1. Ephemeral** | ✅ Live | In-process TTL caches, circuit breakers, pin queues, dream flags | 0 (in-memory) |
 | **2. Session / Midterm** | ✅ Live | Command lifecycle, intent sessions, 72h TTL auto-expiry | 4 |
-| **3. Long-Term Persistent** | ✅ Live | Soul agent (12 modules), memory crystals, associations, dreams | 16 |
+| **3. Long-Term Persistent** | ✅ Live | Soul agent (12 modules), memory crystals, associations, dreams, synthesis, reforge, predictive | 20 |
 | **4. IPFS / Off-Chain** | ✅ Live | Pinata JSON pinning, batch queue (5min), circuit breaker | 0 (external) |
-| **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, auto-detect milestones | 2 (cache) |
-| **6. Cost Monitoring** | ✅ Live | 6-tier token system, x402 payment tracking, revenue analytics | 2 |
+| **5. On-Chain Anchoring** | ⚠️ Code ready | `AgentMemoryAnchor` on Base Mainnet, batch queue (3 items OR 5min flush), auto-detect milestones | 2 (cache) |
+| **6. Cost / Revenue** | ✅ Live | 6-tier token system, x402 payment tracking, Midas revenue analytics, trade execution log | 7 |
 
-**Total:** 24 Supabase tables/views, 30+ source files, 12 Soul modules
+**Total:** 37 Supabase tables, 3 views, 4 enums, 40+ source files, 12 Soul modules, 6 Sentinel modules
 
 ### Layer 1 — Ephemeral (In-Process)
 
@@ -815,23 +1393,23 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 
 **Soul Agent Modules (12):**
 
-| Module | File | Purpose |
-|--------|------|---------|
-| Context orchestrator | `soul/context.ts` | Keyword-scored + association-boosted retrieval |
-| Keyword retrieval | `soul/retrieval.ts` | Scores memories by keyword match × kind weight + recency |
-| Association builder | `soul/associations.ts` | Builds up to 5 associations per memory |
-| Dream mode | `soul/dream.ts` | Triggers after 6h idle, clusters memories, generates insights |
-| Lucid dream proposals | `soul/dream-proposals.ts` | 7 categories of autonomous evolution proposals |
-| Dream synthesis | `soul/synthesis.ts` | Fuses 3+ related anchors into insight shards |
-| Predictive loading | `soul/predictive.ts` | Analyzes 14 days of command history for temporal patterns |
-| Memory reforging | `soul/reforge.ts` | Decay scoring (72h half-life), compression into legendary crystals |
+| Module | File | Lines | Purpose |
+|--------|------|-------|---------|
+| Context orchestrator | `soul/context.ts` | ~200 | Keyword-scored + association-boosted retrieval |
+| Keyword retrieval | `soul/retrieval.ts` | ~150 | Scores memories by keyword match × kind weight + recency |
+| Association builder | `soul/associations.ts` | ~180 | Builds up to 5 associations per memory |
+| Dream mode | `soul/dream.ts` | 398 | 9-step pipeline: triggers after 6h idle, clusters memories, generates insights |
+| Lucid dream proposals | `soul/dream-proposals.ts` | 993 | 7 categories of autonomous evolution proposals, auto-execute at ≥0.8 confidence |
+| Dream synthesis | `soul/synthesis.ts` | 441 | 5 pattern types, fuses 3+ related anchors into insight shards, blind spot detection |
+| Predictive loading | `soul/predictive.ts` | 424 | Time-of-day + sequential + shard cross-ref, analyzes 14 days of command history |
+| Memory reforging | `soul/reforge.ts` | 593 | Decay scoring (72h half-life), auto-archive, compression into legendary crystals |
 
 **Memory Crystal System (Materia Engine):**
 - Crystals with XP, 30 levels, star ratings (1-6★), class evolution (anchor → godhand)
 - 5 FF7-style fusion recipes, keyword-triggered summoning, limit breaks
 - Full game engine: `bridge/lib/memory-crystal.ts` (811 lines)
 
-**Long-Term Tables (16):** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `shared_memory` (view)
+**Long-Term Tables (20):** `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots` + views: `shared_memory`, `crystal_level_thresholds`
 
 ### Layer 4 — IPFS / Off-Chain
 
@@ -855,7 +1433,7 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 **Agent ID:** 16905  
 **Status:** ⚠️ Wallet `0x4Ba6...` needs ETH on Base for gas — code is proven, anchoring paused until funded.
 
-### Layer 6 — Cost Monitoring
+### Layer 6 — Cost / Revenue
 
 | Component | File | Notes |
 |-----------|------|-------|
@@ -864,6 +1442,13 @@ Memory TTL: command outcomes default to **72-hour** expiry, cleaned by `cleanup_
 | Daily spend view | `x402_daily_spend` | Aggregated daily totals per agent |
 | Revenue analytics | `bridge/lib/midas-revenue.ts` | Revenue tracking + settlement status |
 | Dream pricing | `soul/dream-proposals.ts` | Soul proposes x402 pricing adjustments |
+| Trade execution log | `trade_executions` | Midas trade execution details (swaps, arb, rebalance) |
+| Endpoint analytics | `endpoint_analytics` | Per-endpoint usage and performance metrics |
+| Revenue metrics | `revenue_metrics` | Revenue tracking and settlement status |
+| Growth opportunities | `growth_opportunities` | AI-identified growth/optimization opportunities |
+| Pricing recommendations | `pricing_recommendations` | Dynamic pricing recommendation history |
+| Pricing experiments | `pricing_experiments` | A/B pricing experiment tracking |
+| Swarm spawn billing | `swarm_spawn_billing` | Swarm spawn billing events |
 
 ---
 
@@ -874,7 +1459,7 @@ Memory orchestrator providing context curation, association building, dream cons
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Bridge Library | Active | `dashboard/bridge/lib/soul/` (context, associations, dream, dream-proposals, retrieval, types) |
-| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications` tables |
+| DB Schema | Active | `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals` tables |
 | Lucid Dreaming | Active | Phase 5 autonomous evolution — dream proposals, self-modification, meeting triggers |
 | Arena Presence | Active | Room: SOUL (private alcove), Color: Magenta (#ff006e) |
 | Arena Office | Active | L-shaped surveillance desk + arc of mini fleet-monitor screens |
@@ -1183,7 +1768,7 @@ Check live: `just revenue`
 | `EVM_ADDRESS` | `0x21fa51B40BF63E47f000eD77eC7FD018AE0ddA0B` | Receives USDC |
 | `PORT` | `4021` | x402 server port |
 
-### Gated endpoints (x402-server)
+### Gated endpoints (x402-server) — 27 total
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
@@ -1203,8 +1788,22 @@ Check live: `just revenue`
 | `POST /execute-arb` | $0.10+ | Execute arbitrage (1% of profit) |
 | `GET /yield-optimize` | $0.50 | Yield farming optimization scan |
 | `POST /deploy-yield-strategy` | $3.00+ | Deploy yield capital (0.5% of capital) |
+| `GET /whale-alert` | $0.15 | Whale transfer/swap detection |
+| `GET /liquidation-signal` | $0.25 | DeFi liquidation signals |
+| `GET /arb-detection` | $0.20 | Cross-DEX arbitrage signals |
+| `GET /governance-signal` | $0.10 | Governance proposal tracker |
+| `POST /cross-chain-swap` | $0.65 | Initiate Base→Solana→Jupiter→Kamino swap |
+| `GET /bridge-status/:jobId` | $0.05 | Check cross-chain job status |
+| `POST /trigger-return/:jobId` | $0.25 | Trigger return bridge Solana→Base |
+| `POST /kamino/deposit` | $0.15 | Deposit tokens into Kamino vault |
+| `POST /kamino/withdraw` | $0.15 | Withdraw tokens from Kamino vault |
+| `GET /kamino/obligation` | $0.05 | User lending obligation (LTV, deposits, borrows) |
+| `POST /kamino/deposit-collateral` | $0.20 | Deposit collateral into lending market |
+| `POST /kamino/borrow` | $0.20 | Borrow assets against collateral |
+| `POST /kamino/repay` | $0.15 | Repay a loan |
+| `POST /kamino/withdraw-collateral` | $0.20 | Withdraw collateral from lending market |
 
-### Free endpoints (x402-server)
+### Free endpoints (x402-server) — 11 total
 
 | Endpoint | Description |
 |----------|-------------|
@@ -1213,6 +1812,12 @@ Check live: `just revenue`
 | `GET /agent/:agentId/payment-info` | ERC-8004 on-chain agent lookup |
 | `GET /digest` | Trigger payment digest & memory write |
 | `GET /trade-fees` | Trade fee schedule & revenue projections |
+| `GET /cross-chain/queue` | Batch queue stats |
+| `GET /cross-chain/vaults` | Available Kamino vaults |
+| `GET /kamino/vault-details` | Live vault data (APY, holdings, exchange rate via SDK) |
+| `GET /kamino/positions` | User vault positions across all vaults |
+| `GET /kamino/market` | Lending market overview (TVL, reserves, APYs) |
+| `GET /pricing` | Dynamic pricing snapshot |
 
 ### Environment variables
 

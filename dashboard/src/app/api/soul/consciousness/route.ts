@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     case "synthesis_stats": {
       // Use SQL aggregation instead of fetching all rows
       const [totalRes, recent24hRes] = await Promise.all([
-        admin.rpc("exec_sql", { query: "SELECT pattern_type, shard_class, count(*)::int as cnt FROM insight_shards GROUP BY pattern_type, shard_class" }).catch(() => null),
+        admin.rpc("exec_sql", { query: "SELECT pattern_type, shard_class, count(*)::int as cnt FROM insight_shards GROUP BY pattern_type, shard_class" }).then((r) => r, () => null),
         admin.from("insight_shards").select("id", { count: "exact", head: true })
           .gte("created_at", new Date(Date.now() - 86400000).toISOString()),
       ]);
@@ -175,31 +175,40 @@ export async function GET(request: NextRequest) {
 
     /* ── Reforge Stats ───────────────────────── */
     case "reforge_stats": {
-      const { data: decayData } = await admin
+      // Use count queries + bounded selects instead of fetching 5000+ rows
+      const [totalRes, archivedRes, decayingRes, healthyRes, reforgedRes] = await Promise.all([
+        admin.from("memory_decay").select("*", { count: "exact", head: true }),
+        admin.from("memory_decay").select("*", { count: "exact", head: true }).eq("is_archived", true),
+        admin.from("memory_decay").select("*", { count: "exact", head: true }).eq("is_archived", false).lt("decay_score", 0.4),
+        admin.from("memory_decay").select("*", { count: "exact", head: true }).eq("is_archived", false).gte("decay_score", 0.4),
+        admin.from("reforged_crystals").select("source_count").limit(1000),
+      ]);
+
+      // Avg decay from a sample
+      const { data: decaySample } = await admin
         .from("memory_decay")
-        .select("decay_score, is_archived")
-        .limit(5000);
+        .select("decay_score")
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(500);
 
-      const { data: reforged } = await admin
-        .from("reforged_crystals")
-        .select("source_count")
-        .limit(1000);
-
-      const entries = decayData ?? [];
-      const archived = entries.filter((d) => d.is_archived).length;
-      const decaying = entries.filter((d) => !d.is_archived && d.decay_score < 0.4).length;
-      const healthy = entries.filter((d) => !d.is_archived && d.decay_score >= 0.4).length;
-      const avgDecay = entries.length > 0
-        ? Math.round((entries.reduce((s, d) => s + d.decay_score, 0) / entries.length) * 100) / 100
+      const sample = decaySample ?? [];
+      const avgDecay = sample.length > 0
+        ? Math.round((sample.reduce((s, d) => s + d.decay_score, 0) / sample.length) * 100) / 100
         : 1.0;
 
-      const reforgedEntries = reforged ?? [];
+      const reforgedEntries = reforgedRes.data ?? [];
       const totalCompressed = reforgedEntries.reduce((s, r) => s + r.source_count, 0);
 
       return NextResponse.json({
         stats: {
-          totalMemories: entries.length, archived, decaying, healthy,
-          reforgedCrystals: reforgedEntries.length, totalCompressed, avgDecay,
+          totalMemories: totalRes.count ?? 0,
+          archived: archivedRes.count ?? 0,
+          decaying: decayingRes.count ?? 0,
+          healthy: healthyRes.count ?? 0,
+          reforgedCrystals: reforgedEntries.length,
+          totalCompressed,
+          avgDecay,
         },
       });
     }

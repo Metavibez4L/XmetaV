@@ -5,12 +5,47 @@ import { captureCommandOutcome } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
+import { isDiagramCommand, parseDiagramCommand, executeDiagramCommand } from "../lib/diagram-executor.js";
 import { refreshSitrep } from "./heartbeat.js";
 import { TTLCache } from "../lib/ttl-cache.js";
 import type { ChildProcess } from "child_process";
 
 /** Track running processes per agent (one at a time per agent) */
 export const running = new Map<string, ChildProcess>();
+
+/**
+ * Track the last diagram context per agent.
+ * When a diagram is generated, we store it here so follow-up messages
+ * like "update it", "improve it", "retry" can be intercepted instead
+ * of letting the LLM use browser tools and hang.
+ */
+interface DiagramContext {
+  message: string;
+  timestamp: number;
+}
+const lastDiagramContext = new Map<string, DiagramContext>();
+const DIAGRAM_CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
+
+/** Vague follow-up messages that should inherit the previous diagram context */
+const DIAGRAM_FOLLOWUP_PATTERNS = [
+  /^(update|improve|enhance|fix|refine|redo|retry|regenerate|redo)\b/i,
+  /^(update|improve|make|do)\s+(it|that|this|the diagram|the excalidraw)\b/i,
+  /^(make it|do it)\s+(better|nicer|bigger|more detailed|cleaner)/i,
+  /^(it|that|this)\s+(needs?|should|could)\b/i,
+  /^(keep going|continue|go ahead|do it)$/i,
+  /^retry$/i,
+];
+
+function isDiagramFollowUp(agentId: string, message: string): boolean {
+  const ctx = lastDiagramContext.get(agentId);
+  if (!ctx) return false;
+  if (Date.now() - ctx.timestamp > DIAGRAM_CONTEXT_TTL) {
+    lastDiagramContext.delete(agentId);
+    return false;
+  }
+  const trimmed = message.trim();
+  return DIAGRAM_FOLLOWUP_PATTERNS.some((p) => p.test(trimmed));
+}
 
 /** Cache agent enabled status for 30s — avoids DB query on every command */
 const agentEnabledCache = new TTLCache<boolean>(30_000);
@@ -222,6 +257,100 @@ export async function executeCommand(command: {
     return;
   }
 
+  // ── Diagram generation interception ────────────────────────────
+  // If the message is a diagram command (e.g. "/diagram fleet architecture"),
+  // generate the diagram directly and return file paths.
+  // Also catches follow-up messages ("update it", "improve it") within 5 min
+  // of the last diagram, preventing the LLM from using browser tools and hanging.
+  const diagramFollowUp = isDiagramFollowUp(agent_id, message);
+  if (isDiagramCommand(message) || diagramFollowUp) {
+    const effectiveMessage = diagramFollowUp
+      ? `${lastDiagramContext.get(agent_id)!.message} — ${message}`
+      : message;
+    console.log(`[executor] Diagram command detected for "${agent_id}"${diagramFollowUp ? " (follow-up)" : ""}`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    streamer.write(`\n📐 **Generating diagram...**\n\n`);
+    if (diagramFollowUp) {
+      streamer.write(`🔄 *Follow-up on previous diagram — regenerating with updates*\n\n`);
+    }
+
+    try {
+      const result = await executeDiagramCommand(effectiveMessage);
+
+      if (result.success) {
+        streamer.write(`✅ **Diagram generated!**\n\n`);
+        streamer.write(`📊 **${result.title}** (${result.type})\n\n`);
+        streamer.write(`📁 **Files:**\n`);
+        streamer.write(`- Excalidraw: \`${result.excalidrawPath}\`\n`);
+        streamer.write(`- SVG: \`${result.svgPath}\`\n\n`);
+        if (result.opened) {
+          streamer.write(`🖥️ Opened in default app\n`);
+        }
+        streamer.write(`\n💡 Open SVG in browser or load .excalidraw in excalidraw.com to edit\n`);
+
+        // Store diagram context so follow-up messages are intercepted
+        lastDiagramContext.set(agent_id, {
+          message: effectiveMessage,
+          timestamp: Date.now(),
+        });
+      } else {
+        streamer.write(`\n❌ **Diagram generation failed**\n\n`);
+        streamer.write(`${result.error}\n`);
+      }
+
+      await streamer.end(result.success ? 0 : 1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: result.success ? "completed" : "failed" })
+        .eq("id", id);
+
+      captureCommandOutcome(
+        agent_id,
+        message,
+        `Diagram: ${result.title || "unknown"} → ${result.svgPath || "failed"}`,
+        result.success ? 0 : 1
+      ).catch((err) =>
+        console.error(`[executor] Memory capture failed (non-fatal):`, err)
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      streamer.write(`\n❌ **Diagram error**\n\n${msg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    running.delete(agent_id);
+    pickNextCommand(agent_id);
+    return;
+  }
+
   // Inject Soul-curated context into the dispatch message
   let enrichedMessage = message;
   try {
@@ -291,6 +420,13 @@ export async function executeCommand(command: {
 
         // Flush any remaining batched tokens before ending the stream
         flushTokenBatch();
+
+        // Allow queued pipe chunks to drain before finalising the stream.
+        // Node.js can deliver buffered stdout/stderr after the 'exit' event,
+        // causing ghost chunks that get dropped. A short delay lets them arrive
+        // as normal writes instead.
+        await new Promise((r) => setTimeout(r, 80));
+        flushTokenBatch(); // flush any chunks that arrived during the drain
 
         await streamer.end(code);
 

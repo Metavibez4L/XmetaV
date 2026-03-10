@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
@@ -18,6 +19,15 @@ import {
 } from "./payment-memory.js";
 import { createTradeRouter, TRADE_FEE_SCHEDULES } from "./trade-routes.js";
 import { createAlphaFeedsRouter, ALPHA_FEE_SCHEDULES } from "./alpha-feeds.js";
+import { createCrossChainRouter, CROSS_CHAIN_FEE_SCHEDULES } from "./cross-chain-routes.js";
+import {
+  recordDemand,
+  getDynamicPriceString,
+  getPricingSnapshot,
+  syncPricingToSupabase,
+  BUNDLES,
+  getBundlePrice,
+} from "./dynamic-pricing.js";
 
 // ── TTL Cache for expensive lookups ──────────────────────────
 interface CacheEntry<T> { value: T; expiresAt: number; }
@@ -141,6 +151,44 @@ const app = express();
 app.use(compression());  // gzip — ~60% bandwidth reduction
 app.use(express.json());
 
+// ---- Rate Limiting ----
+// Global: 100 req/min per caller (generous for normal use)
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many requests — rate limit exceeded", retryAfterMs: 60_000 },
+  validate: false,
+  keyGenerator: (req) => (req.headers["x-caller-address"] as string) || "global",
+});
+
+// Expensive endpoints: 10 req/min (bridges, swaps, deployments)
+const expensiveLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Rate limit on expensive operations — max 10/min", retryAfterMs: 60_000 },
+  validate: false,
+  keyGenerator: (req) => (req.headers["x-caller-address"] as string) || "global",
+});
+
+app.use(globalLimiter);
+
+// Apply stricter limits to expensive endpoints
+app.post("/cross-chain-swap", expensiveLimiter);
+app.post("/execute-trade", expensiveLimiter);
+app.post("/rebalance-portfolio", expensiveLimiter);
+app.post("/deploy-yield-strategy", expensiveLimiter);
+app.post("/execute-arb", expensiveLimiter);
+app.post("/trigger-return/:jobId", expensiveLimiter);
+app.post("/kamino/deposit", expensiveLimiter);
+app.post("/kamino/withdraw", expensiveLimiter);
+app.post("/kamino/deposit-collateral", expensiveLimiter);
+app.post("/kamino/borrow", expensiveLimiter);
+app.post("/swarm", expensiveLimiter);
+
 // ---- Payment logging helper ----
 async function logPayment(endpoint: string, amount: string, req: express.Request) {
   if (!supabase) return;
@@ -164,6 +212,9 @@ async function logPayment(endpoint: string, amount: string, req: express.Request
     await supabase.from("x402_payments").insert({ ...row, metadata: metaPayload });
     // ---- Midas endpoint_analytics tracking ----
     trackEndpointAnalytics(endpoint, amount, callerAddress);
+
+    // ---- Dynamic pricing demand tracking ----
+    recordDemand(endpoint);
 
     // ---- A/B pricing experiment tracking ----
     const numAmt = parseFloat(amount.replace("$", ""));
@@ -1074,6 +1125,21 @@ app.get("/token-info", async (_req, res) => {
   });
 });
 
+// ---- Dynamic Pricing API (free) ----
+app.get("/pricing", (_req, res) => {
+  const snapshot = getPricingSnapshot();
+  res.json({
+    ...snapshot,
+    bundles: BUNDLES.map((b) => ({
+      name: b.name,
+      description: b.description,
+      endpoints: b.endpoints,
+      bundlePrice: `$${getBundlePrice(b).toFixed(2)}`,
+      discount: `${(b.discount * 100).toFixed(0)}%`,
+    })),
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -1114,9 +1180,29 @@ app.get("/health", (_req, res) => {
         "GET /liquidation-signal": "$0.25 — DeFi liquidation signals",
         "GET /arb-detection": "$0.20 — cross-DEX arbitrage signals",
         "GET /governance-signal": "$0.10 — governance proposal tracker",
+        // Cross-Chain Swaps
+        "POST /cross-chain-swap": "$0.65 — initiate Base→Solana→Jupiter→Kamino swap",
+        "POST /cross-chain-swap/quote": "free — estimate output and fees",
+        "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
+        "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
+        // Kamino Vault Direct
+        "POST /kamino/deposit": "$0.15 — deposit tokens into Kamino vault",
+        "POST /kamino/withdraw": "$0.15 — withdraw tokens from Kamino vault",
+        // Kamino Borrow / Lending
+        "GET /kamino/obligation": "$0.05 — user lending obligation (LTV, deposits, borrows)",
+        "POST /kamino/deposit-collateral": "$0.20 — deposit collateral into lending market",
+        "POST /kamino/borrow": "$0.20 — borrow assets against collateral",
+        "POST /kamino/repay": "$0.15 — repay a loan",
+        "POST /kamino/withdraw-collateral": "$0.20 — withdraw collateral from lending market",
       },
       free: {
         "GET /health": "this endpoint",
+        "GET /cross-chain/queue": "batch queue stats",
+        "GET /cross-chain/vaults": "available Kamino vaults",
+        "GET /kamino/vault-details": "live vault data (APY, holdings, exchange rate via SDK)",
+        "GET /kamino/positions": "user vault positions across all vaults",
+        "GET /kamino/market": "lending market overview (TVL, reserves, APYs)",
+        "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
         "GET /token-info": "XMETAV token info and tier table",
         "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
         "POST /digest": "trigger payment→memory digest (writes to agent memories)",
@@ -1139,6 +1225,13 @@ const alphaRouter = createAlphaFeedsRouter(
   (callerAddress) => getCallerTier(callerAddress)
 );
 app.use(alphaRouter);
+
+// ---- Cross-Chain Swap Routes (Base ↔ Solana / Jupiter / Kamino) ----
+const crossChainRouter = createCrossChainRouter(
+  (endpoint, amount, req) => logPayment(endpoint, amount, req),
+  (callerAddress) => getCallerTier(callerAddress)
+);
+app.use(crossChainRouter);
 
 // ---- On-Demand Payment Digest ----
 app.post("/digest", async (_req, res) => {
@@ -1268,6 +1361,12 @@ const server = app.listen(port, () => {
 
   // Start payment→memory digest scheduler (hourly)
   startDigestScheduler();
+
+  // Start dynamic pricing sync to Supabase (every 5 min)
+  if (supabase) {
+    setInterval(() => syncPricingToSupabase(supabase), 5 * 60 * 1000);
+    console.log(`  Pricing:   dynamic (syncs to Supabase every 5min)`);
+  }
 });
 
 // ── Graceful Shutdown: write session summary to memory ──

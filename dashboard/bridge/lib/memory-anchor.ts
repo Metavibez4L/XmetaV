@@ -201,6 +201,165 @@ export async function anchorMemory(
 const anchorCache = new Map<number, { data: ReturnType<typeof _fetchAnchor> extends Promise<infer R> ? R : never; expiresAt: number }>();
 const ANCHOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// ---- Batch Anchor Queue ----
+
+interface QueuedAnchor {
+  agentId: number;
+  category: MemoryCategoryType;
+  memory: {
+    content: string;
+    kind: string;
+    source?: string;
+    task?: string;
+    timestamp?: string;
+  };
+  resolve: (result: { ipfsCid: string; txHash: string; gatewayUrl: string } | null) => void;
+  reject: (err: Error) => void;
+}
+
+const anchorQueue: QueuedAnchor[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Batch size threshold — flush when we hit this many items */
+const BATCH_SIZE = 3;
+/** Max wait before flushing even a partial batch (ms) */
+const BATCH_FLUSH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Queue a memory for batch anchoring.
+ * Returns the same result shape as anchorMemory().
+ * Findings are buffered and flushed as a single batch pin + tx.
+ */
+export function queueAnchor(
+  agentId: number,
+  category: MemoryCategoryType,
+  memory: {
+    content: string;
+    kind: string;
+    source?: string;
+    task?: string;
+    timestamp?: string;
+  }
+): Promise<{ ipfsCid: string; txHash: string; gatewayUrl: string } | null> {
+  if (!isAnchoringEnabled()) {
+    console.log("[anchor] Batch skipped — not fully configured");
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve, reject) => {
+    anchorQueue.push({ agentId, category, memory, resolve, reject });
+    console.log(`[anchor] Queued anchor (${anchorQueue.length}/${BATCH_SIZE})`);
+
+    // Start a flush timer if not running
+    if (!flushTimer) {
+      flushTimer = setTimeout(() => flushAnchorQueue(), BATCH_FLUSH_INTERVAL);
+    }
+
+    // Flush immediately when batch is full
+    if (anchorQueue.length >= BATCH_SIZE) {
+      flushAnchorQueue();
+    }
+  });
+}
+
+/**
+ * Flush the anchor queue — pins all queued items as one IPFS blob
+ * and writes a single on-chain anchor for the batch.
+ */
+async function flushAnchorQueue(): Promise<void> {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
+  if (anchorQueue.length === 0) return;
+
+  // Drain the queue
+  const batch = anchorQueue.splice(0, anchorQueue.length);
+  console.log(`[anchor] Flushing batch of ${batch.length} anchors`);
+
+  try {
+    // Build a combined IPFS blob
+    const batchBlob = {
+      type: "batch-anchor",
+      count: batch.length,
+      anchoredAt: new Date().toISOString(),
+      items: batch.map((item) => ({
+        agentId: item.agentId,
+        category: item.category,
+        ...item.memory,
+      })),
+    };
+
+    const pinName = `batch-anchor-${batch.length}-${Date.now()}`;
+    const pinResult = await pinJSON(batchBlob, pinName);
+    console.log(`[anchor] Batch pinned to IPFS: ${pinResult.ipfsHash} (${pinResult.pinSize} bytes)`);
+
+    // Use the first item's agentId and highest category for the on-chain anchor
+    const representativeAgentId = batch[0].agentId;
+    const highestCategory = Math.max(...batch.map((b) => b.category)) as MemoryCategoryType;
+
+    const contentHash = keccak256(toHex(pinResult.ipfsHash));
+    const account = privateKeyToAccount(`0x${PRIVATE_KEY!.replace(/^0x/, "")}`);
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http(RPC_URL),
+    });
+
+    const txHash = await walletClient.writeContract({
+      address: ANCHOR_ADDRESS!,
+      abi: ANCHOR_ABI,
+      functionName: "anchor",
+      args: [BigInt(representativeAgentId), contentHash, highestCategory],
+    });
+
+    console.log(`[anchor] Batch tx submitted: ${txHash}`);
+
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+        confirmations: 1,
+        timeout: 60_000,
+      });
+
+      if (receipt.status === "reverted") {
+        console.error(`[anchor] Batch TX reverted: ${txHash}`);
+        batch.forEach((item) => item.resolve(null));
+        return;
+      }
+
+      console.log(
+        `[anchor] ✓ Batch confirmed block ${receipt.blockNumber} (gas: ${receipt.gasUsed}, items: ${batch.length})`
+      );
+    } catch (waitErr) {
+      console.warn(`[anchor] Batch TX confirmation timeout: ${(waitErr as Error).message}`);
+    }
+
+    const result = {
+      ipfsCid: pinResult.ipfsHash,
+      txHash,
+      gatewayUrl: ipfsGatewayURL(pinResult.ipfsHash),
+    };
+
+    // Resolve all queued promises with the shared result
+    batch.forEach((item) => item.resolve(result));
+  } catch (err) {
+    console.error(`[anchor] Batch flush failed:`, (err as Error).message);
+    batch.forEach((item) => item.resolve(null));
+  }
+}
+
+/**
+ * Force-flush any remaining anchors (call on shutdown).
+ */
+export async function flushPendingAnchors(): Promise<void> {
+  if (anchorQueue.length > 0) {
+    console.log(`[anchor] Flushing ${anchorQueue.length} pending anchors on shutdown`);
+    await flushAnchorQueue();
+  }
+}
+
 async function _fetchAnchor(agentId: number) {
   if (!ANCHOR_ADDRESS) return null;
   try {

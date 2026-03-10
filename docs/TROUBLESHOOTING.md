@@ -466,3 +466,42 @@ aplay -l  # List playback devices
   ```bash
   ./scripts/health-check.sh
   ```
+
+## Problem: `rpc.getAccountInfo(...).send is not a function` in Kamino modules
+
+### Cause
+`@kamino-finance/klend-sdk` 7.3.20 requires `@solana/kit` v2 Rpc protocol — **not** the legacy `@solana/web3.js` Connection object. Passing a `Connection` to `KaminoVault` or `KaminoMarket.load()` causes this error.
+
+### Fix
+Use `createSolanaRpc()` from `@solana/kit` instead of `new Connection()`:
+
+```typescript
+import { createSolanaRpc } from "@solana/kit";
+const rpc = createSolanaRpc(process.env.SOLANA_RPC_URL!);
+// Pass to SDK: new KaminoVault(rpc as any, vaultAddress as any)
+```
+
+Both `kamino-vault.ts` and `kamino-borrow.ts` use this pattern. Bridge uses `as any` casts at SDK boundaries for type compat between `@solana/kit` (Address, Rpc, TransactionSigner) and `@solana/web3.js` (PublicKey, Connection, Keypair).
+
+**Fixed in:** commits `a473283` (borrow), `a97458b` (vault)
+
+## Problem: Kamino vault returns "belongs to wrong program"
+
+### Cause
+The configured vault address is a klend lending reserve, not a kvault. The error looks like:
+```
+VaultStateFields account ByYiZxp8Q... belongs to wrong program KLend..., expected KvauG...
+```
+
+### Fix
+Verify vault addresses belong to the kvault program (`KvauGxrk...`). Search live SDK vaults for the correct address:
+```bash
+curl -s "http://localhost:4021/cross-chain/vaults" | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+for v in d['sdkVaults']:
+  if v['tokenMint']=='So11111111111111111111111111111111111111112':
+    print(v['address'], v.get('sharesIssued','?'))
+"
+```
+
+**Fixed in:** commit `a1829f9` — SOL_MAIN corrected to `DcCRSdUMgAt6ZMeuL4BJAsZmJgND2LQd74Zq4z6ckhpg`

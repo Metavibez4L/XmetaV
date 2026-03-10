@@ -1,0 +1,217 @@
+/* ─── Arena HUD Animations ──────────────────────────────────────────── */
+
+/* Glitch title effect */
+@keyframes arena-glitch {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  5% { clip-path: inset(40% 0 20% 0); transform: translate(-2px, 1px); }
+  10% { clip-path: inset(10% 0 60% 0); transform: translate(2px, -1px); }
+  15% { clip-path: inset(0 0 0 0); transform: translate(0); }
+}
+
+@keyframes arena-glitch-2 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 0; }
+  4% { opacity: 0; }
+  5% { clip-path: inset(30% 0 30% 0); transform: translate(3px, 0); opacity: 0.8; }
+  10% { clip-path: inset(50% 0 10% 0); transform: translate(-3px, 0); opacity: 0.6; }
+  15% { opacity: 0; }
+}
+
+.arena-title-glitch {
+  position: relative;
+}
+.arena-title-glitch::before,
+.arena-title-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.arena-title-glitch::before {
+  color: #ff006e;
+  animation: arena-glitch 8s infinite;
+  z-index: -1;
+}
+.arena-title-glitch::after {
+  color: #39ff14;
+  animation: arena-glitch-2 8s infinite;
+  animation-delay: 0.05s;
+  z-index: -1;
+}
+
+/* Scanline overlay */
+@keyframes arena-scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.arena-scanline-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+.arena-scanline-overlay::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f0ff08, #00f0ff12, #00f0ff08, transparent);
+  animation: arena-scanline 6s linear infinite;
+  box-shadow: 0 0 20px 4px #00f0ff06;
+}
+
+/* Vignette corners */
+.arena-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at center, transparent 55%, #05080fcc 100%);
+}
+
+/* Corner brackets */
+.arena-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  z-index: 6;
+  pointer-events: none;
+}
+.arena-corner::before,
+.arena-corner::after {
+  content: "";
+  position: absolute;
+  background: #00f0ff;
+  opacity: 0.15;
+}
+.arena-corner--tl { top: 12px; left: 12px; }
+.arena-corner--tl::before { width: 24px; height: 1px; top: 0; left: 0; }
+.arena-corner--tl::after { width: 1px; height: 24px; top: 0; left: 0; }
+
+.arena-corner--tr { top: 12px; right: 12px; }
+.arena-corner--tr::before { width: 24px; height: 1px; top: 0; right: 0; }
+.arena-corner--tr::after { width: 1px; height: 24px; top: 0; right: 0; }
+
+.arena-corner--bl { bottom: 12px; left: 12px; }
+.arena-corner--bl::before { width: 24px; height: 1px; bottom: 0; left: 0; }
+.arena-corner--bl::after { width: 1px; height: 24px; bottom: 0; left: 0; }
+
+.arena-corner--br { bottom: 12px; right: 12px; }
+.arena-corner--br::before { width: 24px; height: 1px; bottom: 0; right: 0; }
+.arena-corner--br::after { width: 1px; height: 24px; bottom: 0; right: 0; }
+
+/* Radar sweep (for stats panel) */
+@keyframes arena-radar {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.arena-radar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  position: relative;
+  border: 1px solid #00f0ff15;
+  overflow: hidden;
+}
+.arena-radar::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 2px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #00f0ff44, transparent);
+  animation: arena-radar 3s linear infinite;
+}
+.arena-radar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #00f0ff;
+  box-shadow: 0 0 6px #00f0ff88;
+}
+
+/* Event log entry animation */
+@keyframes arena-event-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.arena-event-entry {
+  animation: arena-event-in 0.3s ease-out;
+}
+
+/* Pulse dot for live agents */
+@keyframes arena-pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.arena-pulse-dot {
+  position: relative;
+}
+.arena-pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  animation: arena-pulse-ring 2s ease-out infinite;
+}
+
+/* HUD panel glass effect */
+.arena-hud-panel {
+  background: #05080fdd;
+  border: 1px solid #00f0ff15;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+.arena-hud-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #00f0ff22, transparent);
+}
+
+/* Animated border glow for meeting state */
+@keyframes arena-meeting-border {
+  0%, 100% { border-color: #a855f733; box-shadow: 0 0 12px #a855f711; }
+  50% { border-color: #a855f766; box-shadow: 0 0 24px #a855f722, inset 0 0 12px #a855f708; }
+}
+.arena-meeting-glow {
+  background: #05080fdd;
+  border: 1px solid #a855f733;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: arena-meeting-border 2s ease-in-out infinite;
+}
+
+/* Status bar animation */
+@keyframes arena-status-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Title underline sweep */
+@keyframes arena-underscore {
+  0% { width: 0; opacity: 0; }
+  50% { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0.3; }
+}
+.arena-title-line {
+  height: 1px;
+  background: linear-gradient(90deg, #00f0ff, #00f0ff44, transparent);
+  animation: arena-underscore 3s ease-out forwards;
+}

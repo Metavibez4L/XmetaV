@@ -1,24 +1,77 @@
 {
   "meta": {
-    "lastTouchedVersion": "2026.2.17",
-    "lastTouchedAt": "2026-02-18T00:00:00.000Z"
+    "lastTouchedVersion": "2026.3.7",
+    "lastTouchedAt": "2026-03-08T00:00:00.000Z"
   },
   "agents": {
     "defaults": {
       "models": {
         "ollama:qwen2.5:7b-instruct": {},
-        "ollama:kimi-k2.5:cloud": {}
+        "ollama:kimi-k2.5:cloud": {},
+        "ollama:qwen2.5:32b-instruct": {}
       },
       "workspace": "/home/manifest/.openclaw/workspace",
+      "contextTokens": 131072,
+      "memorySearch": {
+        "provider": "ollama",
+        "model": "nomic-embed-text"
+      },
       "compaction": {
-        "mode": "safeguard"
+        "mode": "safeguard",
+        "recentTurnsPreserve": 4,
+        "postCompactionSections": [
+          "Session Startup",
+          "Red Lines"
+        ]
       },
       "maxConcurrent": 2,
       "subagents": {
         "maxConcurrent": 4
       },
       "model": {
-        "primary": "ollama/qwen2.5:7b-instruct"
+        "primary": "ollama/kimi-k2.5:cloud"
+      },
+      "tools": {
+        "exec": {
+          "pathPrepend": [
+            "/opt/homebrew/bin",
+            "/usr/local/bin"
+          ],
+          "timeout": 300,
+          "notifyOnExit": true,
+          "safeBins": [
+            "cat",
+            "head",
+            "tail",
+            "grep",
+            "awk",
+            "sed",
+            "sort",
+            "uniq",
+            "wc",
+            "tr",
+            "cut",
+            "tee",
+            "diff",
+            "jq",
+            "less",
+            "find",
+            "ls",
+            "file",
+            "date",
+            "echo",
+            "printf",
+            "test",
+            "true",
+            "false",
+            "mktemp"
+          ],
+          "safeBinTrustedDirs": [
+            "/bin",
+            "/usr/bin",
+            "/opt/homebrew/bin"
+          ]
+        }
       }
     },
     "list": [
@@ -31,10 +84,24 @@
         },
         "tools": {
           "profile": "full",
-          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
-          "deny": ["tts"],
+          "allow": [
+            "group:fs",
+            "group:runtime",
+            "group:ui",
+            "group:web",
+            "group:sessions",
+            "group:automation"
+          ],
+          "deny": [
+            "tts"
+          ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -46,11 +113,20 @@
         },
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -62,9 +138,21 @@
         },
         "tools": {
           "profile": "full",
-          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "allow": [
+            "group:fs",
+            "group:runtime",
+            "group:ui",
+            "group:web",
+            "group:sessions",
+            "group:automation"
+          ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -76,11 +164,20 @@
         },
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -92,9 +189,21 @@
         },
         "tools": {
           "profile": "full",
-          "allow": ["group:fs", "group:runtime", "group:ui", "group:web", "group:sessions", "group:automation"],
+          "allow": [
+            "group:fs",
+            "group:runtime",
+            "group:ui",
+            "group:web",
+            "group:sessions",
+            "group:automation"
+          ],
           "elevated": {
             "enabled": true
+          },
+          "exec": {
+            "host": "gateway",
+            "security": "full",
+            "timeout": 300
           }
         }
       },
@@ -104,14 +213,28 @@
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
         },
-        "skills": ["gas", "standards", "addresses", "concepts"],
+        "skills": [
+          "gas",
+          "standards",
+          "addresses",
+          "concepts"
+        ],
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -123,11 +246,20 @@
         },
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 120
           }
         }
       },
@@ -139,11 +271,20 @@
         },
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
           }
         }
       },
@@ -153,14 +294,26 @@
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
         },
-        "skills": ["gas", "l2s"],
+        "skills": [
+          "gas",
+          "l2s"
+        ],
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -170,14 +323,26 @@
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
         },
-        "skills": ["gas", "addresses"],
+        "skills": [
+          "gas",
+          "addresses"
+        ],
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -187,14 +352,34 @@
         "model": {
           "primary": "ollama/kimi-k2.5:cloud"
         },
-        "skills": ["tools", "l2s", "orchestration", "addresses", "concepts", "security", "standards", "frontend-ux", "frontend-playbook", "building-blocks"],
+        "skills": [
+          "tools",
+          "l2s",
+          "orchestration",
+          "addresses",
+          "concepts",
+          "security",
+          "standards",
+          "frontend-ux",
+          "frontend-playbook",
+          "building-blocks"
+        ],
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
           }
         }
       },
@@ -206,11 +391,70 @@
         },
         "tools": {
           "profile": "coding",
-          "allow": ["exec", "process", "read", "write"],
-          "deny": ["tts"],
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
           "exec": {
             "host": "gateway",
-            "security": "full"
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 300
+          }
+        }
+      },
+      {
+        "id": "vox",
+        "workspace": "/home/manifest/.openclaw/agents/vox",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
+          "exec": {
+            "host": "sandbox",
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
+          }
+        }
+      },
+      {
+        "id": "scholar",
+        "workspace": "/home/manifest/.openclaw/agents/scholar",
+        "model": {
+          "primary": "ollama/kimi-k2.5:cloud"
+        },
+        "tools": {
+          "profile": "coding",
+          "allow": [
+            "exec",
+            "process",
+            "read",
+            "write"
+          ],
+          "deny": [
+            "tts"
+          ],
+          "exec": {
+            "host": "sandbox",
+            "security": "allowlist",
+            "ask": "on-miss",
+            "timeout": 600
           }
         }
       }
@@ -230,6 +474,22 @@
     "auth": {
       "mode": "token",
       "token": "REPLACE_ME"
+    },
+    "trustedProxies": [
+      "127.0.0.1"
+    ]
+  },
+  "session": {
+    "reset": {
+      "mode": "daily",
+      "idleMinutes": 240
+    },
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "30d",
+      "maxEntries": 500,
+      "rotateBytes": "10mb",
+      "maxDiskBytes": "50mb"
     }
   },
   "skills": {
@@ -240,9 +500,8 @@
   "models": {
     "providers": {
       "ollama": {
-        "baseUrl": "http://127.0.0.1:11434/v1",
-        "api": "openai-responses",
-        "apiKey": "local",
+        "baseUrl": "http://127.0.0.1:11434",
+        "api": "ollama",
         "models": [
           {
             "id": "qwen2.5:7b-instruct",
@@ -253,8 +512,17 @@
           {
             "id": "kimi-k2.5:cloud",
             "name": "kimi-k2.5:cloud",
-            "input": ["text", "image"],
+            "input": [
+              "text",
+              "image"
+            ],
             "contextWindow": 262144,
+            "maxTokens": 4096
+          },
+          {
+            "id": "qwen2.5:32b-instruct",
+            "name": "qwen2.5:32b-instruct",
+            "contextWindow": 32768,
             "maxTokens": 4096
           }
         ]

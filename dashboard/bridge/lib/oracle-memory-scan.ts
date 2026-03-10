@@ -18,11 +18,19 @@ const SCAN_TRIGGERS = [
   "locate",
 ];
 
+/** Domain-specific markers — one of these is strong signal */
+const SPECIFIC_MARKERS = [
+  "erc8004",
+  "erc-8004",
+  "identity-registry",
+  "memory-similarity",
+  "memory similarity",
+];
+
+/** Generic markers — need 3+ to trigger without a specific marker */
 const TOPIC_MARKERS = [
   "memory",
   "consciousness",
-  "erc8004",
-  "erc-8004",
   "anchor",
   "persistence",
   "metadata",
@@ -34,15 +42,34 @@ const TOPIC_MARKERS = [
 /**
  * Detect whether a command message is asking the oracle to scan
  * for memory-similar ERC-8004 agents.
+ *
+ * Tightened in v1.6.0 — previously matched too broadly on generic
+ * words like "find agents memory", intercepting normal prompts.
+ * Now requires either an explicit phrase, a domain-specific marker,
+ * or 3+ generic topic markers (up from 2).
  */
 export function isMemoryScanCommand(message: string): boolean {
   const lower = message.toLowerCase();
 
-  // Needs at least one scan trigger AND at least two topic markers
-  const hasTrigger = SCAN_TRIGGERS.some((t) => lower.includes(t));
-  const topicHits = TOPIC_MARKERS.filter((m) => lower.includes(m)).length;
+  // Explicit phrase match — always triggers
+  if (
+    lower.includes("memory scan") ||
+    lower.includes("memory-scan") ||
+    lower.includes("memory-similarity scan")
+  ) {
+    return true;
+  }
 
-  return hasTrigger && topicHits >= 2;
+  // Needs at least one scan trigger
+  const hasTrigger = SCAN_TRIGGERS.some((t) => lower.includes(t));
+  if (!hasTrigger) return false;
+
+  // One domain-specific marker is enough
+  if (SPECIFIC_MARKERS.some((m) => lower.includes(m))) return true;
+
+  // Fallback: require 3+ generic topic markers (was 2, too loose)
+  const topicHits = TOPIC_MARKERS.filter((m) => lower.includes(m)).length;
+  return topicHits >= 3;
 }
 
 /** Options extracted from the natural-language command */

@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
             supabase
               .from("x402_payments")
               .select("amount, endpoint, agent_id, created_at, status")
-              .in("status", ["completed", "settled"]),
+              .in("status", ["completed", "settled"])
+              .order("created_at", { ascending: false })
+              .limit(10000),
             supabase
               .from("revenue_metrics")
               .select("*")

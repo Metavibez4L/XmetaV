@@ -146,6 +146,8 @@ const AGENT_COLORS: Record<string, string> = {
   web3dev: "#f97316",
   basedintern: "#39ff14",
   akua: "#06b6d4",
+  vox: "#06b6d4",
+  scholar: "#10b981",
 };
 
 const ROOM_ICONS: Record<string, string> = {
@@ -155,6 +157,8 @@ const ROOM_ICONS: Record<string, string> = {
   web3Lab: "🔬",
   devFloor: "💻",
   soul: "🧠",
+  opsOutreach: "📢",
+  research: "📚",
 };
 
 // ---- Main Component ----

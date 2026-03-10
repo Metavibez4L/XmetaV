@@ -104,10 +104,27 @@ Service health and endpoint summary.
       "GET /arb-opportunity": "$0.25 — arbitrage scan",
       "POST /execute-arb": "$0.10+ — execute arb (1% of profit)",
       "GET /yield-optimize": "$0.50 — yield farming scan",
-      "POST /deploy-yield-strategy": "$3.00+ — deploy yield capital (0.5%)"
+      "POST /deploy-yield-strategy": "$3.00+ — deploy yield capital (0.5%)",
+      "POST /cross-chain-swap": "$0.65 — initiate Base→Solana→Jupiter→Kamino swap",
+      "POST /cross-chain-swap/quote": "free — estimate output and fees",
+      "GET /bridge-status/:jobId": "$0.05 — check cross-chain job status",
+      "POST /trigger-return/:jobId": "$0.25 — trigger return bridge Solana→Base",
+      "POST /kamino/deposit": "$0.15 — deposit into Kamino vault",
+      "POST /kamino/withdraw": "$0.15 — withdraw from Kamino vault",
+      "GET /kamino/obligation": "$0.05 — user lending obligation (LTV, deposits, borrows)",
+      "POST /kamino/deposit-collateral": "$0.20 — deposit collateral into lending market",
+      "POST /kamino/borrow": "$0.20 — borrow assets against collateral",
+      "POST /kamino/repay": "$0.15 — repay a loan",
+      "POST /kamino/withdraw-collateral": "$0.20 — withdraw collateral from lending market"
     },
     "free": {
       "GET /health": "this endpoint",
+      "GET /cross-chain/queue": "batch queue stats",
+      "GET /cross-chain/vaults": "available Kamino vaults",
+      "GET /kamino/vault-details": "live vault data (APY, holdings, exchange rate via SDK)",
+      "GET /kamino/positions": "user vault positions across all vaults",
+      "GET /kamino/market": "lending market overview (TVL, reserves, APYs)",
+      "GET /pricing": "dynamic pricing snapshot (demand, time, bundles)",
       "GET /token-info": "XMETAV token info and tier table",
       "GET /agent/:agentId/payment-info": "ERC-8004 agent payment capabilities",
       "GET /digest": "trigger payment digest & memory write",
@@ -625,6 +642,201 @@ Generate transactions to deploy capital into a yield strategy.
 
 ---
 
+## Cross-Chain Swap Endpoints (Base↔Solana)
+
+Full multi-chain swap pipeline: bridge USDC from Base to Solana, swap via Jupiter Ultra, deposit into Kamino yield vaults, and optionally bridge returns back to Base.
+
+### `POST /cross-chain-swap/quote` (Free)
+
+Estimate output, fees, and Jupiter routing without executing.
+
+**Body**:
+```json
+{
+  "amount": "10",
+  "outputToken": "SOL",
+  "vaultStrategy": "USDC_MAIN",
+  "returnToBase": false
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `amount` | string | Yes | — | USDC amount (human-readable) |
+| `outputToken` | string | No | `"USDC"` | Target token: `SOL`, `USDC`, `BONK`, `JUP` |
+| `vaultStrategy` | string | No | `"none"` | Kamino vault: `USDC_MAIN`, `SOL_MAIN`, `none` |
+| `returnToBase` | boolean | No | `false` | Whether to bridge output back to Base |
+
+**Response** `200`:
+```json
+{
+  "input": 10,
+  "outputToken": "SOL",
+  "estimatedFees": 0.51,
+  "estimatedOutput": 9.49,
+  "margin": "94.9%",
+  "jupiterQuote": {
+    "estimatedOutput": 0.122511342,
+    "priceImpact": -0.0003,
+    "route": ["PancakeSwap", "Whirlpool", "Meteora DLMM", "TesseraV"],
+    "slippageBps": 50
+  },
+  "vaultInfo": null,
+  "batched": false,
+  "note": "Will execute immediately"
+}
+```
+
+---
+
+### `POST /cross-chain-swap` — $0.65
+
+Initiate a full cross-chain swap. Creates a job, optionally batches sub-threshold amounts.
+
+**Body**:
+```json
+{
+  "amount": "10",
+  "outputToken": "SOL",
+  "vaultStrategy": "USDC_MAIN",
+  "returnToBase": false
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `amount` | string | Yes | — | USDC amount ($0.65–$500) |
+| `outputToken` | string | No | `"USDC"` | `SOL`, `USDC`, `BONK`, `JUP` |
+| `vaultStrategy` | string | No | `"none"` | `USDC_MAIN`, `SOL_MAIN`, `none` |
+| `returnToBase` | boolean | No | `false` | Bridge output back to Base |
+
+**Response** `200`:
+```json
+{
+  "jobId": "292e31a9-...",
+  "status": "bridging_to_sol",
+  "estimatedCompletion": "5-20 minutes",
+  "breakdown": {
+    "payment": 10,
+    "estimatedFees": {
+      "bridgeToSolana": 0.25,
+      "jupiterSwap": 0.01,
+      "kaminoDeposit": 0,
+      "bridgeToBase": 0,
+      "total": 0.26
+    },
+    "estimatedOutput": 9.74,
+    "estimatedMargin": "97.4%"
+  },
+  "batched": false
+}
+```
+
+---
+
+### `GET /bridge-status/:jobId` — $0.05
+
+Check the status of a cross-chain job.
+
+**Response** `200`:
+```json
+{
+  "job": {
+    "id": "292e31a9-...",
+    "status": "swapped",
+    "payment_amount": "10.000000",
+    "output_token": "SOL",
+    "bridged_amount": 9.75,
+    "swap_output_amount": 0.122,
+    "created_at": "2026-03-08T...",
+    "updated_at": "2026-03-08T..."
+  }
+}
+```
+
+Job status progression: `pending` → `batched` → `bridging_to_sol` → `bridged` → `swapping` → `swapped` → `depositing` → `vaulted` → `withdrawing` → `bridging_to_base` → `completed`
+
+---
+
+### `POST /trigger-return/:jobId` — $0.25
+
+Trigger withdrawal from Kamino vault and bridge funds back to Base.
+
+**Response** `200`:
+```json
+{
+  "jobId": "292e31a9-...",
+  "status": "withdrawing",
+  "note": "Withdrawal initiated — funds will bridge back to Base"
+}
+```
+
+---
+
+### `GET /cross-chain/queue` (Free)
+
+Batch queue statistics.
+
+**Response** `200`:
+```json
+{
+  "pendingJobs": 0,
+  "pendingAmount": 0,
+  "activeJobs": 0,
+  "completedJobs": 0,
+  "failedJobs": 0,
+  "totalBatches": 0,
+  "batchThreshold": 6.5,
+  "batchTimeout": 3600,
+  "emergencyPause": false
+}
+```
+
+---
+
+### `GET /cross-chain/vaults` (Free)
+
+Available Kamino yield vaults.
+
+**Response** `200`:
+```json
+{
+  "vaults": {
+    "USDC_MAIN": {
+      "address": "HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E",
+      "name": "Kamino USDC Main Vault",
+      "token": "USDC",
+      "tokenMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "estimatedApy": 8.5
+    },
+    "SOL_MAIN": {
+      "address": "ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5",
+      "name": "Kamino SOL Main Vault",
+      "token": "SOL",
+      "tokenMint": "So11111111111111111111111111111111111111112",
+      "estimatedApy": 7.2
+    }
+  },
+  "note": "APY estimates are approximate and subject to change"
+}
+```
+
+---
+
+### On-Chain Contracts (Cross-Chain)
+
+| Contract | Address | Network |
+|----------|---------|---------|
+| USDC Bridge (CCTP) | `0x3eff766C76a1be2Ce1aCF2B69c78bCae257D5188` | Base Mainnet |
+| Solana Token Messenger | `CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3` | Solana Mainnet |
+| USDC (Solana) | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Solana Mainnet |
+| SOL (Native) | `So11111111111111111111111111111111111111112` | Solana Mainnet |
+| Jupiter Program | `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4` | Solana Mainnet |
+| Kamino USDC Vault | `HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E` | Solana Mainnet |
+| Kamino SOL Vault | `ByYiZxp8QrdN9qbdtaAiePN8AAr3qvTPppNJDpf5DVJ5` | Solana Mainnet |
+
+---
+
 ### `GET /trade-fees` (Free)
 
 View the trade fee schedule, whale tiers, and projected monthly revenue.
@@ -636,6 +848,247 @@ View the trade fee schedule, whale tiers, and projected monthly revenue.
   "projectedMonthlyRevenue": "$36,950.00",
   "xmetavDiscountTiers": { ... }
 }
+```
+
+---
+
+## Standalone Kamino Vault Endpoints
+
+Direct deposit/withdraw to Kamino yield vaults without a full cross-chain swap.
+
+### `POST /kamino/deposit` — $0.15
+
+Deposit funds into a Kamino vault.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `vault` | string | Yes | — | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+| `amount` | string | Yes | — | Amount to deposit (in token units) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/deposit \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "amount": "50"}'
+```
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "vault": "USDC_MAIN",
+  "amount": "50",
+  "explorerUrl": "https://solscan.io/tx/...",
+  "timestamp": "2026-03-08T12:00:00.000Z"
+}
+```
+
+---
+
+### `POST /kamino/withdraw` — $0.15
+
+Withdraw funds from a Kamino vault by redeeming kToken shares.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `vault` | string | Yes | — | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+| `shares` | string | Yes | — | kToken shares to redeem (raw units) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/withdraw \
+  -H "Content-Type: application/json" \
+  -d '{"vault": "USDC_MAIN", "shares": "1000000"}'
+```
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "vault": "USDC_MAIN",
+  "amount": "25",
+  "explorerUrl": "https://solscan.io/tx/...",
+  "timestamp": "2026-03-08T12:00:00.000Z"
+}
+```
+
+---
+
+## Kamino SDK Borrow/Lending Endpoints (v28.2)
+
+Full lending market integration via `@kamino-finance/klend-sdk`. SDK-first with API fallback.
+
+### `GET /kamino/vault-details` — Free
+
+Live vault data from the Kamino SDK (APY, holdings, exchange rate).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `vault` | string | Yes (query) | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/vault-details?vault=USDC_MAIN
+```
+
+**Response** `200`:
+```json
+{
+  "vault": "USDC_MAIN",
+  "totalDeposits": "15234567.89",
+  "apy": "8.42",
+  "exchangeRate": "1.0842",
+  "holdings": { "token": "USDC", "amount": "15234567.89" },
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/positions` — Free
+
+User vault positions across all vaults.
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/positions
+```
+
+**Response** `200`:
+```json
+{
+  "positions": [
+    { "vault": "USDC_MAIN", "shares": "100.00", "value": "108.42" },
+    { "vault": "SOL_MAIN", "shares": "5.00", "value": "5.21" }
+  ],
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/market` — Free
+
+Lending market overview with TVL, reserves, and APYs.
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/market
+```
+
+**Response** `200`:
+```json
+{
+  "market": "7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF",
+  "tvl": "1234567890.00",
+  "reserves": [
+    { "symbol": "USDC", "supplyApy": "8.42", "borrowApy": "12.31", "totalSupply": "500000000" },
+    { "symbol": "SOL", "supplyApy": "6.15", "borrowApy": "9.87", "totalSupply": "2000000" }
+  ],
+  "source": "sdk"
+}
+```
+
+---
+
+### `GET /kamino/obligation` — $0.05
+
+User lending obligation including LTV, deposited collateral, and borrowed assets.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `wallet` | string | No (query) | Override wallet address (defaults to server wallet) |
+
+**Example**:
+```bash
+curl http://localhost:4021/kamino/obligation
+```
+
+**Response** `200`:
+```json
+{
+  "obligation": {
+    "deposits": [{ "symbol": "USDC", "amount": "1000.00" }],
+    "borrows": [{ "symbol": "SOL", "amount": "2.5" }],
+    "ltv": "0.45",
+    "liquidationThreshold": "0.80"
+  },
+  "source": "sdk"
+}
+```
+
+---
+
+### `POST /kamino/deposit-collateral` — $0.20
+
+Deposit collateral into the Kamino lending market. SDK-first with API fallback.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Token mint address (e.g., USDC: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) |
+| `amount` | string | Yes | Amount to deposit (human-readable) |
+
+> **Note**: The server automatically resolves the token mint to the correct Kamino lending reserve address via `resolveReserveAddress()`.
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/deposit-collateral \
+  -H "Content-Type: application/json" \
+  -d '{"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
+```
+
+---
+
+### `POST /kamino/borrow` — $0.20
+
+Borrow assets against deposited collateral.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Token mint to borrow |
+| `amount` | string | Yes | Amount to borrow (human-readable) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/borrow \
+  -H "Content-Type: application/json" \
+  -d '{"token": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+```
+
+---
+
+### `POST /kamino/repay` — $0.15
+
+Repay a borrowed loan.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Token mint to repay |
+| `amount` | string | Yes | Amount to repay (human-readable) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/repay \
+  -H "Content-Type: application/json" \
+  -d '{"token": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+```
+
+---
+
+### `POST /kamino/withdraw-collateral` — $0.20
+
+Withdraw collateral from the lending market.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Token mint to withdraw |
+| `amount` | string | Yes | Amount to withdraw (human-readable) |
+
+**Example**:
+```bash
+curl -X POST http://localhost:4021/kamino/withdraw-collateral \
+  -H "Content-Type: application/json" \
+  -d '{"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
 ```
 
 ---
@@ -658,6 +1111,10 @@ View the trade fee schedule, whale tiers, and projected monthly revenue.
 | ERC-8004 Identity Registry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | Base Mainnet |
 | $XMETAV Token (ERC-20) | `0x5b56CD209e3F41D0eCBf69cD4AbDE03fC7c25b54` | Base Mainnet |
 | USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Base Mainnet |
+| USDC Bridge (CCTP) | `0x3eff766C76a1be2Ce1aCF2B69c78bCae257D5188` | Base Mainnet |
+| Solana Token Messenger | `CCTPiPYPc6AsJuwueEnWgSgucamXDZwBd53dQ11YiKX3` | Solana Mainnet |
+| USDC (Solana) | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Solana Mainnet |
+| Jupiter Program | `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4` | Solana Mainnet |
 
 ---
 

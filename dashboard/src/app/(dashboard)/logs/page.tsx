@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { Terminal, FileText, Activity } from "lucide-react";
 import { LiveLogs } from "@/components/LiveLogs";

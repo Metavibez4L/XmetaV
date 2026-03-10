@@ -35,7 +35,7 @@ const VOICES: { id: string; label: string; desc: string }[] = [
 
 // ── Component ──
 
-export function VoiceSettingsPanel({
+export const VoiceSettingsPanel = React.memo(function VoiceSettingsPanel({
   settings,
   onUpdate,
   wakeWordSupported,
@@ -250,8 +250,7 @@ export function VoiceSettingsPanel({
       )}
     </div>
   );
-}
-
+});
 // ── Sub-components ──
 
 function SettingsSection({

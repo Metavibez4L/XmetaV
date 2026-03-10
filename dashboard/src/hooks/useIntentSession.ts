@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { IntentSession, IntentCommand } from "@/lib/types";
 
 export function useIntentSessions() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [sessions, setSessions] = useState<IntentSession[]>([]);
   const [loading, setLoading] = useState(true);
 

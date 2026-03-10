@@ -1,21 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useConsciousness } from "@/hooks/useConsciousness";
 import {
   UnifiedAwareness,
-  MemoryGraph,
   AnchorTimeline,
   ContextMetrics,
   DreamModeStatus,
-  DreamscapeView,
   LucidDreaming,
-  SwarmNetwork,
-  MiniArena,
-  DreamSynthesis,
-  PredictiveContext,
-  MemoryReforge,
 } from "@/components/consciousness";
 import { Brain, RefreshCw, Loader2 } from "lucide-react";
+
+// Lazy-load heavy canvas / visualization components
+const MemoryGraph = dynamic(() => import("@/components/consciousness").then(m => m.MemoryGraph), { ssr: false });
+const DreamscapeView = dynamic(() => import("@/components/consciousness").then(m => m.DreamscapeView), { ssr: false });
+const MiniArena = dynamic(() => import("@/components/consciousness").then(m => m.MiniArena), { ssr: false });
+const SwarmNetwork = dynamic(() => import("@/components/consciousness").then(m => m.SwarmNetwork), { ssr: false });
+const DreamSynthesis = dynamic(() => import("@/components/consciousness").then(m => m.DreamSynthesis), { ssr: false });
+const PredictiveContext = dynamic(() => import("@/components/consciousness").then(m => m.PredictiveContext), { ssr: false });
+const MemoryReforge = dynamic(() => import("@/components/consciousness").then(m => m.MemoryReforge), { ssr: false });
 
 export default function ConsciousnessPage() {
   const {

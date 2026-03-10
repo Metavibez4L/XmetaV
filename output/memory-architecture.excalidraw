@@ -1,0 +1,115 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "XmetaV Memory Architecture Generator",
+  "elements": [
+    {
+      "id": "session-buffer",
+      "type": "rectangle",
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 120,
+      "backgroundColor": "#00f0ff",
+      "strokeColor": "#0a0f14",
+      "roughness": 1,
+      "opacity": 100,
+      "text": "SESSION BUFFER\n(RAM)\n0ms latency\n10 hot memories"
+    },
+    {
+      "id": "supabase",
+      "type": "rectangle",
+      "x": 400,
+      "y": 100,
+      "width": 200,
+      "height": 120,
+      "backgroundColor": "#39ff14",
+      "strokeColor": "#0a0f14",
+      "roughness": 1,
+      "opacity": 100,
+      "text": "SUPABASE\n(PostgreSQL)\n10ms latency\nFull history"
+    },
+    {
+      "id": "base",
+      "type": "rectangle",
+      "x": 700,
+      "y": 100,
+      "width": 200,
+      "height": 120,
+      "backgroundColor": "#ff2d5e",
+      "strokeColor": "#0a0f14",
+      "roughness": 1,
+      "opacity": 100,
+      "text": "BASE MAINNET\n(Proof)\n3s latency\n200 anchors"
+    },
+    {
+      "id": "arrow1",
+      "type": "arrow",
+      "x": 300,
+      "y": 160,
+      "width": 100,
+      "height": 0,
+      "points": [[0, 0], [100, 0]],
+      "strokeColor": "#00f0ff",
+      "roughness": 1
+    },
+    {
+      "id": "arrow2",
+      "type": "arrow",
+      "x": 600,
+      "y": 160,
+      "width": 100,
+      "height": 0,
+      "points": [[0, 0], [100, 0]],
+      "strokeColor": "#39ff14",
+      "roughness": 1
+    },
+    {
+      "id": "dikw-label",
+      "type": "text",
+      "x": 100,
+      "y": 280,
+      "width": 800,
+      "height": 60,
+      "text": "DIKW FLOW: Data → Information → Knowledge → Wisdom",
+      "fontSize": 24,
+      "color": "#00f0ff"
+    },
+    {
+      "id": "hot-label",
+      "type": "text",
+      "x": 150,
+      "y": 240,
+      "width": 100,
+      "height": 20,
+      "text": "HOT",
+      "fontSize": 14,
+      "color": "#00f0ff"
+    },
+    {
+      "id": "warm-label",
+      "type": "text",
+      "x": 450,
+      "y": 240,
+      "width": 100,
+      "height": 20,
+      "text": "WARM",
+      "fontSize": 14,
+      "color": "#39ff14"
+    },
+    {
+      "id": "cold-label",
+      "type": "text",
+      "x": 750,
+      "y": 240,
+      "width": 100,
+      "height": 20,
+      "text": "COLD",
+      "fontSize": 14,
+      "color": "#ff2d5e"
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#0a0f14"
+  }
+}

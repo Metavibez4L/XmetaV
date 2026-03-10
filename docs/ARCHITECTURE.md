@@ -1,6 +1,6 @@
 # Architecture — XmetaV OpenClaw Command Center
 
-**Last updated:** 2026-03-02  
+**Last updated:** 2026-03-08  
 **Platform:** Mac Studio (M3 Ultra, 96GB) — macOS 26.3  
 **Location:** NYC (always-on headless server)  
 **Remote access:** Tailscale VPN from MacBook Air (NC)
@@ -37,6 +37,10 @@ flowchart TB
         TBL_X402["x402_payments"]
         TBL_SOUL["soul_dream_*"]
         TBL_INTENT["intent_sessions"]
+        TBL_SINC["sentinel_incidents"]
+        TBL_SHEAL["sentinel_healing_log"]
+        TBL_STRC["sentinel_traces"]
+        TBL_SRES["sentinel_resource_snapshots"]
     end
 
     subgraph BASE["Base Mainnet (eip155:8453)"]
@@ -48,13 +52,14 @@ flowchart TB
     end
 
     subgraph MACSTUDIO["Mac Studio (M3 Ultra — 96GB, macOS)"]
-        subgraph BRIDGE["Bridge Daemon (:3001)"]
+        subgraph BRIDGE["Bridge Daemon v1.5.0 (:3001)"]
             direction LR
             EXEC["Command\nExecutor"]
             SWEXEC["Swarm\nExecutor"]
             HB["Heartbeat"]
             SOUL_LIB["Soul\nAgent"]
             MEM_ENGINE["Memory\nCrystal Engine"]
+            SENTINEL_ENG["Sentinel\nEngine"]
         end
 
         subgraph X402_SRV["x402 Server (:4021)"]
@@ -96,12 +101,15 @@ flowchart TB
                 A_AKUA_W["akua_web"]
                 A_BI["basedintern"]
                 A_BI_W["basedintern_web"]
+                A_VOX["vox"]
+                A_SCHOLAR["scholar"]
                 A_DYN["dynamic"]
             end
         end
 
         subgraph INFRA["Infrastructure"]
             direction LR
+            LAUNCHD["LaunchAgent\nAuto-Restart\n(KeepAlive)"]
             WATCHDOG["Watchdog\n(launchd)"]
             TAILSCALE["Tailscale\n100.93.86.17"]
             SSH["SSH :22"]
@@ -137,6 +145,9 @@ flowchart TB
     MAIN_AGENT --> FLEET
     FLEET --> PROVIDERS
     FACTORY -->|--github| GITHUB
+    LAUNCHD -->|KeepAlive| DASH
+    LAUNCHD -->|KeepAlive| BRIDGE
+    LAUNCHD -->|KeepAlive| X402_SRV
     BRIDGE -->|auto-pay 402| X402
     BRIDGE -->|pin memories| PINATA
     BRIDGE -->|anchor hashes| ANCHOR
@@ -175,7 +186,8 @@ A cyberpunk-themed web application providing a browser-based control interface f
 - **Styling**: Tailwind CSS + shadcn/ui primitives + custom cyberpunk theme
 - **Auth**: Supabase Auth (email/password)
 - **Hosting**: Vercel (production) or localhost:3000 (development)
-- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs, Consciousness, Memory Cosmos
+- **Pages**: Command Center, Agent Chat, Swarms, Fleet, Payments, Identity, $XMETAV Token, XMETAV HQ (Arena), Live Logs, Consciousness, Memory Cosmos, Trading/DeFi
+- **Trading/DeFi Page** (`/trading`): Three-column layout with `CrossChainPanel` (queue stats, swap quote tool), `KaminoPanel` (vault overview, deposit/withdraw UI), and `KaminoBorrowPanel` (market TVL, reserves with APY, user obligation LTV, 4-action form). API proxy routes: `/api/trading/health`, `/api/trading/cross-chain`, `/api/trading/kamino`, `/api/kamino-borrow`
 
 ### XMETAV HQ — Isometric Office Visualization (PixiJS)
 
@@ -197,11 +209,14 @@ Supabase acts as the communication layer between the remote dashboard and the lo
 
 - **Database**: Postgres with RLS policies for all tables (authenticated SELECT on all user-facing tables; dream tables have both authenticated SELECT and service-role ALL)
 - **Realtime**: WebSocket subscriptions for live updates (commands, responses, swarm status)
-- **Tables**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`
+- **Tables (37)**: `agent_commands`, `agent_responses`, `agent_sessions`, `agent_controls`, `agent_memory`, `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests`, `swarm_runs`, `swarm_tasks`, `x402_payments`, `intent_sessions`, `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`, `erc8004_registry_cache`, `erc8004_scan_log`, `revenue_metrics`, `endpoint_analytics`, `growth_opportunities`, `pricing_recommendations`, `pricing_experiments`, `swarm_spawn_billing`, `trade_executions`, `cross_chain_jobs`, `cross_chain_batches`, `vox_content_queue`
+- **Views (3)**: `x402_daily_spend`, `shared_memory`, `crystal_level_thresholds`
+- **Enums (4)**: `crystal_type`, `crystal_color`, `crystal_class`, `agent_relationship`
+- **Functions (6)**: `cleanup_expired_memories()`, `auto_create_crystal()`, `update_crystal_xp()`, `compute_decay_score()`, `compress_to_legendary()`, `log_association_modification()`
 - **Indexes**: `agent_memory(source)`, `memory_associations(memory_id, related_memory_id)` composite
 - **Project**: `ptlneqcjsnrxxruutsxm`
 
-### Bridge Daemon (Node.js)
+### Bridge Daemon (Node.js — v1.6.0)
 
 A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the remote dashboard to the local OpenClaw CLI.
 
@@ -210,9 +225,14 @@ A local Node.js process (runs on Mac Studio alongside OpenClaw) that bridges the
 - **Swarm Executor**: Subscribes to `swarm_runs` via Realtime, orchestrates multi-agent tasks (parallel/pipeline/collaborative), updates `swarm_tasks` with live output
 - **Heartbeat**: Periodic status updates so the dashboard knows the bridge is alive
 - **Agent Controls**: Checks `agent_controls` table before executing commands (disabled agents are blocked)
-- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, sets session offline, removes PID file
+- **Sentinel Engine**: Autonomous monitoring system with event-driven health checks, smart alerting, self-healing, predictive analysis, and distributed tracing (see below)
+- **Anchor Batch Queue**: `queueAnchor()` + `flushPendingAnchors()` — batches memory anchoring (IPFS + on-chain) in groups of 3, auto-flushes every 5 min (v1.6.0)
+- **Exec Tool Config**: `pathPrepend` in `~/.openclaw/openclaw.json` handles `/opt/homebrew/bin` + `/usr/local/bin` for all agents. Bridge only prepends node binary dir to PATH. Coding agents use `security=allowlist` + `ask=on-miss`; scholar/vox sandboxed. 24 `safeBins` whitelisted fleet-wide.
+- **Payment Cache Invalidation**: Subscribes to `x402_payments` Realtime channel, triggers `invalidateOnPayment()` for session buffer TTL (v1.6.0)
+- **Graceful Shutdown**: SIGTERM handler unsubscribes Realtime channels, stops Sentinel engine, flushes pending anchors, sets session offline
 - **Sequential Command Execution**: `processPendingCommands` awaits each command before processing the next
 - **x402 Client**: Wraps fetch with automatic 402 payment handling via `@x402/fetch` + `viem` signer
+- **Dashboard Integration**: `bridge-manager.ts` uses `launchctl` to start/stop/status the bridge service (no more spawned child processes)
 - **Location**: `dashboard/bridge/`
 
 ### x402 Payment Service (Express)
@@ -221,15 +241,66 @@ A standalone Express server that gates XmetaV API endpoints with USDC micro-paym
 
 - **Port**: 4021
 - **Middleware**: `paymentMiddleware` from `@x402/express` gates endpoints with price + network requirements
-- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+)
+- **Dynamic Pricing Engine**: Demand-based multiplier (0.8×–1.5×), time-of-day adjustment, endpoint bundles (Research Pack, Swarm Suite, Memory Explorer). `GET /pricing` free endpoint for live snapshot. Syncs pricing to Supabase every 5 min (v1.6.0)
+- **Endpoints**: `/agent-task` ($0.10), `/intent` ($0.05), `/fleet-status` ($0.01), `/swarm` ($0.50), `/memory-crystal` ($0.05), `/neural-swarm` ($0.10), `/fusion-chamber` ($0.15), `/cosmos-explore` ($0.20), `/voice/transcribe` ($0.05), `/voice/synthesize` ($0.08), `/execute-trade` ($0.50+), `/rebalance-portfolio` ($2.00+), `/arb-opportunity` ($0.25), `/execute-arb` ($0.10+), `/yield-optimize` ($0.50), `/deploy-yield-strategy` ($3.00+), `/cross-chain-swap` ($0.65), `/cross-chain-swap/quote` (free), `/bridge-status/:jobId` ($0.05), `/trigger-return/:jobId` ($0.25), `/kamino/deposit` ($0.15), `/kamino/withdraw` ($0.15), `/kamino/obligation` ($0.05), `/kamino/deposit-collateral` ($0.20), `/kamino/borrow` ($0.20), `/kamino/repay` ($0.15), `/kamino/withdraw-collateral` ($0.20)
 - **ERC-8004 Identity MW**: Resolves caller agent via `X-Agent-Id` header (on-chain lookup → `req.callerAgent`)
 - **Discovery**: `GET /agent/:agentId/payment-info` — public ERC-8004 lookup with x402 detection
 - **Payment Logging**: Writes to `x402_payments` Supabase table (agent_id, payer/payee, network, metadata)
 - **Token Tiers**: Checks caller's $XMETAV balance on-chain and applies tier discount to pricing
-- **Free endpoints**: `/health`, `/token-info`, `/agent/:agentId/payment-info`, `/digest`, `/trade-fees`
+- **Free endpoints**: `/health`, `/token-info`, `/agent/:agentId/payment-info`, `/digest`, `/trade-fees`, `/cross-chain/queue`, `/cross-chain/vaults`, `/pricing`, `/kamino/vault-details`, `/kamino/positions`, `/kamino/market`
+- **Kamino Vaults**: SDK-first (`@kamino-finance/klend-sdk`) via v2 RPC (`createSolanaRpc()`). USDC vault (`HDsayq...WRS5E`, ~1.2% APY, $70M AUM), SOL vault (`DcCRSd...hpg`, ~8.6% APY, 18.7K SOL AUM)
+- **Kamino Borrow/Lend**: Full lending market integration via klend-sdk — KaminoMarket overview ($1.67B deposits, 55 reserves), user obligations with LTV, deposit-collateral/borrow/repay/withdraw-collateral via KaminoAction
 - **Settlement**: USDC on Base Mainnet
 - **Facilitator**: `@coinbase/x402` CDP facilitator with `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` JWT auth
 - **Location**: `dashboard/x402-server/`
+
+### Cross-Chain Swap Engine (Base↔Solana)
+
+Full multi-chain pipeline for executing USDC→Solana token swaps with vault yield and return bridging.
+
+- **Flow**: USDC on Base → CCTP bridge → Solana USDC → Jupiter Ultra swap (SOL/BONK/JUP) → Kamino vault deposit → withdraw → bridge back to Base
+- **Bridge**: CCTP-based USDC bridge via `0x3eff766C76a1be2Ce1aCF2B69c78bCae257D5188` (Base) ↔ Solana Token Messenger
+- **Jupiter Ultra**: RPC-less swap API (`GET /ultra/v1/order` → sign → `POST /ultra/v1/execute`). API key authenticated. Multi-route aggregation (PancakeSwap, Whirlpool, Meteora DLMM, TesseraV)
+- **Kamino Vaults**: SDK-first via `@kamino-finance/klend-sdk` (`kamino-vault.ts`). Vault data (APY, holdings, exchange rate), user positions, SDK deposit/withdraw with @solana/kit compat. REST API fallback
+- **Kamino Borrow/Lend**: Full lending market module (`kamino-borrow.ts`). KaminoMarket for market overview, KaminoAction for deposit-collateral/borrow/repay/withdraw-collateral, user obligations with LTV tracking
+- **Standalone Kamino Endpoints**: Direct vault deposit/withdraw ($0.15 each), plus 5 gated lending endpoints and 3 free data endpoints
+- **Batch Queue**: Sub-threshold swaps ($6.50) batched with 1hr timeout. Direct execution for amounts above threshold
+- **Job Lifecycle**: `pending→batched→bridging_to_sol→bridged→swapping→swapped→depositing→vaulted→withdrawing→bridging_to_base→completed`
+- **Safety**: Min $0.65, max $500 per swap, 50bps slippage, 3% max price impact
+- **Standalone Kamino Endpoints**: `POST /kamino/deposit` and `POST /kamino/withdraw` ($0.15 each) for direct vault operations without a full cross-chain swap. Plus 5 gated lending endpoints (`/kamino/obligation`, `/kamino/deposit-collateral`, `/kamino/borrow`, `/kamino/repay`, `/kamino/withdraw-collateral`) and 3 free data endpoints (`/kamino/vault-details`, `/kamino/positions`, `/kamino/market`)
+- **DB Tables**: `cross_chain_jobs`, `cross_chain_batches` — migration: `setup-db-crosschain.sql`
+- **Modules**: `cross-chain-types.ts`, `bridge-solana.ts`, `jupiter-swap.ts`, `kamino-vault.ts`, `kamino-borrow.ts`, `cross-chain-queue.ts`, `cross-chain-routes.ts`
+- **Location**: `dashboard/x402-server/`
+
+### Service Management (LaunchAgent)
+
+All three core services are managed by macOS `launchd` via LaunchAgent plists with `KeepAlive: true` and `RunAtLoad: true`.
+
+| Service | Plist Label | Wrapper Script |
+|---------|-------------|---------------|
+| Dashboard :3000 | `com.xmetav.dashboard` | `/usr/local/bin/xmetav/launchd-dashboard.sh` |
+| Bridge :3001 | `com.xmetav.bridge` | `/usr/local/bin/xmetav/launchd-bridge.sh` |
+| x402 :4021 | `com.xmetav.x402` | `/usr/local/bin/xmetav/launchd-x402.sh` |
+
+- **Auto-restart**: Services restart automatically on crash (ThrottleInterval: 10s)
+- **Boot persistence**: All services start on login via `RunAtLoad`
+- **Repo path**: `~/xmetav1/XmetaV` — moved from `~/Documents/` to bypass macOS Sequoia TCC restrictions on launchd
+- **tsx watch**: Bridge and x402 use `tsx watch` for auto-reload on file changes
+- **Source**: Plist copies in `scripts/launchd/`, wrapper scripts in `scripts/launchd-*.sh`
+
+### Sentinel Monitoring Engine
+
+Autonomous monitoring system embedded in the Bridge Daemon (v1.6.0). Provides event-driven health checks, smart alerting, automated self-healing, predictive analysis, and distributed tracing.
+
+- **EventMonitor**: Checks 6 services (bridge, dashboard, x402, ollama, gateway, tailscale) via launchctl + HTTP probes. Adaptive polling interval (5s–120s) based on failure rate. Supabase Realtime subscriptions on `agent_sessions` and `sentinel_incidents`.
+- **AlertManager**: Anti-fatigue alerting with escalation levels (1st fail → immediate, 3rd → warning/5min cooldown, 5th → critical/15min cooldown). Alert history with resolution tracking.
+- **SelfHealer**: Registered remediation actions for each service (restart via `launchctl kickstart`), plus system-level actions (clean stale `.jsonl.lock` files, rotate large logs). 2-minute cooldown per issue.
+- **PredictiveHealth**: Collects macOS resources (CPU via `top`, memory via `vm_stat`, disk via `df`, load via `sysctl`). Linear regression trend prediction. Z-score anomaly detection (threshold: 3).
+- **DistributedTracer**: Span-based request tracking. Calculates P95 latency, throughput (req/min), and error rate. Persists spans to `sentinel_traces` table.
+- **Orchestrator**: Singleton lifecycle wired to bridge start/stop. Auto-heals on `service:down` events. Triggers SITREP on critical alerts. Persists incidents to `sentinel_incidents`.
+- **Endpoints**: `GET /sentinel` on bridge health server, `GET /api/sentinel` on dashboard (authenticated)
+- **DB Tables**: `sentinel_incidents`, `sentinel_healing_log`, `sentinel_traces`, `sentinel_resource_snapshots`
+- **Location**: `dashboard/bridge/lib/sentinel/`, `dashboard/scripts/setup-db-sentinel.sql`
 
 ### ERC-8004 Agent Identity
 
@@ -260,9 +331,12 @@ A dedicated agent that sits between task dispatch and agent execution, curating 
 
 - **Room**: SOUL (private magenta alcove in Arena, cols 0–1, rows 2–5)
 - **Bridge Library**: `dashboard/bridge/lib/soul/` — context building, memory retrieval, association building, dream mode, dream proposals, type definitions
-- **DB Tables**: `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`
-- **Dream Mode**: When all agents are idle, Soul consolidates recent memories into clusters, generates insights, and saves them for future context injection
-- **Lucid Dreaming (Phase 5)**: During dream cycles, Soul generates actionable manifestations (proposals) across 7 categories: fusion, association, pricing, skill, meeting, pattern, correction. High-confidence safe proposals auto-execute; others await user approval via `/api/soul` or the Consciousness page
+- **DB Tables**: `memory_associations`, `memory_queries`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`, `reforged_crystals`
+- **Dream Mode**: When all agents are idle, Soul runs a 9-step dream pipeline: trigger check → fetch recent memories → cluster by keywords → generate insight per cluster → save dream_insights → build associations → run synthesis → run reforge → generate proposals
+- **Lucid Dreaming (Phase 5)**: During dream cycles, Soul generates actionable manifestations (proposals) across 7 categories: fusion, association, pricing, skill, meeting, pattern, correction. High-confidence safe proposals auto-execute (≥0.8 confidence); others await user approval via `/api/soul` or the Consciousness page
+- **Dream Synthesis** (`soul/synthesis.ts`, 441 lines): Fuses 3+ related anchors into insight shards across 5 pattern types, includes blind spot detection for under-explored memory regions
+- **Memory Reforging** (`soul/reforge.ts`, 593 lines): Decay scoring with 72h half-life, auto-archive of low-significance memories, compression of decayed patterns into legendary crystals
+- **Predictive Loading** (`soul/predictive.ts`, 424 lines): Time-of-day + sequential pattern + shard cross-reference analysis over 14 days of command history, pre-loads context into `predictive_contexts`
 - **Association Building**: After each new memory entry, Soul automatically builds associations (causal, similar, sequential, related) with existing memories
 - **Self-Modification**: Soul can propose and auto-execute association reinforcements, creating new links or boosting weak ones based on dream analysis
 - **Context Packets**: Soul builds contextual memory packets injected into agent prompts at dispatch time
@@ -270,6 +344,28 @@ A dedicated agent that sits between task dispatch and agent execution, curating 
 - **API Route**: `GET/POST /api/soul` — proposals listing, stats, sessions, approve/reject, manual dream trigger
 - **ERC-8004**: Listed in `fleet.agents` with 6 soul-specific capabilities
 - **Location**: `dashboard/bridge/lib/soul/`, `dashboard/scripts/setup-db-soul.sql`, `dashboard/supabase/migrations/20260215220000_lucid_dreaming.sql`
+
+### Scholar Research Daemon
+
+A 24/7 autonomous research agent that continuously monitors 5 domains (ERC-8004, x402 protocol, L2 scaling, stablecoin infrastructure, SMB adoption), scores findings for relevance, deduplicates, and anchors high-quality research to memory.
+
+- **Research Loop**: `pickNextDomain()` with adaptive intervals (30/40/60/90/120 min base, scaled by finding quality)
+- **Relevance Scoring**: Multi-factor scoring (keyword match, recency, source authority) with 0.85 duplicate threshold + entity-based semantic dedup
+- **Memory Anchoring**: High-novelty findings (≥ 0.8) queued via `queueAnchor()` for batch IPFS + on-chain anchoring
+- **Vox Feed**: Findings scoring ≥ 0.8 automatically queued to Vox content automation pipeline
+- **Adaptive Intervals**: `adaptiveInterval()` dynamically adjusts polling frequency based on recent avg relevance scores
+- **Entity Dedup**: Extracts ERC numbers, protocol names, token tickers for semantic similarity comparison
+- **Location**: `dashboard/bridge/lib/scholar/` (types, scorer, research-loop)
+
+### Vox Content Automation
+
+Automated marketing content pipeline that transforms high-quality scholar research into social-ready threads.
+
+- **Queue**: `queueVoxContent()` receives high-scoring findings from Scholar
+- **Generation**: `generateThread()` formats research into engaging social threads
+- **Content Calendar**: Max 3 posts/day, minimum 4-hour spacing between posts
+- **Persistence**: `vox_content_queue` Supabase table for queue management
+- **Location**: `dashboard/bridge/lib/vox/content-automation.ts`
 
 ### Memory Crystal System (Cyber-Neural Memory Evolution)
 
@@ -282,11 +378,32 @@ A Final-Fantasy-inspired memory gamification layer at `/memory-cosmos` with 7 in
 - **Memory Cosmos**: Pannable/zoomable explorable world map with golden-spiral island layout, 3 terrain types, neon highway bridges with data particles
 - **Achievements**: 7 seeded achievements with Bronze/Silver/Gold/Legendary tiers
 - **Daily Quests**: Auto-generated daily quests with type-based objectives and XP rewards
-- **Bridge Engine**: `dashboard/bridge/lib/memory-crystal.ts` — full game logic (~530 lines)
+- **Bridge Engine**: `dashboard/bridge/lib/memory-crystal.ts` — full game logic (~810 lines)
 - **DB Tables**: `memory_crystals`, `memory_fusions`, `memory_summons`, `limit_breaks`, `memory_achievements`, `daily_quests` (3 custom enums, `crystal_level_thresholds` view)
 - **Hook**: `useMemoryCrystals` — Supabase queries + realtime subscriptions, 12s auto-refresh
 - **Components**: CrystalCard (canvas), CrystalInventory, FusionChamber, SummonOverlay, LimitBreakBanner, MemoryCosmos, QuestTracker
 - **Location**: `dashboard/src/components/crystals/`, `dashboard/src/hooks/useMemoryCrystals.ts`, `dashboard/bridge/lib/memory-crystal.ts`
+
+### Consciousness Dashboard (`/consciousness`)
+
+Dual-aspect awareness page providing a live window into the agent fleet's memory, anchoring, and dream activity. 12 components (4,139 total lines) arranged in an 8-section layout.
+
+- **Components (12)**: ConsciousnessPage (orchestrator), MemoryGraph (force-directed D3), AnchorTimeline (chronological anchor events), ContextMetrics (memory stats + health), DreamMode (live dream status + proposals), MiniArena (embedded PixiJS arena), MemoryStream (real-time memory feed), AssociationExplorer (graph traversal), InsightPanel (dream insights + synthesis shards), PredictivePanel (pre-loaded context display), DecayMonitor (memory decay + archive status), AwakeningMessages (post-dream awakening notifications)
+- **Data Hook**: `useConsciousness.ts` (309 lines) — 30s polling refresh, 3 Supabase Realtime subscriptions (`agent_memory`, `dream_insights`, `soul_dream_manifestations`)
+- **Tables Consumed**: `agent_memory`, `memory_associations`, `dream_insights`, `soul_dream_manifestations`, `soul_dream_sessions`, `soul_association_modifications`, `insight_shards`, `predictive_contexts`, `memory_decay`
+- **Page Layout**: Header metrics → Memory Graph + Anchor Timeline (side-by-side) → Dream Mode + Mini Arena → Memory Stream → Association Explorer → Insight Panel + Predictive Panel → Decay Monitor → Awakening Messages
+- **Location**: `dashboard/src/components/consciousness/`, `dashboard/src/hooks/useConsciousness.ts`, `dashboard/src/app/consciousness/page.tsx`
+
+### On-Chain Memory Anchoring Pipeline
+
+Three-module pipeline for permanent on-chain memory persistence: IPFS pinning → keccak256 hashing → Base Mainnet contract write.
+
+- **memory-anchor.ts** (480 lines): Batch queue (`queueAnchor()`) accumulates entries until 3 items OR 5-minute timer, then flushes via `flushPendingAnchors()`. Each anchor: pin JSON to IPFS → compute keccak256 of CID → write to `AgentMemoryAnchor` contract on Base (chain 8453). 5-minute TTL read cache for RPC calls.
+- **agent-memory.ts** (377 lines): `captureCommandOutcome()` stores to Supabase, then `anchorIfSignificant()` checks for milestone/decision/incident keywords and queues high-significance memories for anchoring. Auto-creates crystals via `createCrystal()`. Syncs to OpenClaw workspace memory.
+- **ipfs-pinata.ts** (157 lines): `pinJSON()` with circuit breaker (3 consecutive failures → 60s cooldown). Batch pin queue flushed every 5 min. Gateway URL: `https://gateway.pinata.cloud/ipfs/{cid}`.
+- **Contract**: `AgentMemoryAnchor` on Base Mainnet, Agent ID 16905
+- **Status**: ⚠️ Wallet `0x4Ba6...` needs ETH on Base for gas — code proven, anchoring paused until funded
+- **Location**: `dashboard/bridge/lib/memory-anchor.ts`, `dashboard/bridge/lib/agent-memory.ts`, `dashboard/bridge/lib/ipfs-pinata.ts`
 
 ### OpenClaw CLI
 - Entry point for everything: `openclaw ...`
@@ -332,6 +449,8 @@ Static agents are defined in `openclaw.json`. Dynamic agents can be created at r
 | `akua` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/akua` | coding | Solidity/Hardhat repo agent |
 | `akua_web` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/akua` | full | Same repo — browser/web automation only |
 | `soul` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/soul` | coding | **Memory Orchestrator** — context curation, dream consolidation, associations |
+| `vox` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/vox` | coding | **Brand & Campaigns** — content strategy, voice calibration, competitor analysis |
+| `scholar` | `kimi-k2.5:cloud` (256k) | `~/.openclaw/agents/scholar` | coding | **Deep Research** — 24/7 research daemon, relevance scoring, memory anchoring (ERC-8004, x402, L2, stablecoins, SMB adoption) |
 | _(dynamic)_ | `kimi-k2.5:cloud` | _(per-agent)_ | _(per-agent)_ | Created on-demand by Agent Factory |
 
 ### Agent Factory (Orchestrator Layer)

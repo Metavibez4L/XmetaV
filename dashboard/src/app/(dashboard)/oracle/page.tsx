@@ -1,5 +1,3 @@
-"use client";
-
 import AgentDiscoveryPanel from "@/components/oracle/AgentDiscoveryPanel";
 import { Eye, Radio } from "lucide-react";
 

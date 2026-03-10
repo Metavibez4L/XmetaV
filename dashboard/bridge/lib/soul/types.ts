@@ -77,8 +77,8 @@ export interface SoulConfig {
 }
 
 export const DEFAULT_CONFIG: SoulConfig = {
-  maxRetrievalCount: 10,
-  maxContextChars: 3000,
+  maxRetrievalCount: 20,
+  maxContextChars: 6000,
   dreamIdleThresholdHours: 6,
   minAssociationStrength: 0.3,
   associationScanWindow: 50,
