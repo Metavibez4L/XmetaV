@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
@@ -149,6 +150,45 @@ async function getCallerTier(callerAddress?: string): Promise<TokenTier> {
 const app = express();
 app.use(compression());  // gzip — ~60% bandwidth reduction
 app.use(express.json());
+
+// ---- Rate Limiting ----
+// Global: 100 req/min per caller (generous for normal use)
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 100,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many requests — rate limit exceeded", retryAfterMs: 60_000 },
+  // Use x-caller-address (x402 payer identity) when available; otherwise default IP-based key
+  ...(true && { keyGenerator: (req: express.Request) => (req.headers["x-caller-address"] as string) || "ip" }),
+  validate: { xForwardedForHeader: false, ip: false },
+});
+
+// Expensive endpoints: 10 req/min (bridges, swaps, deployments)
+const expensiveLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Rate limit on expensive operations — max 10/min", retryAfterMs: 60_000 },
+  ...(true && { keyGenerator: (req: express.Request) => (req.headers["x-caller-address"] as string) || "ip" }),
+  validate: { xForwardedForHeader: false, ip: false },
+});
+
+app.use(globalLimiter);
+
+// Apply stricter limits to expensive endpoints
+app.post("/cross-chain-swap", expensiveLimiter);
+app.post("/execute-trade", expensiveLimiter);
+app.post("/rebalance-portfolio", expensiveLimiter);
+app.post("/deploy-yield-strategy", expensiveLimiter);
+app.post("/execute-arb", expensiveLimiter);
+app.post("/trigger-return/:jobId", expensiveLimiter);
+app.post("/kamino/deposit", expensiveLimiter);
+app.post("/kamino/withdraw", expensiveLimiter);
+app.post("/kamino/deposit-collateral", expensiveLimiter);
+app.post("/kamino/borrow", expensiveLimiter);
+app.post("/swarm", expensiveLimiter);
 
 // ---- Payment logging helper ----
 async function logPayment(endpoint: string, amount: string, req: express.Request) {
