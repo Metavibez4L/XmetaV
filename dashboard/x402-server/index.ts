@@ -159,9 +159,8 @@ const globalLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests — rate limit exceeded", retryAfterMs: 60_000 },
-  // Use x-caller-address (x402 payer identity) when available; otherwise default IP-based key
-  ...(true && { keyGenerator: (req: express.Request) => (req.headers["x-caller-address"] as string) || "ip" }),
-  validate: { xForwardedForHeader: false, ip: false },
+  validate: false,
+  keyGenerator: (req) => (req.headers["x-caller-address"] as string) || "global",
 });
 
 // Expensive endpoints: 10 req/min (bridges, swaps, deployments)
@@ -171,8 +170,8 @@ const expensiveLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Rate limit on expensive operations — max 10/min", retryAfterMs: 60_000 },
-  ...(true && { keyGenerator: (req: express.Request) => (req.headers["x-caller-address"] as string) || "ip" }),
-  validate: { xForwardedForHeader: false, ip: false },
+  validate: false,
+  keyGenerator: (req) => (req.headers["x-caller-address"] as string) || "global",
 });
 
 app.use(globalLimiter);
