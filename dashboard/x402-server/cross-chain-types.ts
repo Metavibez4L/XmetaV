@@ -171,7 +171,7 @@ export const SAFETY = {
   maxPriceImpact: 1.0,           // 1% max price impact
   maxRetries: 3,
   retryDelays: [60_000, 300_000, 600_000], // 1m, 5m, 10m
-  bridgeTimeout: 900_000,        // 15 min
+  bridgeTimeout: 1_800_000,      // 30 min
   batchCollectTimeout: 3_600_000, // 1 hour max batch wait
   emergencyPause: false,
 } as const;

@@ -10,6 +10,8 @@
 
 import { randomUUID } from "crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createPublicClient, http, parseAbi } from "viem";
+import { base } from "viem/chains";
 import {
   type CrossChainJob,
   type CrossChainJobStatus,
@@ -18,10 +20,69 @@ import {
   type OutputToken,
   SAFETY,
   estimateTotalFees,
+  BASE_CONTRACTS,
 } from "./cross-chain-types.js";
 import { bridgeToSolana, waitForBridgeArrival, bridgeToBase, waitForBaseArrival } from "./bridge-solana.js";
 import { swapOnJupiter } from "./jupiter-swap.js";
 import { depositUsdcToKamino, withdrawUsdcFromKamino } from "./kamino-vault.js";
+
+// ── Retry Wrapper ───────────────────────────────────────────────
+
+async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  maxRetries: number = SAFETY.maxRetries,
+  delays: readonly number[] = SAFETY.retryDelays,
+): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = delays[Math.min(attempt, delays.length - 1)];
+        console.warn(`[cross-chain] ${label} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay / 1000}s:`, err.message);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
+// ── Pre-Flight Balance Check ────────────────────────────────────
+
+const ERC20_ABI_BALANCE = parseAbi([
+  "function balanceOf(address) view returns (uint256)",
+]);
+
+async function checkBaseUsdcBalance(requiredUsdc: number): Promise<void> {
+  const pk = process.env.EVM_PRIVATE_KEY;
+  if (!pk) throw new Error("EVM_PRIVATE_KEY required for balance check");
+
+  const pc = createPublicClient({
+    chain: base,
+    transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org"),
+  });
+
+  // Derive address from private key
+  const { privateKeyToAccount } = await import("viem/accounts");
+  const account = privateKeyToAccount(pk as `0x${string}`);
+
+  const balance = await pc.readContract({
+    address: BASE_CONTRACTS.USDC,
+    abi: ERC20_ABI_BALANCE,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+
+  const balanceUsdc = Number(balance) / 1e6;
+  if (balanceUsdc < requiredUsdc) {
+    throw new Error(
+      `Insufficient USDC balance on Base: $${balanceUsdc.toFixed(2)} available, $${requiredUsdc.toFixed(2)} required`
+    );
+  }
+}
 
 // ── Supabase ────────────────────────────────────────────────────
 
@@ -156,6 +217,11 @@ export function addToBatch(jobId: string): void {
   console.log(`[cross-chain] Batch queue: $${totalPending.toFixed(2)} / $${SAFETY.minBatchThreshold} (${pendingBatchJobs.length} jobs)`);
 
   if (totalPending >= SAFETY.minBatchThreshold) {
+    // Clear timer before executing to prevent double-fire
+    if (batchTimer) {
+      clearTimeout(batchTimer);
+      batchTimer = null;
+    }
     executeBatch();
   } else if (!batchTimer) {
     // Set a timer to execute even if threshold isn't reached
@@ -209,10 +275,14 @@ async function executeBatch(): Promise<void> {
 
   // Execute the batch asynchronously
   processBatch(batch).catch((err) => {
-    console.error(`[cross-chain] Batch ${batchId} failed:`, err);
+    console.error(`[cross-chain] Batch ${batchId} bridge step failed:`, err);
     batch.status = "failed";
+    // Only mark jobs that haven't already progressed past bridging
     for (const id of batchJobIds) {
-      updateJob(id, { status: "failed", error: err.message });
+      const j = jobs.get(id);
+      if (j && j.status !== "completed" && j.status !== "failed") {
+        updateJob(id, { status: "failed", error: `Batch bridge failed: ${err.message}` });
+      }
     }
   });
 }
@@ -225,11 +295,17 @@ async function executeBatch(): Promise<void> {
 async function processBatch(batch: BatchGroup): Promise<void> {
   const { jobIds, totalAmount, id: batchId } = batch;
 
-  // === Step 1: Bridge USDC to Solana ===
+  // === Pre-flight: Check USDC balance on Base ===
+  await checkBaseUsdcBalance(totalAmount);
+
+  // === Step 1: Bridge USDC to Solana (with retry) ===
   console.log(`[cross-chain] [${batchId}] Step 1: Bridging $${totalAmount.toFixed(2)} USDC to Solana`);
   for (const id of jobIds) updateJob(id, { status: "bridging_to_sol" });
 
-  const bridgeResult = await bridgeToSolana(totalAmount);
+  const bridgeResult = await withRetry(
+    `bridge-batch-${batchId}`,
+    () => bridgeToSolana(totalAmount),
+  );
   batch.bridgeTx = bridgeResult.txHash;
 
   for (const id of jobIds) {
@@ -244,13 +320,19 @@ async function processBatch(batch: BatchGroup): Promise<void> {
     updateJob(id, { status: "bridged", bridgedAmount: totalAmount / jobIds.length });
   }
 
-  // === Step 2: Process individual jobs ===
+  // === Step 2: Process individual jobs (isolated — one failure won't kill the batch) ===
   // After bridging, each job gets its own swap/vault/return flow
-  for (const jobId of jobIds) {
-    processJob(jobId).catch((err) => {
-      console.error(`[cross-chain] Job ${jobId} failed:`, err);
-      updateJob(jobId, { status: "failed", error: err.message });
-    });
+  const jobResults = await Promise.allSettled(
+    jobIds.map((jobId) => processJob(jobId))
+  );
+
+  for (let i = 0; i < jobResults.length; i++) {
+    const result = jobResults[i];
+    if (result.status === "rejected") {
+      const failedId = jobIds[i];
+      console.error(`[cross-chain] Job ${failedId} failed:`, result.reason);
+      updateJob(failedId, { status: "failed", error: String(result.reason?.message || result.reason) });
+    }
   }
 
   batch.status = "completed";
@@ -284,7 +366,10 @@ async function processJob(jobId: string): Promise<void> {
     console.log(`[cross-chain] [${jobId}] Step 2: Swapping USDC → ${job.outputToken} on Jupiter`);
     updateJob(jobId, { status: "swapping" });
 
-    const swapResult = await swapOnJupiter(bridgedAmount, job.outputToken);
+    const swapResult = await withRetry(
+      `jupiter-swap-${jobId}`,
+      () => swapOnJupiter(bridgedAmount, job.outputToken),
+    );
     fees.jupiterSwap = bridgedAmount * 0.001; // ~0.1% Jupiter fee estimate
 
     updateJob(jobId, {
@@ -304,7 +389,10 @@ async function processJob(jobId: string): Promise<void> {
     updateJob(jobId, { status: "depositing" });
 
     // For now, only USDC vault is supported
-    const depositResult = await depositUsdcToKamino(bridgedAmount);
+    const depositResult = await withRetry(
+      `kamino-deposit-${jobId}`,
+      () => depositUsdcToKamino(bridgedAmount),
+    );
     fees.kaminoDeposit = 0.01;
 
     updateJob(jobId, {
@@ -323,7 +411,10 @@ async function processJob(jobId: string): Promise<void> {
       console.log(`[cross-chain] [${jobId}] Step 4a: Withdrawing from Kamino vault`);
       updateJob(jobId, { status: "withdrawing" });
 
-      const withdrawResult = await withdrawUsdcFromKamino(job.vaultShares.toString());
+      const withdrawResult = await withRetry(
+        `kamino-withdraw-${jobId}`,
+        () => withdrawUsdcFromKamino(job.vaultShares!.toString()),
+      );
       updateJob(jobId, {
         kaminoWithdrawTx: withdrawResult.txSignature,
       });
@@ -333,7 +424,10 @@ async function processJob(jobId: string): Promise<void> {
     updateJob(jobId, { status: "bridging_to_base" });
 
     const returnAmount = job.swapOutputAmount || bridgedAmount;
-    const returnResult = await bridgeToBase(returnAmount, job.payerAddress);
+    const returnResult = await withRetry(
+      `bridge-to-base-${jobId}`,
+      () => bridgeToBase(returnAmount, job.payerAddress),
+    );
     fees.bridgeToBase = 0.50 / batchSize;
 
     updateJob(jobId, {
@@ -372,9 +466,15 @@ export async function executeJobDirect(jobId: string): Promise<void> {
 
   console.log(`[cross-chain] Direct execution for job ${jobId}: $${job.paymentAmount}`);
 
-  // Bridge directly
+  // Pre-flight: Check USDC balance
+  await checkBaseUsdcBalance(job.paymentAmount);
+
+  // Bridge directly (with retry)
   updateJob(jobId, { status: "bridging_to_sol" });
-  const bridgeResult = await bridgeToSolana(job.paymentAmount);
+  const bridgeResult = await withRetry(
+    `bridge-direct-${jobId}`,
+    () => bridgeToSolana(job.paymentAmount),
+  );
   updateJob(jobId, {
     baseBridgeTx: bridgeResult.txHash,
   });
@@ -423,6 +523,52 @@ export function getQueueStats(): {
     failedJobs,
     totalBatches: batches.size,
   };
+}
+
+// ── Manual Return Trigger ───────────────────────────────────────
+
+/**
+ * Trigger the return pipeline for a vaulted/swapped job.
+ * Called by /trigger-return/:jobId endpoint.
+ */
+export async function processReturn(jobId: string): Promise<void> {
+  const job = jobs.get(jobId);
+  if (!job) throw new Error(`Job ${jobId} not found`);
+
+  // If vaulted, withdraw from Kamino first
+  if (job.vaultStrategy === "kamino" && job.vaultShares) {
+    console.log(`[cross-chain] [${jobId}] Return: Withdrawing from Kamino vault`);
+    updateJob(jobId, { status: "withdrawing" });
+
+    const withdrawResult = await withRetry(
+      `kamino-withdraw-return-${jobId}`,
+      () => withdrawUsdcFromKamino(job.vaultShares!.toString()),
+    );
+    updateJob(jobId, { kaminoWithdrawTx: withdrawResult.txSignature });
+  }
+
+  // Bridge back to Base
+  console.log(`[cross-chain] [${jobId}] Return: Bridging back to Base`);
+  updateJob(jobId, { status: "bridging_to_base" });
+
+  const returnAmount = job.swapOutputAmount || job.bridgedAmount || job.paymentAmount;
+  const returnResult = await withRetry(
+    `bridge-to-base-return-${jobId}`,
+    () => bridgeToBase(returnAmount, job.payerAddress),
+  );
+
+  updateJob(jobId, { returnBridgeTx: returnResult.txSignature });
+
+  // Wait for arrival on Base
+  await waitForBaseArrival(returnAmount * 0.95);
+
+  updateJob(jobId, {
+    status: "completed",
+    returnAmount,
+    completedAt: new Date().toISOString(),
+  });
+
+  console.log(`[cross-chain] [${jobId}] ✅ Return completed!`);
 }
 
 /**

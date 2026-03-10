@@ -25,6 +25,7 @@ import {
   executeJobDirect,
   getQueueStats,
   loadJobsFromDb,
+  processReturn,
 } from "./cross-chain-queue.js";
 import { getSwapQuote } from "./jupiter-swap.js";
 import {
@@ -370,9 +371,11 @@ export function createCrossChainRouter(
       // Log payment
       logPaymentFn("/trigger-return", "$0.25", req);
 
-      // Update job to initiate return
-      // This is handled by the queue processor
-      // For now, mark as bridging_to_base and let the pipeline handle it
+      // Kick off the return pipeline asynchronously
+      processReturn(jobId).catch((err) => {
+        console.error(`[cross-chain] Return failed for ${jobId}:`, err);
+      });
+
       res.json({
         jobId: job.id,
         status: "return-initiated",
