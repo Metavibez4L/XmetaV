@@ -887,18 +887,18 @@ curl -X POST http://localhost:4021/kamino/deposit \
 
 ### `POST /kamino/withdraw` — $0.15
 
-Withdraw funds from a Kamino vault.
+Withdraw funds from a Kamino vault by redeeming kToken shares.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `vault` | string | Yes | — | Vault ID: `USDC_MAIN` or `SOL_MAIN` |
-| `amount` | string | Yes | — | Amount to withdraw (in token units) |
+| `shares` | string | Yes | — | kToken shares to redeem (raw units) |
 
 **Example**:
 ```bash
 curl -X POST http://localhost:4021/kamino/withdraw \
   -H "Content-Type: application/json" \
-  -d '{"vault": "USDC_MAIN", "amount": "25"}'
+  -d '{"vault": "USDC_MAIN", "shares": "1000000"}'
 ```
 
 **Response** `200`:
@@ -1021,18 +1021,20 @@ curl http://localhost:4021/kamino/obligation
 
 ### `POST /kamino/deposit-collateral` — $0.20
 
-Deposit collateral into the Kamino lending market.
+Deposit collateral into the Kamino lending market. SDK-first with API fallback.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mint` | string | Yes | Token mint address (e.g., USDC mint) |
-| `amount` | string | Yes | Amount to deposit |
+| `token` | string | Yes | Token mint address (e.g., USDC: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) |
+| `amount` | string | Yes | Amount to deposit (human-readable) |
+
+> **Note**: The server automatically resolves the token mint to the correct Kamino lending reserve address via `resolveReserveAddress()`.
 
 **Example**:
 ```bash
 curl -X POST http://localhost:4021/kamino/deposit-collateral \
   -H "Content-Type: application/json" \
-  -d '{"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
+  -d '{"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
 ```
 
 ---
@@ -1043,14 +1045,14 @@ Borrow assets against deposited collateral.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mint` | string | Yes | Token mint to borrow |
-| `amount` | string | Yes | Amount to borrow |
+| `token` | string | Yes | Token mint to borrow |
+| `amount` | string | Yes | Amount to borrow (human-readable) |
 
 **Example**:
 ```bash
 curl -X POST http://localhost:4021/kamino/borrow \
   -H "Content-Type: application/json" \
-  -d '{"mint": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+  -d '{"token": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
 ```
 
 ---
@@ -1061,14 +1063,14 @@ Repay a borrowed loan.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mint` | string | Yes | Token mint to repay |
-| `amount` | string | Yes | Amount to repay |
+| `token` | string | Yes | Token mint to repay |
+| `amount` | string | Yes | Amount to repay (human-readable) |
 
 **Example**:
 ```bash
 curl -X POST http://localhost:4021/kamino/repay \
   -H "Content-Type: application/json" \
-  -d '{"mint": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
+  -d '{"token": "So11111111111111111111111111111111111111112", "amount": "1.5"}'
 ```
 
 ---
@@ -1079,14 +1081,14 @@ Withdraw collateral from the lending market.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mint` | string | Yes | Token mint to withdraw |
-| `amount` | string | Yes | Amount to withdraw |
+| `token` | string | Yes | Token mint to withdraw |
+| `amount` | string | Yes | Amount to withdraw (human-readable) |
 
 **Example**:
 ```bash
 curl -X POST http://localhost:4021/kamino/withdraw-collateral \
   -H "Content-Type: application/json" \
-  -d '{"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
+  -d '{"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "500"}'
 ```
 
 ---

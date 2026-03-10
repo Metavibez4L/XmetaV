@@ -263,7 +263,7 @@ export async function depositToVault(
 
   const data = await res.json();
   const txBase64: string = data.transaction;
-  const txBytes = Buffer.from(txBase64, "base64");
+  const txBytes = new Uint8Array(Buffer.from(txBase64, "base64"));
   let signature: string;
 
   try {
@@ -274,7 +274,10 @@ export async function depositToVault(
       preflightCommitment: "confirmed",
     });
     await conn.confirmTransaction(signature, "confirmed");
-  } catch {
+  } catch (err: any) {
+    if (err.message?.includes("Simulation failed") || err.message?.includes("Transaction simulation")) {
+      throw err;
+    }
     const tx = Transaction.from(txBytes);
     tx.sign(kp);
     signature = await sendAndConfirmTransaction(conn, tx, [kp]);
@@ -355,7 +358,7 @@ export async function withdrawFromVault(
     body: JSON.stringify({
       wallet: kp.publicKey.toBase58(),
       kvault: vaultAddress,
-      shares,
+      amount: shares,
     }),
   });
 
@@ -366,7 +369,7 @@ export async function withdrawFromVault(
 
   const data = await res.json();
   const txBase64: string = data.transaction;
-  const txBytes = Buffer.from(txBase64, "base64");
+  const txBytes = new Uint8Array(Buffer.from(txBase64, "base64"));
   let signature: string;
 
   try {
@@ -377,7 +380,10 @@ export async function withdrawFromVault(
       preflightCommitment: "confirmed",
     });
     await conn.confirmTransaction(signature, "confirmed");
-  } catch {
+  } catch (err: any) {
+    if (err.message?.includes("Simulation failed") || err.message?.includes("Transaction simulation")) {
+      throw err;
+    }
     const tx = Transaction.from(txBytes);
     tx.sign(kp);
     signature = await sendAndConfirmTransaction(conn, tx, [kp]);

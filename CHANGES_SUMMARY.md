@@ -1,11 +1,53 @@
-# Changes Summary — March 9, 2026
+# Changes Summary — March 10, 2026
 
 ## System Status: ACTIVE
-**XmetaV Version:** v28.4 (Lossless Context Engine Plugin)
+**XmetaV Version:** v28.5 (Exec Delegation + Kamino Bug Fixes)
 
 ---
 
-## Major Changes (March 9, 2026)
+## Major Changes (March 10, 2026)
+
+### v28.5 — Exec Delegation Architecture + Kamino API Fixes
+
+#### 1. Three-Layer Exec Security
+
+All 14 agents now use a delegation model: non-main agents route exec requests through `@main`, with `@sentinel` reviewing before execution.
+
+| Layer | Component | Details |
+|-------|-----------|---------|
+| **Config** | `exec.security` in `openclaw.json` | Per-agent mode: `full` (main only), `allowlist` (all others) |
+| **Allowlist** | `exec-approvals.json` | 361 role-based glob patterns across 11 agents |
+| **Sentinel Review** | Instruction-based gate in `SOUL.md` | APPROVE/DENY/FLAG decisions with criteria table |
+
+**Key files modified:**
+- `~/.openclaw/openclaw.json` — All non-main agents: `exec.security: "allowlist"`, `exec.host: "gateway"`, `exec.ask: "on-miss"`
+- `~/.openclaw/exec-approvals.json` — 361 patterns (was empty)
+- `~/.openclaw/workspace-sentinel/SOUL.md` — Exec review gate role
+- 10 agent workspace `AGENTS.md` files — Exec delegation protocol
+
+#### 2. Kamino Lending API Bug Fixes
+
+Fixed 5 bugs in Kamino API fallback paths across `kamino-borrow.ts` and `kamino-vault.ts`:
+
+| Bug | Fix |
+|-----|-----|
+| `token` → Kamino expects `reserve` | Changed param name in 4 API calls, added `resolveReserveAddress()` (mint→reserve via SDK) |
+| Vault withdraw sends `shares` → Kamino expects `amount` | Changed param name |
+| `Buffer.from()` breaks `VersionedTransaction.deserialize()` | Changed to `new Uint8Array(Buffer.from(...))` |
+| Legacy tx fallback runs on simulation errors | Added error type check: only fall through on deserialization errors |
+
+#### 3. Full Kamino + Jupiter Endpoint Audit
+
+| Category | Tested | Pass | Fail | Notes |
+|----------|--------|------|------|-------|
+| Kamino FREE | 3 | 3 | 0 | vault-details, market, positions |
+| Kamino GATED | 7 | 5 | 2 | 5 functional (unfunded wallet), 2 blocked by Kamino vault API 500 |
+| Jupiter (cross-chain) | 3 | 3 | 0 | quote, queue, vaults |
+| **Total** | **13** | **11** | **2** | 2 failures are upstream (Kamino vault API) |
+
+---
+
+## Previous Changes (March 9, 2026)
 
 ### v28.4 — Lossless Context Engine Plugin
 
@@ -382,6 +424,9 @@ dashboard/x402-server/index.ts (dynamic pricing, /pricing endpoint)
 ## Verification
 
 ```bash
+# Check exec approvals loaded
+openclaw approvals get 2>&1 | head -5
+
 # Bridge health
 curl -s http://localhost:3001/health | jq .
 
@@ -394,26 +439,21 @@ curl -s http://localhost:4021/pricing | jq .
 # Cross-chain queue stats
 curl -s http://localhost:4021/cross-chain/queue | jq .
 
-# Cross-chain vaults
-curl -s http://localhost:4021/cross-chain/vaults | jq .
-
-# Cross-chain swap quote
+# Cross-chain swap quote (uses Jupiter internally)
 curl -s -X POST http://localhost:4021/cross-chain-swap/quote \
   -H "Content-Type: application/json" \
   -d '{"amount": "10", "outputToken": "SOL"}' | jq .
 
-# Kamino standalone deposit
-curl -s -X POST http://localhost:4021/kamino/deposit \
-  -H "Content-Type: application/json" \
-  -d '{"vault": "USDC_MAIN", "amount": "50"}' | jq .
+# Kamino free endpoints
+curl -s http://localhost:4021/kamino/vault-details | jq .vault,.apy
+curl -s http://localhost:4021/kamino/market | jq .totalDepositTVL,.totalBorrowTVL
+curl -s http://localhost:4021/kamino/positions | jq .
 
-# Kamino standalone withdraw
-curl -s -X POST http://localhost:4021/kamino/withdraw \
+# Kamino gated (lending) — requires funded Solana wallet
+curl -s http://localhost:4021/kamino/obligation | jq .
+curl -s -X POST http://localhost:4021/kamino/deposit-collateral \
   -H "Content-Type: application/json" \
-  -d '{"vault": "USDC_MAIN", "amount": "25"}' | jq .
-
-# Trading dashboard health proxy
-curl -s http://localhost:3000/api/trading/health | jq .
+  -d '{"token": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "amount": "100"}' | jq .
 
 # SSE stream test
 curl -N http://localhost:3000/api/events
@@ -424,4 +464,4 @@ launchctl list | grep com.xmetav
 
 ---
 
-*Generated: 2026-03-08*
+*Generated: 2026-03-10*

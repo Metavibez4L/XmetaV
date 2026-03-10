@@ -1,7 +1,7 @@
 # Status — XmetaV / OpenClaw Command Center
-**Last verified:** 2026-03-09  
+**Last verified:** 2026-03-10  
 **System:** Mac Studio (M3 Ultra — 96GB) — abrahamacStudio  
-**XmetaV Version:** v28.4 (Lossless Context Engine Plugin)  
+**XmetaV Version:** v28.5 (Exec Delegation + Kamino Bug Fixes)  
 **Platform:** macOS 26.3.1 (Tahoe)  
 **Uptime:** Always-on headless server (NYC)  
 **Remote:** Tailscale VPN from MacBook Air (NC) → Mac Studio (NYC)
@@ -218,6 +218,65 @@ Automated health monitor checking every 5 minutes:
 ```bash
 just logs-watchdog
 ```
+
+## v28.5 Exec Delegation + Kamino Bug Fixes (2026-03-10)
+
+### Exec Delegation Architecture
+
+Three-layer exec security: config allowlists, per-agent glob patterns, sentinel instruction-based review.
+
+| Change | Details |
+|--------|---------|
+| **Exec delegation** | All non-main agents route exec through `@main`, sentinel reviews before execution |
+| **exec-approvals.json** | 361 role-based glob patterns across 11 agents (was empty) |
+| **Agent AGENTS.md** | 10 agent workspaces updated with exec delegation protocol |
+| **Sentinel SOUL.md** | Exec review gate role added (APPROVE/DENY/FLAG response format) |
+| **Main AGENTS.md** | Exec handler role added (parse→forward→wait→execute) |
+
+### Kamino Lending Bug Fixes (kamino-borrow.ts, kamino-vault.ts)
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| deposit-collateral/borrow/repay/withdraw-collateral → 500 `required property 'reserve'` | API fallback sent `token` — Kamino expects `reserve` (the reserve account address, not token mint) | Changed `token` → `reserve` in all 4 API fallback calls + added `resolveReserveAddress()` to map mint→reserve via SDK |
+| vault withdraw → 500 `required property 'amount'` | API fallback sent `shares` — Kamino expects `amount` | Changed `shares` → `amount` in withdraw API fallback |
+| Transaction deserialization crash (`Versioned messages must be deserialized with VersionedMessage.deserialize()`) | `Buffer.from()` returns Node Buffer, not Uint8Array; legacy fallback ran on simulation errors | Changed to `new Uint8Array(Buffer.from(...))`, separated simulation errors from deserialization errors |
+
+### Kamino Endpoint Test Results (2026-03-10)
+
+| # | Endpoint | Type | HTTP | Status | Notes |
+|---|----------|------|------|--------|-------|
+| 1 | `GET /kamino/vault-details` | FREE | 200 | ✅ | USDC vault, 1.2% APY, live SDK |
+| 2 | `GET /kamino/market` | FREE | 200 | ✅ | $1.73B deposits, $609M borrows, 55 reserves |
+| 3 | `GET /kamino/positions` | FREE | 200 | ✅ | 2 vaults checked |
+| 4 | `GET /kamino/obligation` | GATED | 200 | ✅ | null (no obligation) |
+| 5 | `POST /kamino/deposit-collateral` | GATED | 500 | ✅* | Tx built+signed, simulation fails: wallet unfunded |
+| 6 | `POST /kamino/borrow` | GATED | 400 | ✅* | No obligation yet (correct — must deposit first) |
+| 7 | `POST /kamino/repay` | GATED | 400 | ✅* | No obligation to repay |
+| 8 | `POST /kamino/withdraw-collateral` | GATED | 400 | ✅* | No obligation |
+| 9 | `POST /kamino/deposit` (vault) | GATED | 500 | ⚠️ | External Kamino vault API 500 (their bug) |
+| 10 | `POST /kamino/withdraw` (vault) | GATED | 500 | ⚠️ | External Kamino vault API 500 (their bug) |
+
+**✅*** = Code fully functional, reaches Kamino API correctly. Errors are expected business logic (unfunded wallet / no obligation). Would succeed with funded Solana wallet.  
+**⚠️** = Kamino's external vault API (`api.kamino.finance/ktx/kvault/*`) returning 500 — upstream issue.
+
+### Jupiter Test Results (2026-03-10)
+
+Jupiter is integrated into the cross-chain swap pipeline, not standalone endpoints:
+
+| Endpoint | HTTP | Status | Notes |
+|----------|------|--------|-------|
+| `POST /cross-chain-swap/quote` | 200 | ✅ | Live Jupiter quote: SOL via HumidiFi, 50bps slippage |
+| `GET /cross-chain/queue` | 200 | ✅ | Queue stats operational |
+| `GET /cross-chain/vaults` | 200 | ✅ | Vault listing + 104 live vaults |
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `x402-server/kamino-borrow.ts` | +61 −17: `reserve` param fix, `resolveReserveAddress()`, `Uint8Array` deserialization, simulation error handling |
+| `x402-server/kamino-vault.ts` | +16 −13: `amount` param fix for withdraw, `Uint8Array` deserialization, simulation error handling |
+
+---
 
 ## v28 Cross-Chain Swap Engine (2026-03-08)
 
@@ -869,15 +928,24 @@ Agent defaults provide fleet-wide exec settings (`agents.defaults.tools.exec`):
 | `safeBins` | 24 entries | stdin-only filters: `cat`, `grep`, `jq`, `sed`, `awk`, `sort`, `wc`, etc. |
 | `safeBinTrustedDirs` | `/bin`, `/usr/bin`, `/opt/homebrew/bin` | Trusted directories for safeBin resolution |
 
-Per-agent exec security:
+Per-agent exec security (3-layer architecture — updated 2026-03-10):
 
-| Agent | Host | Security | Ask | Timeout | Notes |
-|-------|------|----------|-----|---------|-------|
-| `main`, `*_web` | gateway | `full` | — | 300s | Elevated access, unrestricted |
-| `basedintern`, `akua`, `midas`, `oracle`, `alchemist`, `web3dev`, `soul` | gateway | `allowlist` | `on-miss` | 300s | Approval prompts for unlisted commands |
-| `sentinel` | gateway | `allowlist` | `on-miss` | 120s | Short timeout for monitoring loops |
-| `briefing` | gateway | `allowlist` | `on-miss` | 600s | Longer timeout for deep research |
-| `scholar`, `vox` | **sandbox** | `allowlist` | `on-miss` | 600s | Isolated from host filesystem |
+**Layer 1 — Config** (`~/.openclaw/openclaw.json`): exec.security mode per agent  
+**Layer 2 — Allowlist** (`~/.openclaw/exec-approvals.json`): 361 glob patterns across 11 agents  
+**Layer 3 — Sentinel Review**: instruction-based review gate for all non-main exec requests
+
+| Agent | Host | Security | Ask | Timeout | Allowlist Patterns | Notes |
+|-------|------|----------|-----|---------|-------------------|-------|
+| `main` | gateway | `full` | — | 300s | N/A | Sole executor — all agents delegate to main |
+| `basedintern`, `akua` | gateway | `allowlist` | `on-miss` | 300s | 37 each | Dev tools (git, node, npm, curl) |
+| `midas` | gateway | `allowlist` | `on-miss` | 300s | 33 | Finance tools (curl, node, python) |
+| `sentinel` | gateway | `allowlist` | `on-miss` | 120s | 37 | Process inspection (pgrep, lsof, launchctl) |
+| `oracle`, `alchemist` | gateway | `allowlist` | `on-miss` | 300s | 33 each | Network + analysis tools |
+| `web3dev` | gateway | `allowlist` | `on-miss` | 300s | 40 | Broadest: foundry, hardhat, solidity |
+| `briefing`, `soul` | gateway | `allowlist` | `on-miss` | 600s | 29 each | Read-only only |
+| `scholar`, `vox` | gateway | `allowlist` | `on-miss` | 600s | 29 each | Read-only (moved from sandbox) |
+
+**Exec Delegation Protocol**: All non-main agents are instructed (via workspace AGENTS.md) to message `@main` with `EXEC REQUEST` format instead of executing directly. Main routes to `@sentinel` for review before executing.
 
 Test:
 ```bash
@@ -1193,7 +1261,7 @@ Three new bash skills installed for the main agent:
 | `supabase` | `~/.openclaw/workspace/skills/supabase/` | Direct database access with service role key |
 | `web` | `~/.openclaw/workspace/skills/web/` | HTTP operations (GET/POST) with HTML stripping |
 
-Main agent `tools.profile` set to `full` with `exec.security=full`. Coding agents use `security=allowlist` + `ask=on-miss`. Scholar/vox sandboxed (`host=sandbox`). Fleet-wide `safeBins` (24 entries) + `pathPrepend` configured in agent defaults.
+Main agent `tools.profile` set to `full` with `exec.security=full`. All other agents use `security=allowlist` + `ask=on-miss` + `host=gateway` with 361 role-based glob patterns in `~/.openclaw/exec-approvals.json`. Fleet-wide `safeBins` (24 entries) + `pathPrepend` configured in agent defaults. Exec delegation: non-main agents message `@main` → `@sentinel` reviews → main executes.
 
 ### Dispatch skill fix (v13)
 

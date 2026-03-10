@@ -238,6 +238,30 @@ async function buildAndSendTxns(ixs: any[]): Promise<string> {
   return signature;
 }
 
+// ── Mint → Reserve Address Resolver ─────────────────────────────
+
+/**
+ * Resolve a token mint to its Kamino lending reserve address.
+ * The external Kamino API expects the reserve account address, not the mint.
+ */
+async function resolveReserveAddress(tokenMint: string): Promise<string> {
+  const market = await getMarket();
+  const reserves = market.getReserves();
+  const toStr = (v: any): string =>
+    typeof v === "string" ? v : v?.toBase58?.() ?? String(v);
+
+  for (const r of reserves as any[]) {
+    const mint = toStr(r.getLiquidityMint?.());
+    if (mint === tokenMint) {
+      // KaminoReserve.address is the reserve account pubkey
+      const addr = toStr(r.address);
+      if (addr && addr !== "undefined") return addr;
+    }
+  }
+  // If we can't resolve, return the mint and let the API decide
+  return tokenMint;
+}
+
 // ── Deposit Collateral (SDK) ────────────────────────────────────
 
 export interface BorrowTxResult {
@@ -283,13 +307,14 @@ export async function depositCollateral(
   }
 
   // API fallback
+  const reserveAddr = await resolveReserveAddress(tokenMint);
   const res = await fetch(`${APIS.KAMINO_API}/ktx/klend/deposit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       wallet: kp.publicKey.toBase58(),
       market: MAIN_MARKET,
-      token: tokenMint,
+      reserve: reserveAddr,
       amount,
     }),
   });
@@ -335,13 +360,14 @@ export async function borrowAsset(
   }
 
   // API fallback
+  const reserveAddr = await resolveReserveAddress(tokenMint);
   const res = await fetch(`${APIS.KAMINO_API}/ktx/klend/borrow`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       wallet: kp.publicKey.toBase58(),
       market: MAIN_MARKET,
-      token: tokenMint,
+      reserve: reserveAddr,
       amount,
     }),
   });
@@ -363,13 +389,14 @@ export async function repayLoan(
   const conn = getConnection();
 
   // API (repay is only available via API in the SDK via buildRepayAndWithdrawTxns composite)
+  const reserveAddr = await resolveReserveAddress(tokenMint);
   const res = await fetch(`${APIS.KAMINO_API}/ktx/klend/repay`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       wallet: kp.publicKey.toBase58(),
       market: MAIN_MARKET,
-      token: tokenMint,
+      reserve: reserveAddr,
       amount,
     }),
   });
@@ -415,13 +442,14 @@ export async function withdrawCollateral(
   }
 
   // API fallback
+  const reserveAddr = await resolveReserveAddress(tokenMint);
   const res = await fetch(`${APIS.KAMINO_API}/ktx/klend/withdraw`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       wallet: kp.publicKey.toBase58(),
       market: MAIN_MARKET,
-      token: tokenMint,
+      reserve: reserveAddr,
       amount,
     }),
   });
@@ -439,7 +467,9 @@ async function signAndSubmitApiTx(
   conn: Connection,
   kp: Keypair
 ): Promise<string> {
-  const txBytes = Buffer.from(txBase64, "base64");
+  const txBytes = new Uint8Array(Buffer.from(txBase64, "base64"));
+
+  // Try versioned transaction first (most Kamino txns are v0)
   try {
     const vtx = VersionedTransaction.deserialize(txBytes);
     vtx.sign([kp]);
@@ -449,12 +479,19 @@ async function signAndSubmitApiTx(
     });
     await conn.confirmTransaction(sig, "confirmed");
     return sig;
-  } catch {
-    const { Transaction: LegacyTx } = await import("@solana/web3.js");
-    const tx = LegacyTx.from(txBytes);
-    tx.sign(kp);
-    const sig = await conn.sendRawTransaction(tx.serialize());
-    await conn.confirmTransaction(sig, "confirmed");
-    return sig;
+  } catch (vErr: any) {
+    // If tx was deserialized but submission failed, don't try legacy — rethrow
+    if (vErr.message?.includes("Simulation failed") || vErr.message?.includes("Transaction simulation")) {
+      throw vErr;
+    }
+    console.warn("[kamino-borrow] Versioned deserialize failed:", vErr.message);
   }
+
+  // Fallback: legacy transaction (only reached if deserialization itself failed)
+  const { Transaction: LegacyTx } = await import("@solana/web3.js");
+  const tx = LegacyTx.from(txBytes);
+  tx.sign(kp);
+  const sig = await conn.sendRawTransaction(tx.serialize());
+  await conn.confirmTransaction(sig, "confirmed");
+  return sig;
 }
