@@ -4,6 +4,7 @@ import type { MemoryCategoryType } from "./memory-anchor.js";
 import { processNewMemory } from "./soul/index.js";
 import { createCrystal } from "./memory-crystal.js";
 import { notifyMemoryWrite } from "./soul/session-buffer.js";
+import { notifySlack } from "./slack-notify.js";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -210,6 +211,9 @@ export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
   if (data?.id) {
     syncToOpenClawMemory(entry, data.id).catch(() => {});
   }
+
+  // Notify Slack (non-blocking)
+  notifySlack(entry.agent_id, entry.kind, entry.content, entry.source).catch(() => {});
 
   return data?.id ?? null;
 }
