@@ -53,19 +53,22 @@ const OPENCLAW_MEMORY_DIR = join(homedir(), ".openclaw", "workspace", "memory");
  * Each agent has its own workspace; memory files go in {workspace}/memory/.
  * Falls back to the shared dir for unknown agents.
  */
+/** Main workspace — shared by operational agents for unified memory */
+const MAIN_WS = join(homedir(), "xmetav1", "XmetaV");
+
 const AGENT_WORKSPACE_MAP: Record<string, string> = {
-  main: join(homedir(), "xmetav1", "XmetaV"),
+  main: MAIN_WS,
+  sentinel: MAIN_WS,
+  briefing: MAIN_WS,
+  soul: MAIN_WS,
+  oracle: MAIN_WS,
+  midas: MAIN_WS,
   basedintern: join(homedir(), ".openclaw", "workspace-basedintern"),
   basedintern_web: join(homedir(), ".openclaw", "workspace-basedintern"),
   akua: join(homedir(), ".openclaw", "workspace-akua"),
   akua_web: join(homedir(), ".openclaw", "workspace-akua"),
-  midas: join(homedir(), ".openclaw", "workspace-midas"),
-  sentinel: join(homedir(), ".openclaw", "workspace-sentinel"),
-  briefing: join(homedir(), ".openclaw", "workspace-briefing"),
-  oracle: join(homedir(), ".openclaw", "workspace-oracle"),
   alchemist: join(homedir(), ".openclaw", "workspace-alchemist"),
   web3dev: join(homedir(), ".openclaw", "workspace-web3dev"),
-  soul: join(homedir(), ".openclaw", "workspace-soul"),
   vox: join(homedir(), ".openclaw", "agents", "vox"),
   scholar: join(homedir(), ".openclaw", "agents", "scholar"),
 };
