@@ -19,6 +19,7 @@ import { MemoryCategory } from "../memory-anchor.js";
 import { processNewMemory } from "../soul/index.js";
 import { scoreRelevance, isDuplicate } from "./scorer.js";
 import { queueVoxContent } from "../vox/content-automation.js";
+import { notifySlackAnchor } from "../slack-notify.js";
 import {
   RESEARCH_DOMAINS,
   DEFAULT_SCHOLAR_CONFIG,
@@ -277,6 +278,7 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
           finding.anchored = true;
           totalAnchored++;
           console.log(`[scholar] ⚓ Anchored finding (score ${score}): ${result.ipfsCid}`);
+          notifySlackAnchor("scholar", result.ipfsCid, result.txHash, score);
 
           // Record the anchor in memory
           await writeMemory({

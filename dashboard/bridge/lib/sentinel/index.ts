@@ -18,6 +18,7 @@ import { SelfHealer, type HealingResult } from "./self-healer.js";
 import { PredictiveHealth, type Prediction, type ResourceSnapshot } from "./predictive-health.js";
 import { DistributedTracer, type Trace } from "./distributed-tracer.js";
 import { refreshSitrep } from "../../src/heartbeat.js";
+import { notifySlackAlert } from "../slack-notify.js";
 
 export interface SentinelReport {
   timestamp: string;
@@ -224,6 +225,7 @@ export class Sentinel {
     // Alert handler → Persist to DB + trigger SITREP for criticals
     this.alerts.onAlert(async (alert: Alert) => {
       console.log(`[sentinel:alert] [${alert.severity.toUpperCase()}] ${alert.service}: ${alert.message}`);
+      notifySlackAlert(alert.service, alert.severity, alert.message);
 
       // Persist critical/warning alerts as incidents
       if (alert.severity === "critical" || alert.severity === "warning") {

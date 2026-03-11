@@ -9,6 +9,7 @@ import { Sentinel } from "../lib/sentinel/index.js";
 import { startScholar, stopScholar, getScholarStats, researchDomain, RESEARCH_DOMAINS } from "../lib/scholar/index.js";
 import { flushPendingAnchors } from "../lib/memory-anchor.js";
 import { invalidateOnPayment } from "../lib/soul/session-buffer.js";
+import { notifySlackSystem } from "../lib/slack-notify.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -88,6 +89,7 @@ const healthServer = createServer(async (req, res) => {
 });
 healthServer.listen(HEALTH_PORT, () => {
   console.log(`[health] Listening on http://localhost:${HEALTH_PORT}/health`);
+  notifySlackSystem(`Bridge Daemon v1.6.0 started (pid ${process.pid})`, ":rocket:");
 });
 
 // Start heartbeat
