@@ -6,7 +6,7 @@ import { executeCommand } from "./executor.js";
 import { subscribeToSwarms } from "./swarm-executor.js";
 import { startIntentTracker } from "./intent-tracker.js";
 import { Sentinel } from "../lib/sentinel/index.js";
-import { startScholar, stopScholar, getScholarStats } from "../lib/scholar/index.js";
+import { startScholar, stopScholar, getScholarStats, researchDomain, RESEARCH_DOMAINS } from "../lib/scholar/index.js";
 import { flushPendingAnchors } from "../lib/memory-anchor.js";
 import { invalidateOnPayment } from "../lib/soul/session-buffer.js";
 import * as fs from "fs";
@@ -60,6 +60,27 @@ const healthServer = createServer(async (req, res) => {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(err) }));
     }
+  } else if (req.url === "/scholar/trigger" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+    req.on("end", async () => {
+      try {
+        const { domain: domainId } = body ? JSON.parse(body) : { domain: "erc8004" };
+        const domain = RESEARCH_DOMAINS.find((d) => d.id === domainId);
+        if (!domain) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Unknown domain: ${domainId}`, valid: RESEARCH_DOMAINS.map((d) => d.id) }));
+          return;
+        }
+        console.log(`[scholar] Manual trigger for domain: ${domain.label}`);
+        const findings = await researchDomain(domain);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, domain: domainId, findings: findings.length, results: findings }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+    });
   } else {
     res.writeHead(404);
     res.end();
