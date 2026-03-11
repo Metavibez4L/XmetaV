@@ -67,7 +67,7 @@ const AGENT_WORKSPACE_MAP: Record<string, string> = {
   basedintern_web: join(homedir(), ".openclaw", "workspace-basedintern"),
   akua: join(homedir(), ".openclaw", "workspace-akua"),
   akua_web: join(homedir(), ".openclaw", "workspace-akua"),
-  alchemist: join(homedir(), ".openclaw", "workspace-alchemist"),
+  alchemist: MAIN_WS,
   web3dev: join(homedir(), ".openclaw", "workspace-web3dev"),
   vox: join(homedir(), ".openclaw", "agents", "vox"),
   scholar: join(homedir(), ".openclaw", "agents", "scholar"),
