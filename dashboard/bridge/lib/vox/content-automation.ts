@@ -133,8 +133,25 @@ function computeScheduleTime(): string {
  * Queue a scholar finding for Vox marketing content.
  * Called from the research loop when a finding scores above threshold.
  */
+/** Reject findings that are LLM refusals, not real content */
+const CONTENT_BLOCKLIST = [
+  /I cannot provide/i,
+  /I cannot execute/i,
+  /without access to/i,
+  /per my security protocol/i,
+  /I would need .* to execute/i,
+];
+
+function isLowQualityContent(text: string): boolean {
+  return CONTENT_BLOCKLIST.filter((p) => p.test(text)).length >= 2;
+}
+
 export async function queueVoxContent(finding: ResearchFinding): Promise<void> {
   if (finding.relevanceScore < AUTO_THREAD_MIN_SCORE) return;
+  if (isLowQualityContent(finding.content)) {
+    console.log(`[vox] Skipping low-quality content: "${finding.title.slice(0, 60)}..."`);
+    return;
+  }
 
   const thread = generateThread(finding);
   const scheduledFor = computeScheduleTime();

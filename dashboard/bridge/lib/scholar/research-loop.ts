@@ -75,6 +75,27 @@ function pickNextDomain(): DomainConfig | null {
  * Generate the research prompt for a given domain.
  * Each cycle gets a unique angle to avoid repetitive queries.
  */
+/** Detect LLM refusal / "I can't do this" responses that have no real data */
+const REFUSAL_PATTERNS = [
+  /I cannot provide accurate/i,
+  /I cannot execute/i,
+  /I don't have access/i,
+  /I cannot access/i,
+  /without access to/i,
+  /per my security protocol/i,
+  /I would need .* to execute/i,
+  /I'm unable to/i,
+  /I do not have the ability/i,
+  /cannot query .* directly/i,
+  /cannot .* blockchain queries/i,
+];
+
+function isRefusalOutput(text: string): boolean {
+  const matches = REFUSAL_PATTERNS.filter((p) => p.test(text));
+  // If 2+ refusal patterns match, it's a refusal
+  return matches.length >= 2;
+}
+
 function buildResearchPrompt(domain: DomainConfig): string {
   const angles: Record<string, string[]> = {
     erc8004: [
@@ -173,8 +194,8 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
     .join("\n")
     .trim();
 
-  if (cleanOutput.length < 50) {
-    console.log(`[scholar] No meaningful output for ${domain.label}`);
+  if (cleanOutput.length < 50 || isRefusalOutput(cleanOutput)) {
+    console.log(`[scholar] No meaningful output for ${domain.label}${cleanOutput.length >= 50 ? " (refusal detected)" : ""}`);
     await supabase
       .from("agent_sessions")
       .upsert(
