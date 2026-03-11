@@ -54,7 +54,7 @@ const OPENCLAW_MEMORY_DIR = join(homedir(), ".openclaw", "workspace", "memory");
  * Falls back to the shared dir for unknown agents.
  */
 const AGENT_WORKSPACE_MAP: Record<string, string> = {
-  main: join(homedir(), "Documents", "AkuaLabsLanding", "akualabs"),
+  main: join(homedir(), "xmetav1", "XmetaV"),
   basedintern: join(homedir(), ".openclaw", "workspace-basedintern"),
   basedintern_web: join(homedir(), ".openclaw", "workspace-basedintern"),
   akua: join(homedir(), ".openclaw", "workspace-akua"),
