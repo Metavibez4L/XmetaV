@@ -45,33 +45,71 @@ const RECENT_LIMIT = 25;
 /** Kinds worth syncing to OpenClaw workspace memory (vector-searchable) */
 const SYNC_KINDS: Set<MemoryKind> = new Set(["outcome", "error", "fact"]);
 
+/** Shared memory dir (legacy — kept for _shared entries) */
 const OPENCLAW_MEMORY_DIR = join(homedir(), ".openclaw", "workspace", "memory");
 
 /**
- * Sync a memory entry to OpenClaw's workspace memory directory as a markdown
- * file, so the native nomic-embed-text vector search can recall it.
+ * Resolve the per-agent workspace memory directory.
+ * Each agent has its own workspace; memory files go in {workspace}/memory/.
+ * Falls back to the shared dir for unknown agents.
+ */
+const AGENT_WORKSPACE_MAP: Record<string, string> = {
+  main: join(homedir(), "Documents", "AkuaLabsLanding", "akualabs"),
+  basedintern: join(homedir(), ".openclaw", "workspace-basedintern"),
+  basedintern_web: join(homedir(), ".openclaw", "workspace-basedintern"),
+  akua: join(homedir(), ".openclaw", "workspace-akua"),
+  akua_web: join(homedir(), ".openclaw", "workspace-akua"),
+  midas: join(homedir(), ".openclaw", "workspace-midas"),
+  sentinel: join(homedir(), ".openclaw", "workspace-sentinel"),
+  briefing: join(homedir(), ".openclaw", "workspace-briefing"),
+  oracle: join(homedir(), ".openclaw", "workspace-oracle"),
+  alchemist: join(homedir(), ".openclaw", "workspace-alchemist"),
+  web3dev: join(homedir(), ".openclaw", "workspace-web3dev"),
+  soul: join(homedir(), ".openclaw", "workspace-soul"),
+  vox: join(homedir(), ".openclaw", "agents", "vox"),
+  scholar: join(homedir(), ".openclaw", "agents", "scholar"),
+};
+
+function getAgentMemoryDir(agentId: string): string {
+  const ws = AGENT_WORKSPACE_MAP[agentId];
+  if (ws) return join(ws, "memory");
+  return OPENCLAW_MEMORY_DIR; // fallback for unknown agents
+}
+
+/**
+ * Sync a memory entry to the agent's OpenClaw workspace memory directory as a
+ * markdown file, so the native nomic-embed-text vector search can recall it.
+ * Also writes to the shared dir so all agents benefit.
  * Only syncs outcomes, errors, and facts — skips transient kinds.
  */
 async function syncToOpenClawMemory(entry: MemoryEntry, memoryId: string): Promise<void> {
   if (!SYNC_KINDS.has(entry.kind)) return;
   if (entry.agent_id === "_shared") return;
 
-  try {
-    await mkdir(OPENCLAW_MEMORY_DIR, { recursive: true });
-    const date = new Date().toISOString().slice(0, 10);
-    const safeId = memoryId.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 12);
-    const filename = `${date}-${entry.agent_id}-${entry.kind}-${safeId}.md`;
-    const content = [
-      `# ${entry.kind.charAt(0).toUpperCase() + entry.kind.slice(1)}: ${entry.agent_id}`,
-      `**Date:** ${date}`,
-      `**Agent:** ${entry.agent_id}`,
-      `**Kind:** ${entry.kind}`,
-      `**Source:** ${entry.source ?? "bridge"}`,
-      "",
-      entry.content,
-    ].join("\n");
+  const date = new Date().toISOString().slice(0, 10);
+  const safeId = memoryId.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 12);
+  const filename = `${date}-${entry.agent_id}-${entry.kind}-${safeId}.md`;
+  const content = [
+    `# ${entry.kind.charAt(0).toUpperCase() + entry.kind.slice(1)}: ${entry.agent_id}`,
+    `**Date:** ${date}`,
+    `**Agent:** ${entry.agent_id}`,
+    `**Kind:** ${entry.kind}`,
+    `**Source:** ${entry.source ?? "bridge"}`,
+    "",
+    entry.content,
+  ].join("\n");
 
-    await writeFile(join(OPENCLAW_MEMORY_DIR, filename), content, "utf-8");
+  try {
+    // Write to agent's own workspace memory dir
+    const agentDir = getAgentMemoryDir(entry.agent_id);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, filename), content, "utf-8");
+
+    // Also write to shared dir (legacy + cross-agent visibility)
+    if (agentDir !== OPENCLAW_MEMORY_DIR) {
+      await mkdir(OPENCLAW_MEMORY_DIR, { recursive: true });
+      await writeFile(join(OPENCLAW_MEMORY_DIR, filename), content, "utf-8");
+    }
   } catch (err) {
     // Non-fatal — don't break Supabase memory flow
     console.warn(`[memory-sync] Failed to sync to OpenClaw:`, (err as Error).message);
