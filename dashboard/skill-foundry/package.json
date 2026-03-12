@@ -1,0 +1,18 @@
+{
+  "name": "@xmetav/skill-foundry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal builder agent pipeline — transforms capability requests into OpenClaw skill packages",
+  "type": "module",
+  "main": "src/pipeline.ts",
+  "scripts": {
+    "forge": "npx tsx src/pipeline.ts",
+    "test": "npx tsx src/pipeline.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsx": "^4.19.0"
+  }
+}

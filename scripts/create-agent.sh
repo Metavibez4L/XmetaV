@@ -104,7 +104,7 @@ if [[ "$TOOLS_PROFILE" != "coding" && "$TOOLS_PROFILE" != "full" ]]; then
 fi
 
 # Validate template
-VALID_TEMPLATES=("coding" "bot" "research" "devops" "general")
+VALID_TEMPLATES=("coding" "bot" "research" "devops" "general" "skill-foundry")
 TEMPLATE_VALID=false
 for t in "${VALID_TEMPLATES[@]}"; do
   if [[ "$TEMPLATE" == "$t" ]]; then
