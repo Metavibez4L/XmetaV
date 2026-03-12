@@ -258,6 +258,16 @@ server-status:
     @docker info >/dev/null 2>&1 && echo "  Docker          ✅ UP ($(docker ps -q | wc -l | tr -d ' ') containers)" || echo "  Docker          ❌ DOWN"
     @tmux has-session -t xmetav 2>/dev/null && echo "  tmux            ✅ UP ($(tmux list-windows -t xmetav | wc -l | tr -d ' ') windows)" || echo "  tmux            ❌ No session"
 
+# ── Session Maintenance ────────────────────────────────
+
+# Rotate bloated agent sessions & purge stale files
+rotate-sessions:
+    @bash {{root}}/scripts/rotate-sessions.sh
+
+# Dry-run session rotation (no changes)
+rotate-sessions-dry:
+    @DRY_RUN=true bash {{root}}/scripts/rotate-sessions.sh
+
 # ── Remote Reboot ─────────────────────────────────────
 
 # Pre-flight check (verify safe to reboot remotely)
