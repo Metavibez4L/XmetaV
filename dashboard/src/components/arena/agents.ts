@@ -165,6 +165,17 @@ export const ARENA_AGENTS: AgentNodeConfig[] = [
     tile: { col: 8.5, row: 9 },
     size: 26,
   },
+
+  // ── OPS ROOM (skill-foundry, near research + dev) ──────────────
+  {
+    id: "skill-foundry",
+    label: "SKILL FOUNDRY",
+    color: 0xfbbf24,
+    colorHex: "#fbbf24",
+    room: "ops",
+    tile: { col: 5, row: 9 },
+    size: 28,
+  },
 ];
 
 /** Meeting table center tile (for dispatch beam routing) */
@@ -188,6 +199,7 @@ export const MEETING_SEATS: { agentId: string; angle: number }[] = [
   { agentId: "midas", angle: 165 },              // between oracle & alchemist
   { agentId: "vox", angle: 105 },                // ops outreach seat
   { agentId: "scholar", angle: 75 },             // research seat
+  { agentId: "skill-foundry", angle: 90 },      // ops/builder seat
 ];
 
 /** Static topology connections (kept for dispatch beam logic) */
@@ -235,4 +247,9 @@ export const ARENA_CONNECTIONS: [string, string][] = [
   ["scholar", "oracle"],
   ["scholar", "midas"],
   ["scholar", "briefing"],
+  // Skill Foundry builder connections
+  ["skill-foundry", "main"],
+  ["skill-foundry", "scholar"],
+  ["skill-foundry", "web3dev"],
+  ["skill-foundry", "akua"],
 ];

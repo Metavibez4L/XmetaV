@@ -51,7 +51,7 @@ const LEVEL_ICONS = {
   debug: Terminal,
 };
 
-const KNOWN_AGENTS = ["main", "basedintern", "akua", "bridge", "system"];
+const KNOWN_AGENTS = ["main", "basedintern", "akua", "bridge", "system", "skill-foundry"];
 
 export function LiveLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);

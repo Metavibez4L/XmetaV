@@ -426,4 +426,12 @@ export const KNOWN_AGENTS: Omit<AgentInfo, "status">[] = [
     model: "ollama/kimi-k2.5:cloud",
     skills: ["deep-research", "relevance-scoring", "knowledge-anchoring"],
   },
+  {
+    id: "skill-foundry",
+    name: "Skill Foundry (Builder)",
+    workspace: "~/.openclaw/workspace-skill-foundry",
+    tools: "coding",
+    model: "ollama/qwen3.5:35b-a3b",
+    skills: ["search-for-service", "x402"],
+  },
 ];

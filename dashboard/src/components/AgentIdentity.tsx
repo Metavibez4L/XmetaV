@@ -148,6 +148,7 @@ const AGENT_COLORS: Record<string, string> = {
   akua: "#06b6d4",
   vox: "#06b6d4",
   scholar: "#10b981",
+  "skill-foundry": "#fbbf24",
 };
 
 const ROOM_ICONS: Record<string, string> = {
@@ -159,6 +160,7 @@ const ROOM_ICONS: Record<string, string> = {
   soul: "🧠",
   opsOutreach: "📢",
   research: "📚",
+  ops: "🔨",
 };
 
 // ---- Main Component ----

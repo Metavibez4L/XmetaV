@@ -2,7 +2,7 @@
  * x402 Payment → Agent Memory Pipeline
  *
  * Converts payment events into shared agent memories so Oracle, Midas,
- * Alchemist, and other agents can study payment patterns, revenue
+ * Alchemist, Skill Foundry, and other agents can study payment patterns, revenue
  * milestones, and usage trends during their dispatch context injection.
  *
  * Memory flow:
