@@ -15,6 +15,7 @@ let timer: ReturnType<typeof setInterval> | null = null;
 const FLEET_AGENTS = [
   "main", "soul", "oracle", "sentinel", "briefing",
   "alchemist", "web3dev", "akua", "basedintern", "midas", "vox", "scholar",
+  "skill-foundry",
 ];
 
 /** Path to the briefing skill (pure bash — no LLM tokens) */
