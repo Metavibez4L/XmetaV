@@ -12,6 +12,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "crypto";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -236,6 +237,15 @@ export async function generatePaymentDigest(): Promise<void> {
   const allPayments = payments || [];
   if (allPayments.length === 0) return;
 
+  // Dedup: skip if data hasn't changed since last digest
+  const digestKey = `${allPayments.length}:${allPayments[0]?.created_at}`;
+  const digestHash = createHash("sha256").update(digestKey).digest("hex").slice(0, 16);
+  if (digestHash === lastDigestHash) {
+    console.log("[x402→memory] Digest skipped — data unchanged");
+    return;
+  }
+  lastDigestHash = digestHash;
+
   // Helper: parse amount strings like "$0.10" or "0.10"
   const parseAmount = (amt: string | null | undefined): number => {
     if (!amt) return 0;
@@ -413,6 +423,7 @@ export async function writeSessionSummary(): Promise<void> {
 let digestInterval: ReturnType<typeof setInterval> | null = null;
 let digestTimeout: ReturnType<typeof setTimeout> | null = null;
 let digestRunning = false;
+let lastDigestHash: string | null = null;
 
 /**
  * Start the periodic digest writer. Default: every 60 minutes.
