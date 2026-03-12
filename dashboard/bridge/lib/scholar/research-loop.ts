@@ -163,7 +163,7 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
       "--session-id", `scholar_research_${Date.now()}`,
       "--message", prompt,
     ], {
-      timeout: 120_000,
+      timeout: 180_000,
       env: { ...process.env },
     });
 
@@ -188,12 +188,18 @@ export async function researchDomain(domain: DomainConfig): Promise<ResearchFind
     return [];
   }
 
-  // Clean the output (remove openclaw banners)
-  const cleanOutput = rawOutput
+  // Clean the output (remove openclaw banners + thinking leakage)
+  let cleanOutput = rawOutput
     .split("\n")
     .filter((line) => !line.includes("OpenClaw") && !line.includes("[tools]") && line.trim())
     .join("\n")
     .trim();
+
+  // Strip qwen3.5 <think>…</think> blocks if present
+  cleanOutput = cleanOutput.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+  // Strip inline thinking preamble (lines before actual content that read like internal reasoning)
+  cleanOutput = cleanOutput.replace(/^(?:The user wants?.*?\n|I (?:should|need to|will|'ll).*?\n|Let me.*?\n)+/i, "").trim();
 
   if (cleanOutput.length < 50 || isRefusalOutput(cleanOutput)) {
     console.log(`[scholar] No meaningful output for ${domain.label}${cleanOutput.length >= 50 ? " (refusal detected)" : ""}`);

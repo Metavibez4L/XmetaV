@@ -1,0 +1,150 @@
+🎬 **XmetaV Content Plan: Cross-Chain Launch Campaign**
+
+Focus: Jupiter + Kamino Cross-Chain Features | Platforms: X (Twitter) + Reddit
+
+---
+
+## 📋 Campaign Overview
+
+**Phase 1: Teasers (Week 1-2)**
+**Phase 2: Launch (Week 3-4)**
+**Phase 3: Post-Launch Momentum (Ongoing)**
+
+---
+
+## 🎯 Trending Topics to Hook Into
+
+1. **AI Agents + DeFi** — autonomous agents earning yield
+2. **Cross-Chain UX** — solving fragmentation pain points
+3. **Solana DeFi Summer 2.0** — Kamino's rise, Jupiter's dominance
+4. **Agentic Infrastructure** — infra that runs itself
+5. **x402 Protocol** — micropayments for agent services
+
+---
+
+## 🎬 Content Pillars & Production
+
+### **Pillar 1: "Building in Public"**
+Raw Screen Studio captures of the actual product
+- Cross-chain swaps in real-time (Base ↔ Solana)
+- Kamino vault deposits via agent commands
+- Jupiter route optimization under the hood
+- Revenue tracking dashboards
+
+**Format:** 45-90s vertical videos (iPhone 17 Pro Max)
+**Tone:** Founder energy, technical but accessible
+
+### **Pillar 2: "Why This Matters"**
+Educational threads breaking down complex topics
+- Why cross-chain agents are inevitable
+- How x402 enables agent economies
+- The bridge problem nobody talks about
+- Revenue transparency in agent infra
+
+**Format:** X threads (5-10 tweets) + Reddit long-form
+**Tone:** Thought leadership, contrarian when justified
+
+### **Pillar 3: "Proof of Work"**
+Show, don't tell
+- Live dashboard metrics
+- Transaction receipts on-chain
+- Memory anchoring in action
+- Fleet status in real-time
+
+**Format:** Screenshots, screen recordings, OBS overlays
+**Tone:** Transparency, credibility
+
+---
+
+## 📅 Weekly Content Calendar
+
+### **Week 1: Foundation Teasers**
+- **Day 1-2:** "What if your agents could earn yield across chains?" (thread)
+- **Day 3:** Screen Studio capture: Agent initiating Jupiter swap (15s teaser)
+- **Day 4:** "The bridge gap is the last mile problem of crypto" (hot take)
+- **Day 5-7:** Reddit: Deep dive on agent infrastructure + cross-chain UX
+
+### **Week 2: Feature Teasers**
+- **Day 1:** Teaser: "Cross-chain swaps, zero human input" (video)
+- **Day 2:** Thread: How Kamino integration works under the hood
+- **Day 3:** Behind-the-scenes: Elgato + KeyLight setup tour
+- **Day 4:** "Agents don't sleep. Neither does our infrastructure." (messaging)
+- **Day 5-7:** Reddit AMA prep + community seeding
+
+### **Week 3: Launch Week**
+- **Day 1:** LAUNCH POST — "Cross-chain is live" (video demo)
+- **Day 2:** Technical breakdown thread
+- **Day 3:** User/customer spotlight (if applicable)
+- **Day 4:** "Day 1 metrics" transparency post
+- **Day 5:** Reddit launch post on r/solana, r/ethdev, r/cryptocurrency
+
+### **Week 4: Post-Launch Momentum**
+- **Day 1-7:** Daily proof-of-work content (tx receipts, dashboard clips)
+- **Ongoing:** Respond to comments, build in public momentum
+
+---
+
+## 🛠️ Production Workflow
+
+**Setup (Already Ready):**
+- Mac Studio Air M4 24GB — main recording/editing
+- iPhone 17 Pro Max — vertical content for X
+- KeyLight + Elgato — professional lighting
+- Solid mic — crisp audio
+- Screen Studio + OBS — recording stack
+
+**Process:**
+1. Record raw captures in Screen Studio (product demos)
+2. Quick edits (cut dead air, add captions)
+3. iPhone vertical format for X (9:16)
+4. Desktop format for Reddit (16:9 or 4:3)
+5. Schedule via native tools or Buffer
+
+---
+
+## 📝 Content Templates
+
+**X Thread Template:**
+1. Hook — contrarian or curiosity gap
+2. Problem statement
+3-7. Body — technical but accessible
+8. Solution reveal
+9. Call to action
+10. CTA link + tag
+
+**Reddit Template:**
+Title: Clear + benefit-driven
+
+TL;DR: One sentence summary
+
+Deep dive with headers, screenshots, proof
+- What we built
+- Why it matters
+- How it works
+- What's next
+
+Engagement question for comments
+
+---
+
+## 📊 Success Metrics
+
+- **X:** Follower growth, impressions, engagement rate
+- **Reddit:** Upvotes, comment quality, subreddit penetration
+- **Product:** Waitlist signups, API calls, cross-chain volume
+
+---
+
+## ✅ Immediate Next Steps
+
+1. Record 3 teaser videos this week (Jupiter swap, Kamino deposit, dashboard walkthrough)
+2. Draft 2 X threads for Week 1
+3. Prepare Reddit post for r/solana launch
+4. Set up tracking — UTM links for all CTAs
+5. Cross-post to branding channel for execution updates
+
+---
+
+Execution updates will be posted in the branding channel as we ship.
+
+Let's execute. 🚀
