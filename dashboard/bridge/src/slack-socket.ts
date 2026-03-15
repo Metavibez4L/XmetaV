@@ -232,10 +232,6 @@ export function startSlackSocket(): void {
           break;
         }
 
-        await respond({
-          response_type: "in_channel",
-          text: `:hourglass_flowing_sand: Dispatching to *${agentId}*...\n> ${message.length > 100 ? message.slice(0, 100) + "..." : message}\n\nI'll post the response here when done.`,
-        });
         break;
       }
 
@@ -321,11 +317,6 @@ export function startSlackSocket(): void {
     const agentId = parseAgentFromText(text);
     const message = cleanMentions(text);
 
-    await say({
-      text: `:hourglass_flowing_sand: Dispatching to *${agentId}*... I'll reply here when done.`,
-      thread_ts: threadTs,
-    });
-
     const result = await dispatchToAgent(agentId, message, {
       channel,
       thread_ts: threadTs,
@@ -334,7 +325,7 @@ export function startSlackSocket(): void {
 
     if (!result.ok) {
       await say({
-        text: `:rotating_light: Failed to dispatch to *${agentId}*: ${result.error}`,
+        text: `:x: ${result.error}`,
         thread_ts: threadTs,
       });
     }
@@ -355,8 +346,6 @@ export function startSlackSocket(): void {
     const agentId = parseAgentFromText(text);
     const cleanedMessage = cleanMentions(text);
 
-    await say(`:hourglass_flowing_sand: Dispatching to *${agentId}*... I'll reply here when done.`);
-
     const result = await dispatchToAgent(agentId, cleanedMessage, {
       channel,
       thread_ts: threadTs,
@@ -365,7 +354,7 @@ export function startSlackSocket(): void {
     });
 
     if (!result.ok) {
-      await say(`:rotating_light: Failed to dispatch: ${result.error}`);
+      await say(`:x: ${result.error}`);
     }
   });
 

@@ -308,11 +308,11 @@ export class SlackStreamer {
   }
 
   /** Post the initial placeholder message. Call once before feeding chunks. */
-  async start(agentId: string): Promise<void> {
+  async start(_agentId: string): Promise<void> {
     const ts = await postToSlackThread(
       this.channel,
       this.threadTs,
-      `:hourglass_flowing_sand: *${agentId}* is thinking...`
+      `:hourglass_flowing_sand: ...`
     );
     this.messageTs = ts;
     this.scheduleUpdate();
@@ -325,7 +325,7 @@ export class SlackStreamer {
   }
 
   /** Finalize — send the cleaned-up final response. */
-  async finish(agentId: string, rawOutput: string, success: boolean): Promise<void> {
+  async finish(_agentId: string, rawOutput: string, success: boolean): Promise<void> {
     this.done = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     if (!this.messageTs) return;
@@ -333,8 +333,7 @@ export class SlackStreamer {
     // Import dynamically to avoid circular deps
     const { extractOutcomeSummary } = await import("../lib/agent-memory.js");
     const summary = extractOutcomeSummary(rawOutput, 8) || "(no output)";
-    const status = success ? ":white_check_mark:" : ":x:";
-    const final = `${status} *${agentId}*\n${summary}`;
+    const final = success ? summary : `:x: ${summary}`;
     await updateSlackMessage(this.channel, this.messageTs, final);
   }
 

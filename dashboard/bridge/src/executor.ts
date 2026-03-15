@@ -48,12 +48,11 @@ function extractSlackMeta(message: string): { meta: SlackMeta | null; cleanMessa
   }
 }
 
-/** Format agent output for Slack — strip noise and keep only the meaningful result */
-function formatForSlack(rawOutput: string, agentId: string, success: boolean): string {
+/** Format agent output for Slack — just the direct response */
+function formatForSlack(rawOutput: string, _agentId: string, success: boolean): string {
   const summary = extractOutcomeSummary(rawOutput, 8);
-  const text = summary || "(no output)";
-  const status = success ? ":white_check_mark:" : ":x:";
-  return `${status} *${agentId}*\n${text}`;
+  if (!success) return `:x: ${summary || "(no output)"}`;
+  return summary || "(no output)";
 }
 
 /** Track running processes by command ID for correct concurrent tracking */
