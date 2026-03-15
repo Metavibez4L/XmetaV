@@ -1,5 +1,4 @@
 import { supabase } from "../lib/supabase.js";
-import { filterOutput } from "../lib/output-filter.js";
 
 const CHUNK_SIZE = 80;            // chars per chunk — faster flushing
 const FLUSH_INTERVAL_MS = 40;     // flush every 40ms for 2x smoother streaming
@@ -79,10 +78,7 @@ export function createStreamer(commandId: string) {
       console.log(`[streamer] Dropping ghost chunk (${text.length} chars) for command ${commandId}`);
       return;
     }
-    // Filter verbose noise (CoT, system logs, tool XML, exec loops)
-    const cleaned = filterOutput(text);
-    if (cleaned.length === 0) return;
-    buffer += cleaned;
+    buffer += text;
     // If buffer is large enough, flush immediately
     if (buffer.length >= CHUNK_SIZE) {
       flush();

@@ -101,12 +101,38 @@ export function stripToolCallBlocks(text: string): string {
 /**
  * Filter a raw output string — remove noise lines, ANSI, tool call blocks.
  * Returns only meaningful content lines joined by newlines.
+ * NOTE: Too aggressive for final Slack responses — use filterOutputLight() there.
  */
 export function filterOutput(raw: string): string {
   const clean = stripToolCallBlocks(stripAnsi(raw));
   return clean
     .split("\n")
     .filter((l) => !isNoiseLine(l))
+    .join("\n");
+}
+
+/** Lightweight noise patterns — only system/framework logs, not conversational CoT */
+const LIGHT_NOISE: RegExp[] = [
+  LOG_PREFIX,
+  ...EXIT_NOISE,
+  ...PROGRESS_NOISE,
+  ...EXEC_LOOP_NOISE,
+  ...PLUGIN_NOISE,
+];
+
+/**
+ * Light filter for final Slack responses — strips system logs and tool calls
+ * but preserves conversational content (CoT patterns like "I can help..." are kept).
+ */
+export function filterOutputLight(raw: string): string {
+  const clean = stripToolCallBlocks(stripAnsi(raw));
+  return clean
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim();
+      if (t.length === 0) return false;
+      return !LIGHT_NOISE.some((p) => p.test(t));
+    })
     .join("\n");
 }
 

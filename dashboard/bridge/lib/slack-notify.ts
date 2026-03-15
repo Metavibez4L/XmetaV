@@ -10,7 +10,7 @@
  */
 
 import type { MemoryKind } from "./agent-memory.js";
-import { filterOutput } from "./output-filter.js";
+import { filterOutput, filterOutputLight } from "./output-filter.js";
 
 const WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL ?? "";
 
@@ -330,9 +330,11 @@ export class SlackStreamer {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     if (!this.messageTs) return;
 
-    // Import dynamically to avoid circular deps
-    const { extractOutcomeSummary } = await import("../lib/agent-memory.js");
-    const summary = extractOutcomeSummary(rawOutput, 8) || "(no output)";
+    // Light filter preserves conversational content, only strips system noise
+    const cleaned = filterOutputLight(rawOutput);
+    const summary = cleaned.trim()
+      ? (cleaned.length > 2800 ? cleaned.slice(-2800) : cleaned)
+      : "(no output)";
     const final = success ? summary : `:x: ${summary}`;
     await updateSlackMessage(this.channel, this.messageTs, final);
   }
