@@ -97,6 +97,36 @@ healthServer.listen(HEALTH_PORT, () => {
 // Start heartbeat
 startHeartbeat();
 
+// Warm the Ollama model so it stays in VRAM — prevents OpenClaw's 15s
+// first-token timeout from firing during cold loads of the 35B model.
+(async () => {
+  const OLLAMA_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+  const MODEL = "qwen3.5:35b-a3b";
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, prompt: "", keep_alive: "30m" }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.ok) console.log(`[bridge] Model ${MODEL} warmed (keep_alive 30m)`);
+    else console.warn(`[bridge] Model warmup failed: HTTP ${res.status}`);
+  } catch (err) {
+    console.warn(`[bridge] Model warmup skipped:`, (err as Error).message);
+  }
+})();
+
+// Re-warm every 25 min to keep model in VRAM (keep_alive=30m)
+setInterval(() => {
+  const OLLAMA_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+  fetch(`${OLLAMA_URL}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "qwen3.5:35b-a3b", prompt: "", keep_alive: "30m" }),
+    signal: AbortSignal.timeout(15000),
+  }).catch(() => {});
+}, 25 * 60 * 1000);
+
 // Start Scholar research daemon (24/7 continuous research)
 startScholar();
 
