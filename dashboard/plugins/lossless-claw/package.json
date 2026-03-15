@@ -1,8 +1,5 @@
 {
   "name": "lossless-claw",
-  "version": "1.0.0",
-  "description": "Context engine plugin — preserves full session memory without compaction loss",
-  "private": true,
   "openclaw": {
     "extensions": ["./index.ts"]
   }

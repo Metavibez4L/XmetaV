@@ -284,6 +284,6 @@ export default function register(api: any) {
   );
 
   logger.debug?.(
-    "[lossless-claw] Context engine plugin registered — zero context loss mode active",
+    "[lossless-claw] Context engine plugin registered",
   );
 }
