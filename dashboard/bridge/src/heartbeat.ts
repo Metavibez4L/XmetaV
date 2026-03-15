@@ -102,7 +102,11 @@ async function sendHeartbeat() {
 export function startHeartbeat() {
   console.log("[heartbeat] Starting (every 30s)");
   sendHeartbeat(); // immediate first beat
-  timer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+  timer = setInterval(() => {
+    sendHeartbeat().catch((err) => {
+      console.error("[heartbeat] Uncaught error in heartbeat cycle:", err);
+    });
+  }, HEARTBEAT_INTERVAL_MS);
 }
 
 export function stopHeartbeat() {
