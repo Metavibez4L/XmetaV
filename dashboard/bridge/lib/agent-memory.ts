@@ -212,8 +212,10 @@ export async function writeMemory(entry: MemoryEntry): Promise<string | null> {
     syncToOpenClawMemory(entry, data.id).catch(() => {});
   }
 
-  // Notify Slack (non-blocking)
-  notifySlack(entry.agent_id, entry.kind, entry.content, entry.source).catch(() => {});
+  // Notify Slack — only surface actionable responses (outcomes + errors)
+  if (entry.kind === "outcome" || entry.kind === "error") {
+    notifySlack(entry.agent_id, entry.kind, entry.content, entry.source).catch(() => {});
+  }
 
   return data?.id ?? null;
 }
@@ -272,10 +274,29 @@ export function extractOutcomeSummary(rawOutput: string, maxLines = 5): string {
     /^Error:\s/,
     /^node:\S/,
     /^.*session file locked/,
+    // Chain-of-thought / internal reasoning noise
+    /^(Let me search|Let me fetch|Let me get|Let me try|Let me check|Let me now)\b/i,
+    /^(I need to|I should|I found|I'm finding|I'm getting|I got|I'll now)\b/i,
+    /^(The search results|Good results|Good search|Good data|Good!|Great!|Excellent!)\b/i,
+    /^(The user has|The user wants|The user is|User is asking)\b/i,
+    /^(The fetch failed|The web search|This is excellent)\b/i,
+    // Tool call XML blocks
+    /^<tool_call>/,
+    /^<function=/,
+    /^<parameter=/,
+    /^<\/tool_call>/,
+    /^<\/function>/,
+    /^<\/parameter>/,
+    // Plugin registration noise
+    /^\[plugins\]/,
+    /^\[lossless-claw\]/,
+    /^\[no-think\]/,
   ];
 
-  // Strip ANSI
-  const clean = rawOutput.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+  // Strip ANSI + tool call XML blocks (multi-line)
+  const clean = rawOutput
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "");
 
   const lines = clean
     .split("\n")
@@ -304,9 +325,8 @@ export async function captureCommandOutcome(
   if (!summary) return;
 
   const kind: MemoryKind = exitCode === 0 ? "outcome" : "error";
-  const taskSnippet = message.length > 80 ? message.slice(0, 80) + "..." : message;
 
-  const memContent = `Task: "${taskSnippet}" → ${kind === "outcome" ? "completed" : "failed (exit " + exitCode + ")"}. Output: ${summary}`;
+  const memContent = exitCode === 0 ? summary : `[exit ${exitCode}] ${summary}`;
 
   const memoryId = await writeMemory({
     agent_id: agentId,
@@ -322,6 +342,7 @@ export async function captureCommandOutcome(
   }
 
   // Anchor significant memories on-chain (IPFS + Base)
+  const taskSnippet = message.length > 80 ? message.slice(0, 80) + "..." : message;
   await anchorIfSignificant(agentId, kind, taskSnippet, summary);
 }
 
