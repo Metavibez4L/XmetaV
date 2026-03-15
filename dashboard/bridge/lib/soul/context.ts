@@ -38,25 +38,22 @@ export async function buildSoulContext(
 
   const keywords = extractKeywords(taskMessage);
 
-  // Fetch relevant memories (scored by keyword match + associations)
-  const memories = await retrieveRelevantMemories(agentId, taskMessage);
-
-  // Fetch dream insights that match the task
-  const insights = await getRelevantInsights(keywords);
-
-  // Get on-chain anchor count for identity context
-  let anchorInfo = "";
-  if (isAnchoringEnabled()) {
-    try {
-      const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
-      const latest = await getLatestAnchor(agentTokenId);
-      if (latest) {
-        anchorInfo = `[identity] ${latest.totalAnchors} memories anchored on-chain. Last anchor: category ${latest.category}, block time ${new Date(latest.timestamp * 1000).toISOString().slice(0, 16)}.`;
-      }
-    } catch {
-      // Non-fatal
-    }
-  }
+  // Parallel fetch: memories + insights + anchor info
+  const [memories, insights, anchorInfo] = await Promise.all([
+    retrieveRelevantMemories(agentId, taskMessage),
+    getRelevantInsights(keywords),
+    (async () => {
+      if (!isAnchoringEnabled()) return "";
+      try {
+        const agentTokenId = Number(process.env.ERC8004_AGENT_ID || "16905");
+        const latest = await getLatestAnchor(agentTokenId);
+        if (latest) {
+          return `[identity] ${latest.totalAnchors} memories anchored on-chain. Last anchor: category ${latest.category}, block time ${new Date(latest.timestamp * 1000).toISOString().slice(0, 16)}.`;
+        }
+      } catch { /* Non-fatal */ }
+      return "";
+    })(),
+  ]);
 
   // Build the context string
   if (memories.length === 0 && insights.length === 0 && !anchorInfo) {

@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase.js";
-import { running } from "./executor.js";
+import { running, getAgentChild } from "./executor.js";
 import { CursorClient } from "../lib/cursor-client.js";
 
 // ============================================================
@@ -95,7 +95,7 @@ async function maybeStartTimeout(commandId: string, agentId: string) {
     console.log(`[intent-tracker] Command ${commandId} TIMED OUT after ${timeoutMs / 1000}s`);
 
     // Kill the child process
-    const child = running.get(agentId);
+    const child = getAgentChild(agentId);
     if (child) {
       try {
         child.kill("SIGTERM");
@@ -103,7 +103,6 @@ async function maybeStartTimeout(commandId: string, agentId: string) {
           try { child.kill("SIGKILL"); } catch { /* already dead */ }
         }, 5000);
       } catch { /* already dead */ }
-      running.delete(agentId);
     }
 
     // Mark command as timeout

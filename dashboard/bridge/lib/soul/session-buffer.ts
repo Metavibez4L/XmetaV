@@ -22,10 +22,10 @@ export type ScoredMemory = MemoryEntry & { relevance: number };
 // ---- Caches ----
 
 /** Built soul context strings, keyed by agentId */
-export const contextCache = new TTLCache<string>(30_000);
+export const contextCache = new TTLCache<string>(120_000);
 
 /** Scored retrieval results, keyed by "agentId:keywordsHash" */
-export const retrievalCache = new TTLCache<ScoredMemory[]>(15_000);
+export const retrievalCache = new TTLCache<ScoredMemory[]>(30_000);
 
 // ---- Adaptive TTL ----
 
@@ -43,13 +43,13 @@ const VOLATILE_KEYWORDS = new Set([
  */
 export function adaptiveTTL(keywords: string[]): number {
   const hasVolatile = keywords.some((kw) => VOLATILE_KEYWORDS.has(kw));
-  if (hasVolatile) return 5_000;   // 5s — financial data changes rapidly
+  if (hasVolatile) return 10_000;   // 10s — financial data changes rapidly
 
   const statusKeywords = ["status", "identity", "config", "health", "version"];
   const isStable = keywords.some((kw) => statusKeywords.includes(kw));
-  if (isStable) return 30_000;     // 30s — stable data
+  if (isStable) return 60_000;     // 60s — stable data
 
-  return 15_000;                   // 15s default
+  return 30_000;                   // 30s default
 }
 
 // ---- Session Ring Buffer ----

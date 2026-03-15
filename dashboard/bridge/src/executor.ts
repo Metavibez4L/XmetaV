@@ -1,17 +1,87 @@
 import { supabase } from "../lib/supabase.js";
 import { runAgentWithFallback } from "../lib/openclaw.js";
 import { createStreamer } from "./streamer.js";
-import { captureCommandOutcome } from "../lib/agent-memory.js";
+import { captureCommandOutcome, extractOutcomeSummary } from "../lib/agent-memory.js";
 import { buildSoulContext } from "../lib/soul/index.js";
 import { parseSwapCommand, executeSwap, isSwapEnabled } from "../lib/swap-executor.js";
 import { isMemoryScanCommand, executeMemoryScan } from "../lib/oracle-memory-scan.js";
 import { isDiagramCommand, parseDiagramCommand, executeDiagramCommand } from "../lib/diagram-executor.js";
 import { refreshSitrep } from "./heartbeat.js";
 import { TTLCache } from "../lib/ttl-cache.js";
+import { postToSlackThread, postToResponseUrl, SlackStreamer } from "../lib/slack-notify.js";
 import type { ChildProcess } from "child_process";
 
-/** Track running processes per agent (one at a time per agent) */
-export const running = new Map<string, ChildProcess>();
+// ── Slack metadata extraction ─────────────────────────────────
+
+interface SlackMeta {
+  channel?: string;
+  thread_ts?: string;
+  response_url?: string;
+  user_id?: string;
+  source?: string;
+}
+
+/**
+ * Extract Slack context from a command message that was injected by
+ * the /api/slack/events or /api/slack/commands handlers.
+ *
+ * Format: __SLACK__{"channel":"C123","thread_ts":"..."}__\nActual message
+ *
+ * Returns { meta, cleanMessage } — cleanMessage has the prefix stripped.
+ */
+function extractSlackMeta(message: string): { meta: SlackMeta | null; cleanMessage: string } {
+  const prefix = "__SLACK__";
+  const suffix = "__\n";
+  if (!message.startsWith(prefix)) return { meta: null, cleanMessage: message };
+
+  const end = message.indexOf(suffix);
+  if (end === -1) return { meta: null, cleanMessage: message };
+
+  try {
+    const jsonStr = message.slice(prefix.length, end);
+    const meta = JSON.parse(jsonStr) as SlackMeta;
+    const cleanMessage = message.slice(end + suffix.length);
+    return { meta, cleanMessage };
+  } catch {
+    return { meta: null, cleanMessage: message };
+  }
+}
+
+/** Format agent output for Slack — strip noise and keep only the meaningful result */
+function formatForSlack(rawOutput: string, agentId: string, success: boolean): string {
+  const summary = extractOutcomeSummary(rawOutput, 8);
+  const text = summary || "(no output)";
+  const status = success ? ":white_check_mark:" : ":x:";
+  return `${status} *${agentId}*\n${text}`;
+}
+
+/** Track running processes by command ID for correct concurrent tracking */
+export const running = new Map<string, { agentId: string; child: ChildProcess }>();
+
+/** Check if any command is currently running for an agent */
+export function isAgentBusy(agentId: string): boolean {
+  for (const entry of running.values()) {
+    if (entry.agentId === agentId && entry.child.exitCode === null) return true;
+  }
+  return false;
+}
+
+/** Get the first running child process for an agent (for kill/cancel) */
+export function getAgentChild(agentId: string): ChildProcess | undefined {
+  for (const entry of running.values()) {
+    if (entry.agentId === agentId && entry.child.exitCode === null) return entry.child;
+  }
+  return undefined;
+}
+
+/** Count running commands for an agent */
+function countAgentRuns(agentId: string): number {
+  let count = 0;
+  for (const entry of running.values()) {
+    if (entry.agentId === agentId && entry.child.exitCode === null) count++;
+  }
+  return count;
+}
 
 /**
  * Track the last diagram context per agent.
@@ -47,8 +117,8 @@ function isDiagramFollowUp(agentId: string, message: string): boolean {
   return DIAGRAM_FOLLOWUP_PATTERNS.some((p) => p.test(trimmed));
 }
 
-/** Cache agent enabled status for 30s — avoids DB query on every command */
-const agentEnabledCache = new TTLCache<boolean>(30_000);
+/** Cache agent enabled status for 5 min — controls rarely change */
+const agentEnabledCache = new TTLCache<boolean>(300_000);
 
 async function isAgentEnabled(agentId: string): Promise<boolean> {
   return agentEnabledCache.getOrFetch(`enabled:${agentId}`, async () => {
@@ -72,12 +142,15 @@ export async function executeCommand(command: {
   agent_id: string;
   message: string;
 }) {
-  const { id, agent_id, message } = command;
+  const { id, agent_id } = command;
+
+  // Extract Slack metadata before any processing — strip prefix from message
+  const { meta: slackMeta, cleanMessage: message } = extractSlackMeta(command.message);
 
   // CONCURRENCY: Allow up to 4 concurrent commands per agent (96GB RAM)
   const MAX_CONCURRENT = 4;
-  const currentRuns = [...running.entries()].filter(([_, child]) => child.exitCode === null).length;
-  const agentRuns = [...running.entries()].filter(([aid, child]) => aid === agent_id && child.exitCode === null).length;
+  const currentRuns = [...running.values()].filter(({ child }) => child.exitCode === null).length;
+  const agentRuns = countAgentRuns(agent_id);
   
   if (agentRuns >= MAX_CONCURRENT) {
     console.log(`[executor] Agent "${agent_id}" has ${agentRuns} running commands (max ${MAX_CONCURRENT}), queueing command ${id}`);
@@ -181,7 +254,6 @@ export async function executeCommand(command: {
         { onConflict: "agent_id" }
       );
 
-    running.delete(agent_id);
     pickNextCommand(agent_id);
     return;
   }
@@ -252,7 +324,6 @@ export async function executeCommand(command: {
         { onConflict: "agent_id" }
       );
 
-    running.delete(agent_id);
     pickNextCommand(agent_id);
     return;
   }
@@ -346,36 +417,37 @@ export async function executeCommand(command: {
         { onConflict: "agent_id" }
       );
 
-    running.delete(agent_id);
     pickNextCommand(agent_id);
     return;
   }
 
-  // Inject Soul-curated context into the dispatch message
+  // Inject Soul-curated context into the dispatch message (parallel with status update)
   let enrichedMessage = message;
-  try {
-    const soulCtx = await buildSoulContext(agent_id, message);
-    if (soulCtx) {
-      enrichedMessage = soulCtx + message;
-      console.log(`[executor] Soul injected context for "${agent_id}" (${soulCtx.length} chars)`);
-    }
-  } catch (err) {
-    console.error(`[executor] Soul context failed (non-fatal):`, err);
+  const [, soulResult] = await Promise.all([
+    // Mark as running + update session in parallel with soul context
+    Promise.all([
+      supabase.from("agent_commands").update({ status: "running" }).eq("id", id),
+      supabase.from("agent_sessions").upsert(
+        { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      ),
+    ]),
+    buildSoulContext(agent_id, message).catch((err) => {
+      console.error(`[executor] Soul context failed (non-fatal):`, err);
+      return "";
+    }),
+  ]);
+  if (soulResult) {
+    enrichedMessage = soulResult + message;
+    console.log(`[executor] Soul injected context for "${agent_id}" (${soulResult.length} chars)`);
   }
 
-  // Mark as running
-  await supabase
-    .from("agent_commands")
-    .update({ status: "running" })
-    .eq("id", id);
-
-  // Update agent session status to busy
-  await supabase
-    .from("agent_sessions")
-    .upsert(
-      { agent_id, status: "busy", last_heartbeat: new Date().toISOString() },
-      { onConflict: "agent_id" }
-    );
+  // Start Slack streamer for real-time updates (if this came from Slack)
+  let slackStreamer: SlackStreamer | undefined;
+  if (slackMeta?.channel && slackMeta.thread_ts) {
+    slackStreamer = new SlackStreamer(slackMeta.channel, slackMeta.thread_ts);
+    slackStreamer.start(agent_id).catch(() => {});
+  }
 
   const streamer = createStreamer(id);
   streamer.start();
@@ -407,6 +479,8 @@ export async function executeCommand(command: {
       message: enrichedMessage,
       onChunk: (text) => {
         rawOutput += text;
+        // Feed Slack streamer for real-time updates
+        if (slackStreamer) slackStreamer.push(text);
         tokenBatch += text;
         tokenCount++;
         if (tokenCount >= BATCH_TOKENS) {
@@ -416,17 +490,14 @@ export async function executeCommand(command: {
         }
       },
       onExit: async (code) => {
-        running.delete(agent_id);
+        running.delete(id);
 
         // Flush any remaining batched tokens before ending the stream
         flushTokenBatch();
 
-        // Allow queued pipe chunks to drain before finalising the stream.
-        // Node.js can deliver buffered stdout/stderr after the 'exit' event,
-        // causing ghost chunks that get dropped. A short delay lets them arrive
-        // as normal writes instead.
-        await new Promise((r) => setTimeout(r, 80));
-        flushTokenBatch(); // flush any chunks that arrived during the drain
+        // Brief drain for any queued pipe chunks after process exit.
+        await new Promise((r) => setTimeout(r, 20));
+        flushTokenBatch();
 
         await streamer.end(code);
 
@@ -451,6 +522,17 @@ export async function executeCommand(command: {
 
         console.log(`[executor] Command ${id} finished: ${status}`);
 
+        // Finalize Slack response — streamer edits its message with clean result
+        if (slackStreamer) {
+          slackStreamer.finish(agent_id, rawOutput, code === 0).catch(() => {});
+        } else if (slackMeta) {
+          // Fallback for slash commands (no thread_ts, use response_url)
+          if (slackMeta.response_url) {
+            const slackText = formatForSlack(rawOutput, agent_id, code === 0);
+            postToResponseUrl(slackMeta.response_url, slackText).catch(() => {});
+          }
+        }
+
         // Refresh SITREP so main always has latest context
         refreshSitrep("post-command");
 
@@ -459,7 +541,7 @@ export async function executeCommand(command: {
       },
     });
 
-    running.set(agent_id, child);
+    running.set(id, { agentId: agent_id, child });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error(`[executor] Failed to spawn agent:`, errorMsg);
@@ -472,7 +554,7 @@ export async function executeCommand(command: {
       .update({ status: "failed" })
       .eq("id", id);
 
-    running.delete(agent_id);
+    running.delete(id);
   }
 }
 

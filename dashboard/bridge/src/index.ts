@@ -10,6 +10,7 @@ import { startScholar, stopScholar, getScholarStats, researchDomain, RESEARCH_DO
 import { flushPendingAnchors } from "../lib/memory-anchor.js";
 import { invalidateOnPayment } from "../lib/soul/session-buffer.js";
 import { notifySlackSystem } from "../lib/slack-notify.js";
+import { startSlackSocket } from "./slack-socket.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -89,7 +90,8 @@ const healthServer = createServer(async (req, res) => {
 });
 healthServer.listen(HEALTH_PORT, () => {
   console.log(`[health] Listening on http://localhost:${HEALTH_PORT}/health`);
-  notifySlackSystem(`Bridge Daemon v1.6.0 started (pid ${process.pid})`, ":rocket:");
+  // Suppress verbose startup noise — only log locally
+  console.log(`[bridge] Daemon v1.6.0 started (pid ${process.pid})`);
 });
 
 // Start heartbeat
@@ -120,6 +122,34 @@ const channel = supabase
 
 // Also pick up any pending commands that were created while bridge was offline
 async function processPendingCommands() {
+  // ── Stale session lock reaper ────────────────────────────────
+  // Remove .jsonl.lock files left behind by crashed agent processes.
+  // A lock is stale if the PID that created it is no longer running.
+  const sessionsDir = path.resolve(process.env.HOME || "/home/manifest", ".openclaw/agents/main/sessions");
+  try {
+    const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".lock"));
+    for (const lockFile of files) {
+      try {
+        const lockPath = path.resolve(sessionsDir, lockFile);
+        const content = fs.readFileSync(lockPath, "utf-8").trim();
+        const pid = parseInt(content, 10);
+        if (pid && pid !== process.pid) {
+          try {
+            process.kill(pid, 0); // test if PID is alive
+          } catch {
+            // PID is gone — lock is stale, remove it
+            fs.unlinkSync(lockPath);
+            console.log(`[bridge] Removed stale session lock: ${lockFile} (dead pid ${pid})`);
+          }
+        }
+      } catch {
+        // Can't read/parse lock — skip it
+      }
+    }
+  } catch {
+    // Sessions dir doesn't exist or not readable — OK
+  }
+
   // ── Stale command reaper ─────────────────────────────────────
   // Commands stuck in "running" from a previous bridge session are zombies —
   // the process that was executing them is gone. Mark them as failed so the
@@ -185,6 +215,9 @@ const paymentChannel = supabase
 
 // Start intent session tracker
 const intentChannel = startIntentTracker();
+
+// Start Slack Socket Mode (local, no public URL needed)
+startSlackSocket();
 
 console.log("[bridge] Listening for commands, swarm runs, intent sessions & scholar research...");
 console.log("[bridge] Press Ctrl+C to stop");

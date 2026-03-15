@@ -102,8 +102,8 @@ export function createStreamer(commandId: string) {
         .insert({ command_id: commandId, content, is_final: false });
     }
 
-    // Small delay to ensure last chunk is received by realtime subscribers
-    await new Promise(r => setTimeout(r, 40));
+    // Brief delay for realtime subscriber delivery
+    await new Promise(r => setTimeout(r, 10));
 
     // Write final marker (content is empty — is_final flag signals completion)
     const { error } = await supabase

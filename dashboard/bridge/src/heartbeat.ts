@@ -3,7 +3,7 @@ import { execFile } from "child_process";
 import { supabase } from "../lib/supabase.js";
 import { maybeStartDream } from "../lib/soul/index.js";
 import { expireOldProposals } from "../lib/soul/dream-proposals.js";
-import { running } from "./executor.js";
+import { running, isAgentBusy } from "./executor.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000; // 30 seconds
 let expireCheckCounter = 0;
@@ -68,7 +68,7 @@ async function sendHeartbeat() {
   // Keep all fleet agents alive — idle unless actively running a command
   const rows = FLEET_AGENTS.map((id) => ({
     agent_id: id,
-    status: running.has(id) ? "busy" : "idle",
+    status: isAgentBusy(id) ? "busy" : "idle",
     hostname: host,
     last_heartbeat: now,
   }));
