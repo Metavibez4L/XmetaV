@@ -9,6 +9,7 @@ import { isDiagramCommand, parseDiagramCommand, executeDiagramCommand } from "..
 import { refreshSitrep } from "./heartbeat.js";
 import { TTLCache } from "../lib/ttl-cache.js";
 import { postToSlackThread, postToResponseUrl, SlackStreamer } from "../lib/slack-notify.js";
+import { Sentinel } from "../lib/sentinel/index.js";
 import type { ChildProcess } from "child_process";
 
 // ── Slack metadata extraction ─────────────────────────────────
@@ -95,6 +96,18 @@ interface DiagramContext {
 }
 const lastDiagramContext = new Map<string, DiagramContext>();
 const DIAGRAM_CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
+
+/** Detect health-check / heartbeat messages that would cause LLM exec loops in Slack */
+const HEALTH_CHECK_PATTERNS = [
+  /\b(health.?check|heartbeat|service.?status|check.?health|system.?status)\b/i,
+  /\bcurl\s.*localhost.*(health|status)/i,
+  /\bopenclaw\s+(gateway|services?)\s+(status|health|restart)/i,
+  /\bHEARTBEAT_OK\b/,
+];
+
+function isHealthCheckCommand(message: string): boolean {
+  return HEALTH_CHECK_PATTERNS.some((p) => p.test(message));
+}
 
 /** Vague follow-up messages that should inherit the previous diagram context */
 const DIAGRAM_FOLLOWUP_PATTERNS = [
@@ -317,6 +330,92 @@ export async function executeCommand(command: {
     }
 
     // Reset session
+    await supabase
+      .from("agent_sessions")
+      .upsert(
+        { agent_id, status: "idle", last_heartbeat: new Date().toISOString() },
+        { onConflict: "agent_id" }
+      );
+
+    pickNextCommand(agent_id);
+    return;
+  }
+
+  // ── Health check interception (Slack only) ─────────────────────
+  // When a health check / heartbeat command comes via Slack, run the
+  // sentinel's native Node.js checks directly instead of spawning the
+  // LLM — OpenClaw's exec tool requires approval that cannot be
+  // granted through Slack, causing an infinite retry loop.
+  if (slackMeta && isHealthCheckCommand(message)) {
+    console.log(`[executor] Health-check intercepted for "${agent_id}" via Slack — running sentinel directly`);
+
+    await supabase
+      .from("agent_commands")
+      .update({ status: "running" })
+      .eq("id", id);
+
+    const streamer = createStreamer(id);
+    streamer.start();
+
+    try {
+      const sentinel = Sentinel.getInstance();
+      const report = await sentinel.generateReport();
+      const services = Object.values(report.health);
+      const up = services.filter((s) => s.status === "up").length;
+      const total = services.length;
+
+      const lines = services.map((s) => {
+        const icon = s.status === "up" ? "✅" : s.status === "degraded" ? "⚠️" : "❌";
+        const lat = s.latencyMs != null ? ` (${s.latencyMs}ms)` : "";
+        const pid = s.pid ? ` PID ${s.pid}` : "";
+        return `${icon} **${s.service}** — ${s.status}${pid}${lat}${s.error ? ` _${s.error}_` : ""}`;
+      });
+
+      const res = report.resources;
+      const resLine = res
+        ? `\n**CPU:** ${res.cpuPercent.toFixed(0)}% · **Memory:** ${res.memoryPercent.toFixed(0)}% · **Disk:** ${res.diskPercent.toFixed(0)}% · **Load:** ${res.loadAvg1m.toFixed(1)}`
+        : "";
+
+      const output = [
+        `## Health Check — ${up}/${total} services up`,
+        "",
+        ...lines,
+        resLine,
+        "",
+        `**Incidents:** ${report.incidents.open} open · ${report.incidents.last24h} last 24h`,
+        `**Healing:** ${report.healingStats.total} total (${report.healingStats.successRate.toFixed(0)}% success)`,
+        "",
+        "HEARTBEAT_OK",
+      ].join("\n");
+
+      streamer.write(output);
+      await streamer.end(0);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "completed" })
+        .eq("id", id);
+
+      captureCommandOutcome(agent_id, message, output, 0).catch(() => {});
+
+      // Post to Slack directly
+      if (slackMeta.channel && slackMeta.thread_ts) {
+        const slackText = formatForSlack(output, agent_id, true);
+        postToSlackThread(slackMeta.channel, slackMeta.thread_ts, slackText).catch(() => {});
+      } else if (slackMeta.response_url) {
+        postToResponseUrl(slackMeta.response_url, formatForSlack(output, agent_id, true)).catch(() => {});
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      streamer.write(`\n❌ Health check error: ${msg}\n`);
+      await streamer.end(1);
+
+      await supabase
+        .from("agent_commands")
+        .update({ status: "failed" })
+        .eq("id", id);
+    }
+
     await supabase
       .from("agent_sessions")
       .upsert(

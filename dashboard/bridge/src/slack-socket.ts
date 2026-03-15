@@ -13,6 +13,7 @@
 import { App, LogLevel } from "@slack/bolt";
 import { createClient } from "@supabase/supabase-js";
 import { postToSlackThread } from "../lib/slack-notify.js";
+import { Sentinel } from "../lib/sentinel/index.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -133,6 +134,7 @@ export function startSlackSocket(): void {
             "`/xmetav agents` — List all active agents",
             "`/xmetav ask <message>` — Ask the main agent",
             "`/xmetav ask @agent <message>` — Ask a specific agent",
+            "`/xmetav health` — Service health (no LLM needed)",
             "`/xmetav memory <term>` — Search agent memory",
             "`/xmetav dream` — Trigger manual dream cycle",
             "`/xmetav help` — This message",
@@ -234,6 +236,56 @@ export function startSlackSocket(): void {
           response_type: "in_channel",
           text: `:hourglass_flowing_sand: Dispatching to *${agentId}*...\n> ${message.length > 100 ? message.slice(0, 100) + "..." : message}\n\nI'll post the response here when done.`,
         });
+        break;
+      }
+
+      case "health": {
+        try {
+          const sentinel = Sentinel.getInstance();
+          const report = await sentinel.generateReport();
+          const services = Object.values(report.health);
+          const up = services.filter((s) => s.status === "up").length;
+          const total = services.length;
+          const emoji = up === total ? ":white_check_mark:" : ":warning:";
+
+          const lines = services.map((s) => {
+            const se = s.status === "up" ? ":large_green_circle:" : s.status === "degraded" ? ":large_yellow_circle:" : ":red_circle:";
+            const lat = s.latencyMs != null ? ` (${s.latencyMs}ms)` : "";
+            const pid = s.pid ? ` PID ${s.pid}` : "";
+            return `${se} *${s.service}* — ${s.status}${pid}${lat}${s.error ? ` _${s.error}_` : ""}`;
+          });
+
+          const res = report.resources;
+          const resLines = res
+            ? [
+                "",
+                `*CPU:* ${res.cpuPercent.toFixed(0)}% \u00b7 *Memory:* ${res.memoryPercent.toFixed(0)}% \u00b7 *Disk:* ${res.diskPercent.toFixed(0)}% \u00b7 *Load:* ${res.loadAvg1m.toFixed(1)}`
+              ]
+            : [];
+
+          const incLines = [
+            "",
+            `*Incidents:* ${report.incidents.open} open · ${report.incidents.last24h} last 24h · ${report.incidents.resolvedToday} resolved today`,
+            `*Healing:* ${report.healingStats.total} total (${report.healingStats.successRate.toFixed(0)}% success)`,
+          ];
+
+          await respond({
+            response_type: "in_channel",
+            text: [
+              `${emoji} *XmetaV Health Check* — ${up}/${total} services up`,
+              "",
+              ...lines,
+              ...resLines,
+              ...incLines,
+            ].join("\n"),
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await respond({
+            response_type: "ephemeral",
+            text: `:x: Health check failed: ${msg}`,
+          });
+        }
         break;
       }
 
