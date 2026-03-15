@@ -8,6 +8,7 @@ import { notifySlack } from "./slack-notify.js";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { extractCleanSummary } from "./output-filter.js";
 
 // ============================================================
 // Agent Memory — Persistent context across spawns
@@ -243,72 +244,7 @@ export async function writeSharedMemory(
  * Strips noise, takes last N non-empty lines.
  */
 export function extractOutcomeSummary(rawOutput: string, maxLines = 5): string {
-  if (!rawOutput) return "";
-
-  const NOISE = [
-    /^\[agent\//,
-    /^\[tools\]/,
-    /^\[mcp\]/,
-    /^\[skill\]/,
-    /^\[exit code/,
-    /^\[context\]/,
-    /^\[memory\]/,
-    /^\[dispatch\]/,
-    /^\[Bridge\]/,
-    /^\[openclaw\]/,
-    /^\[session\]/,
-    /^\[model\]/,
-    /^\[runtime\]/,
-    /^\[thinking\]/,
-    /^\[streaming\]/,
-    /^\[diagnostic\]/,
-    /^\[heartbeat\]/,
-    /^\[bridge\]/,
-    /^\[swarm\]/,
-    /^\[intent-tracker\]/,
-    /^\[voice\//,
-    /^Command exited with code/,
-    /^command@/,
-    /^ENTER send/,
-    /^\s*at\s+\S/,
-    /^Error:\s/,
-    /^node:\S/,
-    /^.*session file locked/,
-    // Chain-of-thought / internal reasoning noise
-    /^(Let me search|Let me fetch|Let me get|Let me try|Let me check|Let me now)\b/i,
-    /^(I need to|I should|I found|I'm finding|I'm getting|I got|I'll now)\b/i,
-    /^(The search results|Good results|Good search|Good data|Good!|Great!|Excellent!)\b/i,
-    /^(The user has|The user wants|The user is|User is asking)\b/i,
-    /^(The fetch failed|The web search|This is excellent)\b/i,
-    // Tool call XML blocks
-    /^<tool_call>/,
-    /^<function=/,
-    /^<parameter=/,
-    /^<\/tool_call>/,
-    /^<\/function>/,
-    /^<\/parameter>/,
-    // Plugin registration noise
-    /^\[plugins\]/,
-    /^\[lossless-claw\]/,
-    /^\[no-think\]/,
-  ];
-
-  // Strip ANSI + tool call XML blocks (multi-line)
-  const clean = rawOutput
-    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
-    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "");
-
-  const lines = clean
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-    .filter((l) => !NOISE.some((pat) => pat.test(l)));
-
-  // Take last N lines as the outcome
-  const summary = lines.slice(-maxLines).join("\n");
-
-  // Cap at ~500 chars
-  return summary.length > 500 ? summary.slice(-500) : summary;
+  return extractCleanSummary(rawOutput, maxLines);
 }
 
 /**

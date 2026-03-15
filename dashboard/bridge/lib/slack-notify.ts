@@ -10,6 +10,7 @@
  */
 
 import type { MemoryKind } from "./agent-memory.js";
+import { filterOutput } from "./output-filter.js";
 
 const WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL ?? "";
 
@@ -351,23 +352,7 @@ export class SlackStreamer {
         .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
         .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "");
       // Filter noisy lines (chain-of-thought, log prefixes, tool calls)
-      const STREAM_NOISE = [
-        /^\[(?:agent|tools|mcp|skill|context|memory|dispatch|bridge|openclaw|session|model|runtime|thinking|streaming|diagnostic|heartbeat|swarm|intent-tracker|plugins|lossless-claw|no-think|voice)\b/i,
-        /^(Let me |I need to |I should |I found |I'll now |I'm (?:finding|getting|going))\b/i,
-        /^(The search results|The user |The fetch|Good !|Great!|Excellent!|Good results|Good search)\b/i,
-        /^<(tool_call|function=|parameter=|\/tool_call|\/function|\/parameter)/,
-        /^Command exited with code/,
-        /^command@/,
-        /^ENTER send/,
-        /^\s*at\s+\S/,
-      ];
-      const filtered = stripped
-        .split("\n")
-        .filter((l) => {
-          const t = l.trim();
-          return t.length > 0 && !STREAM_NOISE.some((p) => p.test(t));
-        })
-        .join("\n");
+      const filtered = filterOutput(stripped);
       // Truncate to last 2800 chars for Slack limit
       const display = filtered.length > 2800
         ? "..." + filtered.slice(-2800)
